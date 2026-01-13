@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Search, 
+import {
+  Search,
   Filter,
   MoreVertical,
   Mail,
@@ -37,19 +37,30 @@ const roleConfig = {
 };
 
 export default function AdminUsers() {
-  const { users, isLoading } = useUsers();
+  const { users, isLoading, updateUserRole, deleteUser } = useUsers();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    
+
     return matchesSearch && matchesRole;
   });
+
+  const handleRoleUpdate = async (userId: string, currentRole: User['role']) => {
+    const newRole = currentRole === 'admin' ? 'pharmacist' : (currentRole === 'pharmacist' ? 'user' : 'pharmacist');
+    await updateUserRole(userId, newRole);
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
+      await deleteUser(userId);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -111,7 +122,7 @@ export default function AdminUsers() {
             filteredUsers.map((user, index) => {
               const role = roleConfig[user.role || 'user'];
               const RoleIcon = role.icon;
-              
+
               return (
                 <motion.div
                   key={user.uid}
@@ -144,8 +155,18 @@ export default function AdminUsers() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
                         <DropdownMenuItem className="font-cairo">عرض التفاصيل</DropdownMenuItem>
-                        <DropdownMenuItem className="font-cairo">تعديل الدور</DropdownMenuItem>
-                        <DropdownMenuItem className="font-cairo text-destructive">حظر المستخدم</DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="font-cairo text-primary"
+                          onClick={() => handleRoleUpdate(user.uid, user.role)}
+                        >
+                          تغيير الدور (تبديل)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="font-cairo text-destructive"
+                          onClick={() => handleDelete(user.uid)}
+                        >
+                          حذف المستخدم
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -155,7 +176,7 @@ export default function AdminUsers() {
                       <Mail className="w-4 h-4" />
                       <span className="truncate" dir="ltr">{user.email}</span>
                     </div>
-                    
+
                     {user.pharmacyName && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Store className="w-4 h-4" />

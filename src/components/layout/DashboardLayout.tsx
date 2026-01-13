@@ -12,10 +12,12 @@ import {
   X,
   Bell,
   Search,
-  ChevronDown
+  ChevronDown,
+  Building2
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -35,6 +37,8 @@ const adminNavItems = [
   { icon: Pill, label: 'الأدوية', path: '/admin/medicines' },
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
   { icon: Users, label: 'المستخدمين', path: '/admin/users' },
+  { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
+  { icon: Bell, label: 'الإشعارات', path: '/admin/notifications' },
   { icon: Settings, label: 'الإعدادات', path: '/admin/settings' },
 ];
 
@@ -229,10 +233,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-            </button>
+            <NotificationBell />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

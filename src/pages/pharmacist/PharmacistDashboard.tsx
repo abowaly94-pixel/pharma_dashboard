@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { 
-  Pill, 
-  ShoppingCart, 
+import {
+  Pill,
+  ShoppingCart,
   TrendingUp,
   DollarSign,
   Package,
@@ -11,6 +11,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentOrdersTable } from '@/components/dashboard/RecentOrdersTable';
 import { SalesChart } from '@/components/dashboard/Charts';
+import { AllMedicinesTable } from '@/components/dashboard/AllMedicinesTable';
+import { AllOrdersTable } from '@/components/dashboard/AllOrdersTable';
 import { useMedicines } from '@/hooks/useMedicines';
 import { useOrders } from '@/hooks/useOrders';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,18 +79,20 @@ export default function PharmacistDashboard() {
           >
             <h3 className="text-lg font-semibold font-cairo mb-4">أكثر الأدوية مبيعاً</h3>
             <div className="space-y-4">
-              {medicines.slice(0, 3).map((medicine, index) => (
-                <div key={medicine.id} className="flex items-center gap-4">
-                  <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                    {index + 1}
-                  </span>
-                  <div className="flex-1">
-                    <p className="font-medium">{medicine.name}</p>
-                    <p className="text-sm text-muted-foreground">{medicine.sellingCount} مبيعات</p>
+              {[...medicines]
+                .sort((a, b) => (b.sellingCount || 0) - (a.sellingCount || 0))
+                .slice(0, 3).map((medicine, index) => (
+                  <div key={medicine.id} className="flex items-center gap-4">
+                    <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1">
+                      <p className="font-medium">{medicine.name}</p>
+                      <p className="text-sm text-muted-foreground">{medicine.sellingCount || 0} مبيعات</p>
+                    </div>
+                    <span className="text-primary font-semibold">{medicine.price} ج.م</span>
                   </div>
-                  <span className="text-primary font-semibold">{medicine.price} ج.م</span>
-                </div>
-              ))}
+                ))}
             </div>
           </motion.div>
 
@@ -132,6 +136,12 @@ export default function PharmacistDashboard() {
 
         {/* Recent Orders */}
         <RecentOrdersTable orders={orders} />
+
+        {/* All Data Tables for Pharmacist */}
+        <div className="space-y-8">
+          <AllMedicinesTable medicines={medicines} />
+          <AllOrdersTable orders={orders} />
+        </div>
       </div>
     </DashboardLayout>
   );

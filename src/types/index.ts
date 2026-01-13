@@ -15,6 +15,30 @@ export interface Medicine {
   sellingCount: number;
   reviews: Review[];
   subabaseORImageUrl: string;
+  subabaseImageUrl?: string; // الحقل الصحيح من Supabase
+  category?: string;
+  manufacturer?: string;
+  expiryDate?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface Pharmacy {
+  id: string;
+  pharmacyId: number;
+  name: string;
+  address: string;
+  city: string;
+  phoneNumber: string;
+  email: string;
+  ownerName: string;
+  licenseNumber: string;
+  isActive: boolean;
+  rating: number;
+  totalOrders: number;
+  totalMedicines: number;
+  createdAt: Date;
+  updatedAt?: Date;
 }
 
 export interface Review {
@@ -56,6 +80,8 @@ export interface Order {
   prescriptionUrl: string;
   createdAt: Date;
   updatedAt: Date;
+  pharmacyId?: number;
+  reviews?: Review[];
 }
 
 export interface User {

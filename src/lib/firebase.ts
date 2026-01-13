@@ -1,24 +1,28 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getAnalytics } from 'firebase/analytics';
 
-// Firebase configuration - you need to replace these with your actual Firebase config
+// Firebase configuration - using the exact config you provided
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "your-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "your-project.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "your-project-id",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "your-project.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "your-sender-id",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "your-app-id"
+  apiKey: "AIzaSyBLPXSx83_5rBSr8XWN41WnQEYoaPfLjtM",
+  authDomain: "pharmanow-754a7.firebaseapp.com",
+  projectId: "pharmanow-754a7",
+  storageBucket: "pharmanow-754a7.firebasestorage.app",
+  messagingSenderId: "899708379709",
+  appId: "1:899708379709:web:808bc5cc7ce74cbeb38054",
+  measurementId: "G-J9Y4XV5MQ2"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore
-export const db = getFirestore(app);
-
-// Initialize Auth
+// Initialize Services (force long polling to avoid network/proxy issues)
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false
+});
 export const auth = getAuth(app);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 export default app;

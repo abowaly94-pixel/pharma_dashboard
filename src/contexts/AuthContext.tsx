@@ -1,78 +1,114 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<User | null>;
+  logout: () => Promise<void>;
   isAdmin: boolean;
   isPharmacist: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo users for testing
-const demoUsers: Record<string, User & { password: string }> = {
-  'admin@pharmanow.com': {
-    uid: 'admin-001',
-    email: 'admin@pharmanow.com',
-    name: 'مدير النظام',
-    profileImageUrl: '',
-    cart: [],
-    favorites: [],
-    role: 'admin',
-    password: 'admin123'
-  },
-  'pharmacy@pharmanow.com': {
-    uid: 'pharm-001',
-    email: 'pharmacy@pharmanow.com',
-    name: 'صيدلية النادى',
-    profileImageUrl: '',
-    cart: [],
-    favorites: [],
-    role: 'pharmacist',
-    pharmacyId: 827457,
-    pharmacyName: 'ELNADA PHARMACY',
-    password: 'pharmacy123'
-  }
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved session
-    const savedUser = localStorage.getItem('pharmanow_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Persistent session handling with Firebase
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Fetch additional user data (role, name, etc.) from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setUser({
+              ...userData,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || userData.email,
+            });
+          } else {
+            // Fallback for users without a Firestore doc yet
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'Unknown',
+              role: 'user',
+              profileImageUrl: firebaseUser.photoURL || '',
+              cart: [],
+              favorites: []
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<User | null> => {
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const demoUser = demoUsers[email];
-    if (demoUser && demoUser.password === password) {
-      const { password: _, ...userWithoutPassword } = demoUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('pharmanow_user', JSON.stringify(userWithoutPassword));
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Fetch user data immediately for redirection
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        const fullUser = {
+          ...userData,
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || userData.email,
+        };
+        setUser(fullUser);
+        setIsLoading(false);
+        return fullUser;
+      }
+
+      const fallbackUser: User = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || 'Unknown',
+        role: 'user',
+        profileImageUrl: firebaseUser.photoURL || '',
+        cart: [],
+        favorites: []
+      };
+      setUser(fallbackUser);
       setIsLoading(false);
-      return true;
+      return fallbackUser;
+    } catch (error) {
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return null;
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('pharmanow_user');
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const isAdmin = user?.role === 'admin';

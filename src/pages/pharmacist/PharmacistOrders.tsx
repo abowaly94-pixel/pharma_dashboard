@@ -12,7 +12,7 @@ import {
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrders } from "@/hooks/useOrders";
 import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types';
 import {

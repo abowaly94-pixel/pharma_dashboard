@@ -1,127 +1,193 @@
 import { useState, useEffect } from 'react';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  orderBy
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Medicine } from '@/types';
-
-// Demo data based on Firebase structure
-const demoMedicines: Medicine[] = [
-  {
-    id: '8vLjQaKOj3FvSJRw2ItM',
-    name: 'Nexium',
-    code: '569063',
-    description: '-Esomeprazole Used for treating acid reflux and stomach ulcers It is prescribed by doctors for related conditions.',
-    price: 332,
-    quantity: 9,
-    pharmacyId: 827457,
-    pharmacyName: 'ELNADA PHARMACY',
-    pharmcyAddress: 'ElSalam, El Menia, Minya Governorate 2441207.',
-    avgRating: 0,
-    ratingCount: 0,
-    discountRating: 0,
-    isNewProduct: true,
-    sellingCount: 0,
-    reviews: [],
-    subabaseORImageUrl: 'https://jzvdrawjkkqbxvhpefhd.supabase.co/storage/v1/object/public/Medicine/919f-4a8c-a6a4-ab2947d0fbc3.png'
-  },
-  {
-    id: '9iKPCXkcyeewx948h8RS',
-    name: 'Aloe Pura Gel',
-    code: '355696',
-    description: '- Organic Aloe Vera Aloe Pura Gel contains Organic Aloe Vera and is used for skincare or beauty enhancement. It is dermatologically tested and widely used.',
-    price: 150,
-    quantity: 25,
-    pharmacyId: 409241,
-    pharmacyName: 'ELNADA PHARMACY',
-    pharmcyAddress: 'ElSalam, El Menia, Minya Governorate 2441207.',
-    avgRating: 4.5,
-    ratingCount: 12,
-    discountRating: 10,
-    isNewProduct: true,
-    sellingCount: 45,
-    reviews: [],
-    subabaseORImageUrl: 'https://jzvdrawjkkqbxvhpefhd.supabase.co/storage/v1/object/public/Medicine/aloe.png'
-  },
-  {
-    id: 'DlpA5I91vuKvTC8B6a1c',
-    name: 'Mustela Baby Cream',
-    code: '380455',
-    description: '- Avocado Perseose Mustela Baby Cream contains Avocado Perseose and is used for skincare or beauty enhancement. It is dermatologically tested and widely used.',
-    price: 700,
-    quantity: 6,
-    pharmacyId: 673237,
-    pharmacyName: 'ELNADA PHARMACY',
-    pharmcyAddress: 'ElSalam, El Menia, Minya Governorate 2441207.',
-    avgRating: 0,
-    ratingCount: 0,
-    discountRating: 5,
-    isNewProduct: true,
-    sellingCount: 0,
-    reviews: [],
-    subabaseORImageUrl: 'https://jzvdrawjkkqbxvhpefhd.supabase.co/storage/v1/object/public/Medicine/mustela.png'
-  },
-  {
-    id: 'GfmZCgKRw09zLTOT5KmU',
-    name: 'Panadol Extra',
-    code: '123456',
-    description: 'Pain relief medication containing paracetamol and caffeine for headaches, migraines, and general pain.',
-    price: 45,
-    quantity: 100,
-    pharmacyId: 827457,
-    pharmacyName: 'ELNADA PHARMACY',
-    pharmcyAddress: 'ElSalam, El Menia, Minya Governorate 2441207.',
-    avgRating: 4.8,
-    ratingCount: 89,
-    discountRating: 0,
-    isNewProduct: false,
-    sellingCount: 234,
-    reviews: [],
-    subabaseORImageUrl: 'https://jzvdrawjkkqbxvhpefhd.supabase.co/storage/v1/object/public/Medicine/panadol.png'
-  },
-  {
-    id: 'H8XfUuStxqsNUG0rw9zk',
-    name: 'Vitamin C 1000mg',
-    code: '789012',
-    description: 'High potency Vitamin C supplement for immune system support and antioxidant protection.',
-    price: 120,
-    quantity: 50,
-    pharmacyId: 827457,
-    pharmacyName: 'ELNADA PHARMACY',
-    pharmcyAddress: 'ElSalam, El Menia, Minya Governorate 2441207.',
-    avgRating: 4.6,
-    ratingCount: 56,
-    discountRating: 15,
-    isNewProduct: false,
-    sellingCount: 178,
-    reviews: [],
-    subabaseORImageUrl: 'https://jzvdrawjkkqbxvhpefhd.supabase.co/storage/v1/object/public/Medicine/vitc.png'
-  }
-];
+import { toast } from 'sonner';
 
 export function useMedicines(pharmacyId?: number) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const fetchMedicines = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        let filteredMedicines = demoMedicines;
-        if (pharmacyId) {
-          filteredMedicines = demoMedicines.filter(m => m.pharmacyId === pharmacyId);
-        }
-        
-        setMedicines(filteredMedicines);
-      } catch (err) {
-        setError('Failed to fetch medicines');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    setError(null);
 
-    fetchMedicines();
+    // Create base query - remove orderBy temporarily to test
+    let medicinesQuery;
+    
+    try {
+      if (pharmacyId) {
+        // For pharmacist - filter by pharmacy first, then try orderBy
+        medicinesQuery = query(
+          collection(db, 'medicines'),
+          where('pharmacyId', '==', pharmacyId)
+        );
+      } else {
+        // For admin - get all medicines
+        medicinesQuery = query(collection(db, 'medicines'));
+      }
+
+      const unsubscribe = onSnapshot(medicinesQuery,
+        (snapshot) => {
+          console.log(`📊 تم جلب ${snapshot.size} دواء من Firebase`);
+          
+          const medicinesList = snapshot.docs.map(doc => {
+            const data = doc.data();
+            
+            return {
+              id: doc.id,
+              name: data.name || 'دواء غير معروف',
+              code: data.code || '',
+              description: data.description || '',
+              price: data.price || 0,
+              quantity: data.quantity || 0,
+              pharmacyId: data.pharmacyId || 0,
+              pharmacyName: data.pharmacyName || '',
+              pharmcyAddress: data.pharmcyAddress || '',
+              avgRating: data.avgRating || 0,
+              ratingCount: data.ratingCount || 0,
+              discountRating: data.discountRating || 0,
+              isNewProduct: data.isNewProduct || false,
+              sellingCount: data.sellingCount || 0,
+              reviews: data.reviews || [],
+              subabaseORImageUrl: data.subabaseORImageUrl || '',
+              subabaseImageUrl: data.subabaseImageUrl || '', // الحقل الصحيح
+              category: data.category || '',
+              manufacturer: data.manufacturer || '',
+              expiryDate: data.expiryDate?.toDate(),
+              createdAt: data.createdAt?.toDate() || new Date(),
+              updatedAt: data.updatedAt?.toDate()
+            } as Medicine;
+          });
+
+          // Sort manually by createdAt if needed
+          medicinesList.sort((a, b) => {
+            const dateA = a.createdAt || new Date(0);
+            const dateB = b.createdAt || new Date(0);
+            return dateB.getTime() - dateA.getTime();
+          });
+
+          console.log('✅ تم تحميل الأدوية بنجاح:', medicinesList.map(m => m.name));
+          setMedicines(medicinesList);
+          setFilteredMedicines(medicinesList);
+          setIsLoading(false);
+        },
+        (err) => {
+          console.error('❌ خطأ في جلب الأدوية:', err);
+          console.error('تفاصيل الخطأ:', {
+            code: err.code,
+            message: err.message,
+            pharmacyId: pharmacyId
+          });
+          
+          let errorMessage = 'فشل في تحميل الأدوية';
+          
+          if (err.code === 'failed-precondition') {
+            errorMessage = 'يحتاج إنشاء فهرس في Firebase Console';
+          } else if (err.code === 'permission-denied') {
+            errorMessage = 'ليس لديك صلاحية للوصول للأدوية';
+          } else if (err.code === 'unavailable') {
+            errorMessage = 'خدمة Firebase غير متاحة حالياً';
+          }
+          
+          setError(errorMessage);
+          setIsLoading(false);
+          toast.error(`حدث خطأ: ${errorMessage}`);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('❌ خطأ في إنشاء الاستعلام:', err);
+      setError('خطأ في إعداد الاستعلام');
+      setIsLoading(false);
+    }
   }, [pharmacyId]);
 
-  return { medicines, isLoading, error, setMedicines };
+  // Search functionality
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredMedicines(medicines);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = medicines.filter(medicine =>
+      medicine.name.toLowerCase().includes(query) ||
+      medicine.code.toLowerCase().includes(query) ||
+      medicine.description.toLowerCase().includes(query) ||
+      medicine.pharmacyName.toLowerCase().includes(query) ||
+      medicine.category?.toLowerCase().includes(query) ||
+      medicine.manufacturer?.toLowerCase().includes(query)
+    );
+
+    setFilteredMedicines(filtered);
+  }, [searchQuery, medicines]);
+
+  const addMedicine = async (medicine: Omit<Medicine, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await addDoc(collection(db, 'medicines'), {
+        ...medicine,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast.success('تم إضافة الدواء بنجاح');
+    } catch (err) {
+      console.error('Error adding medicine:', err);
+      toast.error('فشل في إضافة الدواء');
+      throw err;
+    }
+  };
+
+  const updateMedicine = async (id: string, updates: Partial<Medicine>) => {
+    try {
+      const medicineRef = doc(db, 'medicines', id);
+      await updateDoc(medicineRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+      toast.success('تم تحديث بيانات الدواء بنجاح');
+    } catch (err) {
+      console.error('Error updating medicine:', err);
+      toast.error('فشل في تحديث بيانات الدواء');
+      throw err;
+    }
+  };
+
+  const deleteMedicine = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'medicines', id));
+      toast.success('تم حذف الدواء بنجاح');
+    } catch (err) {
+      console.error('Error deleting medicine:', err);
+      toast.error('فشل في حذف الدواء');
+      throw err;
+    }
+  };
+
+  return {
+    medicines: filteredMedicines,
+    allMedicines: medicines, // Ensure allMedicines is returned
+    isLoading,
+    error,
+    searchQuery,
+    setSearchQuery,
+    addMedicine,
+    updateMedicine,
+    deleteMedicine
+  };
 }

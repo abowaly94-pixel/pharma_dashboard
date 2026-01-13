@@ -21,14 +21,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const loggedInUser = await login(email, password);
+      if (loggedInUser) {
         toast.success('تم تسجيل الدخول بنجاح');
-        // Redirect based on role
-        if (email === 'admin@pharmanow.com') {
+
+        // Dynamic redirection based on role from Firestore
+        if (loggedInUser.role === 'admin') {
           navigate('/admin');
-        } else {
+        } else if (loggedInUser.role === 'pharmacist') {
           navigate('/pharmacist');
+        } else {
+          toast.error('هذا الحساب لا يملك صلاحيات الوصول للوحة التحكم');
         }
       } else {
         toast.error('بيانات الدخول غير صحيحة');
@@ -127,21 +130,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-muted rounded-xl">
-            <p className="text-sm font-medium font-cairo mb-3">بيانات تجريبية للدخول:</p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">أدمن:</span>
-                <code className="text-xs bg-background px-2 py-1 rounded">admin@pharmanow.com / admin123</code>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">صيدلي:</span>
-                <code className="text-xs bg-background px-2 py-1 rounded">pharmacy@pharmanow.com / pharmacy123</code>
-              </div>
-            </div>
-          </div>
         </motion.div>
       </div>
 

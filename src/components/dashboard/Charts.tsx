@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion';
 import { Order } from '@/types';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -20,16 +20,24 @@ interface SalesChartProps {
 const COLORS = ['hsl(160, 84%, 39%)', 'hsl(217, 91%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)'];
 
 export function SalesChart({ orders }: SalesChartProps) {
-  // Generate weekly data
-  const weeklyData = [
-    { name: 'السبت', sales: 1200, orders: 5 },
-    { name: 'الأحد', sales: 1800, orders: 8 },
-    { name: 'الاثنين', sales: 1500, orders: 6 },
-    { name: 'الثلاثاء', sales: 2200, orders: 10 },
-    { name: 'الأربعاء', sales: 1900, orders: 7 },
-    { name: 'الخميس', sales: 2500, orders: 12 },
-    { name: 'الجمعة', sales: 3000, orders: 15 },
-  ];
+  // Calculate real weekly data from orders
+  const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const weeklyData = days.map((day, index) => {
+    const dayOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate.getDay() === index;
+    });
+
+    return {
+      name: day,
+      sales: dayOrders.reduce((sum, order) => sum + order.totalAmount, 0),
+      orders: dayOrders.length
+    };
+  });
+
+  // Reorder to start from Saturday for Arabic preference if needed, or just keep as is.
+  // Standard Arabic week starts Saturday: index 6, then 0-5.
+  const reorderedData = [weeklyData[6], ...weeklyData.slice(0, 6)];
 
   return (
     <motion.div
@@ -39,23 +47,23 @@ export function SalesChart({ orders }: SalesChartProps) {
       className="bg-card rounded-xl shadow-card border border-border/30 p-6"
     >
       <h3 className="text-lg font-semibold font-cairo mb-6">المبيعات الأسبوعية</h3>
-      
+
       <div className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={weeklyData}>
+          <AreaChart data={reorderedData}>
             <defs>
               <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0}/>
+                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis 
-              dataKey="name" 
+            <XAxis
+              dataKey="name"
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
             />
-            <YAxis 
+            <YAxis
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
             />
@@ -107,7 +115,7 @@ export function OrderStatusChart({ orders }: OrderStatusChartProps) {
       className="bg-card rounded-xl shadow-card border border-border/30 p-6"
     >
       <h3 className="text-lg font-semibold font-cairo mb-6">حالة الطلبات</h3>
-      
+
       <div className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
