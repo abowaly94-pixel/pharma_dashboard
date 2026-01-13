@@ -44,9 +44,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex" dir="rtl">
+    <div className="min-h-screen flex">
       {/* Left Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+      <div className="flex-1 flex items-center justify-center p-8 bg-background" dir="rtl">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -130,11 +130,30 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          {/* Demo Credentials */}
+          <div className="mt-8 p-4 bg-muted rounded-xl">
+            <p className="text-sm font-medium font-cairo mb-3">بيانات تجريبية للدخول:</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">أدمن:</span>
+                <code className="text-xs bg-background px-2 py-1 rounded">admin@test.com</code>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">صيدلي:</span>
+                <code className="text-xs bg-background px-2 py-1 rounded">pharmacist@test.com</code>
+              </div>
+              <div className="text-center pt-2 border-t border-border">
+                <span className="text-muted-foreground">كلمة المرور: </span>
+                <code className="text-xs bg-background px-2 py-1 rounded">123456</code>
+              </div>
+            </div>
+          </div>
         </motion.div>
       </div>
 
       {/* Right Side - Hero */}
-      <div className="hidden lg:flex flex-1 gradient-primary items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 gradient-primary items-center justify-center p-12" dir="rtl">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

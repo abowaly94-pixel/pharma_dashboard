@@ -19,9 +19,6 @@ import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
 import PharmacistOrders from "./pages/pharmacist/PharmacistOrders";
 import NotFound from "./pages/NotFound";
-import FixMedicinesPage from "./pages/FixMedicinesPage";
-import AutoSeedPage from "./pages/AutoSeedPage";
-import ViewAllMedicines from "./pages/ViewAllMedicines";
 
 const queryClient = new QueryClient();
 
@@ -39,9 +36,6 @@ const App = () => {
                 {/* Public Routes */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/fix-medicines" element={<FixMedicinesPage />} />
-                <Route path="/seed" element={<AutoSeedPage />} />
-                <Route path="/view-medicines" element={<ViewAllMedicines />} />
 
                 {/* Admin Routes */}
                 <Route
