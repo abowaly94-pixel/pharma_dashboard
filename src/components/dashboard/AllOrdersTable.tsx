@@ -3,6 +3,8 @@ import { Order } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 
 interface AllOrdersTableProps {
   orders: Order[];
@@ -75,6 +77,9 @@ export function AllOrdersTable({ orders }: AllOrdersTableProps) {
               <th className="text-right px-6 py-4 text-sm font-bold text-gray-700 font-cairo">
                 عدد الأدوية
               </th>
+              <th className="text-right px-6 py-4 text-sm font-bold text-gray-700 font-cairo">
+                الروشتة
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -115,6 +120,22 @@ export function AllOrdersTable({ orders }: AllOrdersTableProps) {
                       <span className="text-sm font-semibold text-gray-800">{order.cartItem.length}</span>
                       <span className="text-xs text-gray-500">دواء</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {order.orderStatus === 'delivered' && order.prescriptionUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-emerald-600 font-cairo hover:text-emerald-700"
+                        onClick={() => window.open(order.prescriptionUrl!, '_blank')}
+                      >
+                        <FileText className="w-4 h-4 ml-1" />
+                        الروشتة
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                 </motion.tr>
               );

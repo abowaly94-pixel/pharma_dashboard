@@ -14,6 +14,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAdmin: boolean;
   isPharmacist: boolean;
 }
@@ -25,11 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Persistent session handling with Firebase
+    // Persistent session handling
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Fetch additional user data (role, name, etc.) from Firestore
+          // Fetch additional user data from database
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
 
           if (userDoc.exists()) {
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: firebaseUser.email || userData.email,
             });
           } else {
-            // Fallback for users without a Firestore doc yet
+            // Fallback for users without a database record yet
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
@@ -111,11 +112,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser({
+            ...userData,
+            uid: currentUser.uid,
+            email: currentUser.email || userData.email,
+          });
+        }
+      } catch (error) {
+        console.error('Error refreshing user data:', error);
+      }
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
   const isPharmacist = user?.role === 'pharmacist';
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, isAdmin, isPharmacist }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser, isAdmin, isPharmacist }}>
       {children}
     </AuthContext.Provider>
   );

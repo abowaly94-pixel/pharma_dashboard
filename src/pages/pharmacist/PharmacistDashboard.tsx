@@ -19,8 +19,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function PharmacistDashboard() {
   const { user } = useAuth();
-  const { medicines } = useMedicines(user?.pharmacyId);
-  const { orders } = useOrders(user?.pharmacyId);
+  const hasPharmacyId = user?.pharmacyId !== undefined && user?.pharmacyId !== null;
+  const { medicines } = useMedicines(user?.pharmacyId, { enabled: hasPharmacyId });
+  const { orders } = useOrders(user?.pharmacyId, { enabled: hasPharmacyId });
 
   const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
   const totalStock = medicines.reduce((sum, med) => sum + med.quantity, 0);

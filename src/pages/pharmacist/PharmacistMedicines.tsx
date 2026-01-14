@@ -8,7 +8,9 @@ import {
   Eye,
   Package,
   Star,
-  AlertCircle
+  AlertCircle,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -26,7 +28,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
-  const { medicines, isLoading, deleteMedicine } = useMedicines(user?.pharmacyId);
+  const hasPharmacyId = user?.pharmacyId !== undefined && user?.pharmacyId !== null;
+  const { medicines, isLoading, deleteMedicine } = useMedicines(user?.pharmacyId, { enabled: hasPharmacyId });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
 
@@ -55,7 +58,7 @@ export default function PharmacistMedicines() {
         >
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent font-cairo mb-2">
-              💊 أدويتي
+              أدويتي
             </h1>
             <p className="text-gray-600 text-lg">إدارة منتجات صيدليتك بكل سهولة</p>
           </div>
@@ -96,7 +99,7 @@ export default function PharmacistMedicines() {
                 <p className="text-3xl font-bold text-green-900">{medicines.filter(m => m.quantity > 10).length}</p>
               </div>
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
-                <span className="text-2xl">✅</span>
+                <CheckCircle className="w-7 h-7 text-white" />
               </div>
             </div>
           </motion.div>
@@ -130,7 +133,7 @@ export default function PharmacistMedicines() {
                 <p className="text-3xl font-bold text-red-900">{outOfStockMedicines.length}</p>
               </div>
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg">
-                <span className="text-2xl">❌</span>
+                <XCircle className="w-7 h-7 text-white" />
               </div>
             </div>
           </motion.div>
@@ -146,7 +149,7 @@ export default function PharmacistMedicines() {
             <Alert className="border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 shadow-sm">
               <AlertCircle className="w-5 h-5 text-orange-600" />
               <AlertDescription className="font-cairo font-medium text-orange-800">
-                ⚠️ تنبيه: يوجد {lowStockMedicines.length} منتج بمخزون منخفض (أقل من 10 وحدات). يرجى إعادة التخزين قريباً!
+                تنبيه: يوجد {lowStockMedicines.length} منتج بمخزون منخفض (أقل من 10 وحدات). يرجى إعادة التخزين قريباً.
               </AlertDescription>
             </Alert>
           </motion.div>
@@ -162,7 +165,7 @@ export default function PharmacistMedicines() {
           <div className="relative max-w-2xl mx-auto">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <Input
-              placeholder="🔍 ابحث عن دواء بالاسم أو الكود..."
+              placeholder="ابحث عن دواء بالاسم أو الكود..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pr-12 h-14 text-lg font-cairo bg-white border-2 border-gray-200 focus:border-green-400 rounded-xl shadow-sm"
@@ -185,7 +188,21 @@ export default function PharmacistMedicines() {
 
         {/* Medicines Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {isLoading ? (
+          {!hasPharmacyId ? (
+            <div className="col-span-full">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-16 text-center"
+              >
+                <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <Package className="w-16 h-16 text-gray-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 font-cairo mb-3">جاري تحميل بيانات الصيدلية...</h3>
+                <p className="text-gray-600 text-lg font-cairo">يرجى الانتظار</p>
+              </motion.div>
+            </div>
+          ) : isLoading ? (
             [...Array(8)].map((_, i) => (
               <div key={i} className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 animate-pulse border border-gray-100 shadow-sm">
                 <div className="w-full h-40 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl mb-4" />
@@ -209,7 +226,7 @@ export default function PharmacistMedicines() {
                   <Package className="w-16 h-16 text-gray-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-800 font-cairo mb-3">
-                  {searchQuery ? '🔍 لم يتم العثور على نتائج' : '📦 لا توجد أدوية حتى الآن'}
+                  {searchQuery ? 'لم يتم العثور على نتائج' : 'لا توجد أدوية حتى الآن'}
                 </h3>
                 <p className="text-gray-600 text-lg mb-6 font-cairo">
                   {searchQuery 
@@ -237,12 +254,12 @@ export default function PharmacistMedicines() {
                 {/* Stock Badge */}
                 {medicine.quantity === 0 ? (
                   <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-lg flex items-center gap-1">
-                    <span>❌</span>
+                    <XCircle className="w-4 h-4" />
                     <span>نفذ</span>
                   </div>
                 ) : medicine.quantity < 10 ? (
                   <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-lg flex items-center gap-1 animate-pulse">
-                    <span>⚠️</span>
+                    <AlertCircle className="w-4 h-4" />
                     <span>مخزون منخفض</span>
                   </div>
                 ) : null}
@@ -373,7 +390,7 @@ export default function PharmacistMedicines() {
           <DialogContent className="max-w-3xl bg-white/95 backdrop-blur-xl border-2 border-white/40 shadow-2xl" dir="rtl">
             <DialogHeader>
               <DialogTitle className="font-cairo text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                💊 تفاصيل الدواء
+                تفاصيل الدواء
               </DialogTitle>
             </DialogHeader>
             {selectedMedicine && (
@@ -418,15 +435,15 @@ export default function PharmacistMedicines() {
                         </span>
                         {selectedMedicine.quantity === 0 ? (
                           <span className="text-xs bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1.5 rounded-full font-bold">
-                            ❌ نفذ من المخزون
+                            نفذ من المخزون
                           </span>
                         ) : selectedMedicine.quantity < 10 ? (
                           <span className="text-xs bg-gradient-to-r from-orange-500 to-amber-500 text-white px-3 py-1.5 rounded-full font-bold">
-                            ⚠️ مخزون منخفض
+                            مخزون منخفض
                           </span>
                         ) : (
                           <span className="text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1.5 rounded-full font-bold">
-                            ✅ متوفر
+                            متوفر
                           </span>
                         )}
                       </div>
@@ -445,12 +462,12 @@ export default function PharmacistMedicines() {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100 text-center">
-                    <p className="text-xs text-green-700 font-cairo font-medium mb-2">💰 السعر</p>
+                    <p className="text-xs text-green-700 font-cairo font-medium mb-2">السعر</p>
                     <p className="text-2xl font-bold text-green-900">{selectedMedicine.price} ج.م</p>
                   </div>
 
                   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100 text-center">
-                    <p className="text-xs text-blue-700 font-cairo font-medium mb-2">📦 الكمية</p>
+                    <p className="text-xs text-blue-700 font-cairo font-medium mb-2">الكمية</p>
                     <p className={`text-2xl font-bold ${
                       selectedMedicine.quantity === 0 ? 'text-red-600' :
                       selectedMedicine.quantity < 10 ? 'text-orange-600' : 
@@ -461,12 +478,12 @@ export default function PharmacistMedicines() {
                   </div>
 
                   <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100 text-center">
-                    <p className="text-xs text-purple-700 font-cairo font-medium mb-2">📊 المبيعات</p>
+                    <p className="text-xs text-purple-700 font-cairo font-medium mb-2">المبيعات</p>
                     <p className="text-2xl font-bold text-purple-900">{selectedMedicine.sellingCount || 0}</p>
                   </div>
 
                   <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-100 text-center">
-                    <p className="text-xs text-yellow-700 font-cairo font-medium mb-2">⭐ التقييم</p>
+                    <p className="text-xs text-yellow-700 font-cairo font-medium mb-2">التقييم</p>
                     <div className="flex items-center justify-center gap-1">
                       <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                       <p className="text-2xl font-bold text-yellow-900">

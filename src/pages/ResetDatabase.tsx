@@ -11,7 +11,7 @@ export default function ResetDatabase() {
   const navigate = useNavigate();
 
   const handleReset = async () => {
-    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع البيانات من Firestore (المستخدمين، الأدوية، الطلبات)')) {
+    if (!confirm('هل أنت متأكد؟ سيتم حذف جميع البيانات من Firestore (المستخدمين، الأدوية، الطلبات)')) {
       return;
     }
 
@@ -22,21 +22,21 @@ export default function ResetDatabase() {
       for (const userDoc of usersSnapshot.docs) {
         await deleteDoc(doc(db, 'users', userDoc.id));
       }
-      console.log('✅ Deleted all users from Firestore');
+      console.log('Deleted all users from Firestore');
 
       // Delete all medicines
       const medicinesSnapshot = await getDocs(collection(db, 'medicines'));
       for (const medicineDoc of medicinesSnapshot.docs) {
         await deleteDoc(doc(db, 'medicines', medicineDoc.id));
       }
-      console.log('✅ Deleted all medicines');
+      console.log('Deleted all medicines');
 
       // Delete all orders
       const ordersSnapshot = await getDocs(collection(db, 'orders'));
       for (const orderDoc of ordersSnapshot.docs) {
         await deleteDoc(doc(db, 'orders', orderDoc.id));
       }
-      console.log('✅ Deleted all orders');
+      console.log('Deleted all orders');
 
       toast.success('تم حذف جميع البيانات بنجاح');
       
@@ -75,7 +75,7 @@ export default function ResetDatabase() {
 
           {/* Warning */}
           <div className="bg-red-50 border border-red-200 p-4 rounded-lg text-right">
-            <h3 className="font-bold font-cairo mb-2 text-red-700">⚠️ تحذير:</h3>
+            <h3 className="font-bold font-cairo mb-2 text-red-700">تحذير:</h3>
             <ul className="text-sm space-y-1 text-red-600">
               <li>• سيتم حذف جميع المستخدمين من Firestore</li>
               <li>• سيتم حذف جميع الأدوية</li>
@@ -85,7 +85,7 @@ export default function ResetDatabase() {
 
           {/* Note */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-right">
-            <h3 className="font-bold font-cairo mb-2 text-yellow-700">📝 ملاحظة:</h3>
+            <h3 className="font-bold font-cairo mb-2 text-yellow-700">ملاحظة:</h3>
             <p className="text-sm text-yellow-600">
               يجب حذف المستخدمين من Firebase Authentication يدوياً من 
               <a 

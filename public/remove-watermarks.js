@@ -31,7 +31,11 @@
     if (document.body) {
       Array.from(document.body.children).forEach(child => {
         const id = child.id || '';
-        const className = child.className || '';
+        const className = typeof child.className === 'string' ? child.className : '';
+        const attributes = Array.from(child.attributes || []);
+        const hasRadixAttribute = attributes.some(attr => attr.name.startsWith('data-radix'));
+        const hasOverlayRole = child.getAttribute && ['tooltip', 'dialog', 'menu'].includes(child.getAttribute('role') || '');
+        const isPortalChild = hasRadixAttribute || className.toLowerCase().includes('radix');
         
         // Keep only known safe elements
         const isSafe = 
@@ -40,7 +44,9 @@
           child.hasAttribute('data-sonner-toaster') ||
           child.hasAttribute('data-toast-viewport') ||
           child.tagName === 'SCRIPT' ||
-          child.tagName === 'STYLE';
+          child.tagName === 'STYLE' ||
+          isPortalChild ||
+          hasOverlayRole;
         
         if (!isSafe) {
           const text = child.textContent || '';
@@ -49,7 +55,7 @@
             className.toLowerCase().includes('lovable') ||
             text.toLowerCase().includes('lovable');
           
-          if (hasLovable || (child.tagName === 'DIV' && !id && !className)) {
+          if (hasLovable) {
             try {
               child.parentNode.removeChild(child);
             } catch (e) {

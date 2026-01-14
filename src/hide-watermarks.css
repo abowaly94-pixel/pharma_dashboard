@@ -4,6 +4,11 @@
 [class*="lovable" i],
 [id*="lovable" i],
 [data-lovable],
+[data-watermark],
+[data-brand*="lovable" i],
+[data-component*="lovable" i],
+[data-source*="lovable" i],
+[data-powered*="lovable" i],
 [class*="Lovable"],
 [id*="Lovable"],
 [class*="LOVABLE"] {
@@ -17,19 +22,26 @@
   left: -9999px !important;
 }
 
-/* Hide any fixed positioned elements that might be watermarks */
-body > div:not(#root):not([id*="radix"]):not([data-sonner-toaster]):not([data-toast-viewport]) {
+/* Hide direct children with Lovable markers */
+body > div[data-lovable],
+body > div[id*="lovable" i],
+body > div[class*="lovable" i] {
   display: none !important;
+  visibility: hidden !important;
 }
 
-/* Hide watermark iframes */
-iframe:not([src*="firebase"]):not([src*="google"]) {
+/* Hide watermark iframes only when explicitly tagged */
+iframe[data-lovable],
+iframe[id*="lovable" i],
+iframe[src*="lovable" i] {
   display: none !important;
 }
 
 /* Hide any SVG hearts or logos in corners */
-svg[style*="position: fixed"],
-svg[style*="position: absolute"] {
+svg[style*="position: fixed"][data-lovable],
+svg[style*="position: absolute"][data-lovable],
+svg[id*="lovable" i],
+svg[class*="lovable" i] {
   display: none !important;
 }
 
@@ -59,17 +71,37 @@ svg[style*="position: absolute"] {
 a[href*="lovable" i] {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 /* Additional protection - hide any small fixed elements in corners */
-div[style*="position: fixed"][style*="z-index"] {
-  /* This will catch most badge-style watermarks */
+div[style*="position: fixed"][style*="z-index"][data-lovable],
+div[style*="position: fixed"][style*="z-index"][data-watermark],
+div[style*="position: fixed"][style*="z-index"][id*="lovable" i],
+div[style*="position: fixed"][style*="z-index"][class*="lovable" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 /* Hide elements with specific positioning that look like badges */
-*[style*="position: fixed"][style*="bottom: 16px"],
-*[style*="position: fixed"][style*="bottom: 20px"],
-*[style*="position: fixed"][style*="top: 16px"],
-*[style*="position: fixed"][style*="top: 20px"] {
-  /* Potential watermark positions */
+*[style*="position: fixed"][style*="bottom: 16px"][data-lovable],
+*[style*="position: fixed"][style*="bottom: 16px"][data-watermark],
+*[style*="position: fixed"][style*="bottom: 16px"][id*="lovable" i],
+*[style*="position: fixed"][style*="bottom: 16px"][class*="lovable" i],
+*[style*="position: fixed"][style*="bottom: 20px"][data-lovable],
+*[style*="position: fixed"][style*="bottom: 20px"][data-watermark],
+*[style*="position: fixed"][style*="bottom: 20px"][id*="lovable" i],
+*[style*="position: fixed"][style*="bottom: 20px"][class*="lovable" i],
+*[style*="position: fixed"][style*="top: 16px"][data-lovable],
+*[style*="position: fixed"][style*="top: 16px"][data-watermark],
+*[style*="position: fixed"][style*="top: 16px"][id*="lovable" i],
+*[style*="position: fixed"][style*="top: 16px"][class*="lovable" i],
+*[style*="position: fixed"][style*="top: 20px"][data-lovable],
+*[style*="position: fixed"][style*="top: 20px"][data-watermark],
+*[style*="position: fixed"][style*="top: 20px"][id*="lovable" i],
+*[style*="position: fixed"][style*="top: 20px"][class*="lovable" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }

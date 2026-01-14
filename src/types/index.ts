@@ -89,6 +89,7 @@ export interface User {
   email: string;
   name: string;
   profileImageUrl: string;
+  phoneNumber?: string;
   cart: CartItem[];
   favorites: string[];
   role?: 'admin' | 'pharmacist' | 'user';

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -15,11 +15,11 @@ import {
   ChevronDown,
   Building2
 } from 'lucide-react';
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +52,8 @@ const pharmacistNavItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,6 +63,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setSearchOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [searchOpen]);
+
+  const isItemActive = (itemPath: string) => {
+    if (location.pathname === itemPath) return true;
+    if (itemPath === '/admin' || itemPath === '/pharmacist') return false;
+    return location.pathname.startsWith(`${itemPath}/`);
   };
 
   return (
@@ -98,7 +119,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = isItemActive(item.path);
             return (
               <Link
                 key={item.path}
@@ -184,7 +205,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = isItemActive(item.path);
             return (
               <Link
                 key={item.path}
@@ -213,7 +234,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main Content */}
       <div className={`flex-1 ${sidebarOpen ? 'lg:mr-[280px]' : 'lg:mr-[80px]'} transition-all duration-300`}>
         {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-lg border-b border-border h-16 flex items-center justify-between px-4 lg:px-8">
+        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur-lg border-b border-border h-16 flex items-center justify-between px-4 lg:px-8">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -221,19 +242,34 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            
-            <div className="hidden md:flex items-center gap-2 bg-muted rounded-lg px-4 py-2 w-64">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="بحث..."
-                className="bg-transparent border-none outline-none text-sm w-full font-cairo"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-4">
             <NotificationBell />
+
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="بحث"
+                >
+                  <Search className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-3" dir="rtl">
+                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+                  <Search className="w-4 h-4 text-muted-foreground" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="بحث..."
+                    className="bg-transparent border-none outline-none text-sm w-full font-cairo"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -248,13 +284,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem className="font-cairo">
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  className="font-cairo cursor-pointer"
+                  onClick={() => navigate(isAdmin ? '/admin/settings' : '/pharmacist/settings')}
+                >
                   <Settings className="w-4 h-4 ml-2" />
                   الإعدادات
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive font-cairo">
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive font-cairo cursor-pointer">
                   <LogOut className="w-4 h-4 ml-2" />
                   تسجيل الخروج
                 </DropdownMenuItem>

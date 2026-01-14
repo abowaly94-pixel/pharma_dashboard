@@ -1,0 +1,74 @@
+/* CRITICAL FIX FOR RADIX UI DROPDOWNS */
+/* This file ensures all Radix UI components work correctly */
+
+/* Force display for all Radix UI portals and popper wrappers */
+body > [data-radix-popper-content-wrapper],
+body > div[data-radix-portal],
+#root ~ [data-radix-popper-content-wrapper],
+#root ~ div[data-radix-portal] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* Ensure all Radix UI content is visible and interactive */
+[data-radix-select-content],
+[data-radix-dropdown-menu-content],
+[data-radix-popover-content],
+[data-radix-context-menu-content],
+[data-radix-menubar-content] {
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 9999 !important;
+}
+
+/* Ensure viewports are visible */
+[data-radix-select-viewport],
+[data-radix-dropdown-menu-viewport] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure items are visible and clickable */
+[data-radix-select-item],
+[data-radix-dropdown-menu-item],
+[data-radix-context-menu-item],
+[data-radix-menubar-item] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Ensure triggers are clickable */
+[data-radix-select-trigger],
+[data-radix-dropdown-menu-trigger],
+[data-radix-popover-trigger],
+[data-radix-context-menu-trigger],
+[data-radix-menubar-trigger] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Ensure scroll buttons are visible */
+[data-radix-select-scroll-up-button],
+[data-radix-select-scroll-down-button] {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Override any conflicting styles */
+[data-radix-popper-content-wrapper] *,
+[data-radix-portal] * {
+  pointer-events: auto !important;
+}

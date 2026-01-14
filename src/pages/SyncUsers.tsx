@@ -22,7 +22,7 @@ export default function SyncUsers() {
     setLogs([]);
 
     try {
-      addLog('🔄 بدء عملية المزامنة...');
+      addLog('بدء عملية المزامنة...');
 
       // قائمة المستخدمين المتوقعين
       const expectedUsers = [
@@ -55,13 +55,13 @@ export default function SyncUsers() {
       // مزامنة كل مستخدم
       for (const user of expectedUsers) {
         try {
-          addLog(`\n📧 معالجة: ${user.email}`);
+          addLog(`\nمعالجة: ${user.email}`);
           
           // محاولة تسجيل الدخول للحصول على UID
           const userCredential = await signInWithEmailAndPassword(auth, user.email, user.password);
           const uid = userCredential.user.uid;
           
-          addLog(`✅ تم العثور على UID: ${uid.substring(0, 8)}...`);
+          addLog(`تم العثور على UID: ${uid.substring(0, 8)}...`);
 
           // التحقق من وجود البيانات في Firestore
           const userDocRef = doc(db, 'users', uid);
@@ -80,25 +80,25 @@ export default function SyncUsers() {
             updatedAt: new Date()
           }, { merge: true });
 
-          addLog(`✅ تم تحديث بيانات ${user.name} في Firestore`);
+          addLog(`تم تحديث بيانات ${user.name} في Firestore`);
           
           // تسجيل الخروج
           await signOut(auth);
           
         } catch (error: any) {
           if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-            addLog(`⚠️ المستخدم ${user.email} غير موجود في Firebase Auth`);
+            addLog(`المستخدم ${user.email} غير موجود في Firebase Auth`);
           } else {
-            addLog(`❌ خطأ في ${user.email}: ${error.message}`);
+            addLog(`خطأ في ${user.email}: ${error.message}`);
           }
         }
       }
 
-      addLog('\n✅ اكتملت عملية المزامنة!');
+      addLog('\nاكتملت عملية المزامنة');
       toast.success('تم مزامنة المستخدمين بنجاح');
 
     } catch (error: any) {
-      addLog(`\n❌ خطأ عام: ${error.message}`);
+      addLog(`\nخطأ عام: ${error.message}`);
       toast.error('حدث خطأ أثناء المزامنة');
     } finally {
       setIsSyncing(false);
@@ -126,7 +126,7 @@ export default function SyncUsers() {
 
           {/* Info */}
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-right">
-            <h3 className="font-bold font-cairo mb-2 text-blue-700">ℹ️ ماذا تفعل هذه الصفحة؟</h3>
+            <h3 className="font-bold font-cairo mb-2 text-blue-700">ماذا تفعل هذه الصفحة؟</h3>
             <ul className="text-sm space-y-1 text-blue-600">
               <li>• تسجيل دخول لكل مستخدم للحصول على UID الصحيح</li>
               <li>• حفظ/تحديث بيانات المستخدم في Firestore</li>

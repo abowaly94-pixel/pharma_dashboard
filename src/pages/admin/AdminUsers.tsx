@@ -153,16 +153,16 @@ export default function AdminUsers() {
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem className="font-cairo">عرض التفاصيل</DropdownMenuItem>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="font-cairo cursor-pointer">عرض التفاصيل</DropdownMenuItem>
                         <DropdownMenuItem
-                          className="font-cairo text-primary"
+                          className="font-cairo text-primary cursor-pointer"
                           onClick={() => handleRoleUpdate(user.uid, user.role)}
                         >
                           تغيير الدور (تبديل)
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="font-cairo text-destructive"
+                          className="font-cairo text-destructive cursor-pointer"
                           onClick={() => handleDelete(user.uid)}
                         >
                           حذف المستخدم

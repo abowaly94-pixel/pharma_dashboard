@@ -179,7 +179,7 @@ export default function AdminMedicines() {
             <div className="text-center py-4">
               <div className="inline-flex items-center gap-2 text-muted-foreground">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                جاري تحميل الأدوية من Firebase...
+                جاري تحميل الأدوية...
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

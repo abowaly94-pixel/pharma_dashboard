@@ -13,13 +13,21 @@ import { db } from '@/lib/firebase';
 import { Order } from '@/types';
 import { toast } from 'sonner';
 
-export function useOrders(pharmacyId?: number) {
+export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (options?.enabled === false) {
+      setOrders([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
 
     // Create base query
     let ordersQuery = query(
@@ -28,7 +36,7 @@ export function useOrders(pharmacyId?: number) {
     );
 
     // Filter by pharmacyId if provided
-    if (pharmacyId) {
+    if (pharmacyId !== undefined && pharmacyId !== null) {
       ordersQuery = query(
         collection(db, 'orders'),
         where('pharmacyId', '==', pharmacyId),
@@ -81,6 +89,7 @@ export function useOrders(pharmacyId?: number) {
         }).filter((order): order is Order => order !== null);
 
         setOrders(ordersList);
+        setError(null);
         setIsLoading(false);
       },
       (err) => {
@@ -92,7 +101,7 @@ export function useOrders(pharmacyId?: number) {
     );
 
     return () => unsubscribe();
-  }, [pharmacyId]);
+  }, [pharmacyId, options?.enabled]);
 
   const updateOrderStatus = async (orderId: string, status: Order['orderStatus']) => {
     try {

@@ -15,7 +15,7 @@ import { db } from '@/lib/firebase';
 import { Medicine } from '@/types';
 import { toast } from 'sonner';
 
-export function useMedicines(pharmacyId?: number) {
+export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,6 +23,14 @@ export function useMedicines(pharmacyId?: number) {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    if (options?.enabled === false) {
+      setMedicines([]);
+      setFilteredMedicines([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -30,7 +38,7 @@ export function useMedicines(pharmacyId?: number) {
     let medicinesQuery;
     
     try {
-      if (pharmacyId) {
+      if (pharmacyId !== undefined && pharmacyId !== null) {
         // For pharmacist - filter by pharmacy first, then try orderBy
         medicinesQuery = query(
           collection(db, 'medicines'),
@@ -116,7 +124,7 @@ export function useMedicines(pharmacyId?: number) {
       setError('خطأ في إعداد الاستعلام');
       setIsLoading(false);
     }
-  }, [pharmacyId]);
+  }, [pharmacyId, options?.enabled]);
 
   // Search functionality
   useEffect(() => {

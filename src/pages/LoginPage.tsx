@@ -83,7 +83,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@pharmanow.com"
+                  placeholder="Enter your account"
                   className="pr-10 text-left"
                   dir="ltr"
                   required

@@ -290,9 +290,9 @@ button, a, input, select, textarea {
 
 
 /* Additional protection against watermarks */
-body > div:not(#root):not([data-sonner-toaster]):not([data-toast-viewport]):not([id*="radix"]),
+body > div:not(#root):not([data-sonner-toaster]):not([data-toast-viewport]):not([id*="radix"]):not([data-radix-popper-content-wrapper]):not([data-radix-portal]),
 body > iframe:not([src*="firebase"]):not([src*="google"]),
-body > a:not([id*="radix"]) {
+body > a:not([id*="radix"]):not([data-radix-collection-item]) {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
@@ -314,4 +314,74 @@ a[href*="lovable" i] {
   height: 0 !important;
   position: absolute !important;
   left: -9999px !important;
+}
+
+/* Fix for dropdown menus and select components - CRITICAL */
+/* Override any hiding rules for Radix UI portals */
+body > [data-radix-popper-content-wrapper],
+body > [data-radix-portal],
+#root ~ [data-radix-popper-content-wrapper],
+#root ~ [data-radix-portal] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 100 !important;
+  position: fixed !important;
+}
+
+[data-radix-popper-content-wrapper],
+[data-radix-portal] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
+/* Ensure dropdowns appear above other content */
+[data-radix-select-content],
+[data-radix-dropdown-menu-content],
+[data-radix-popover-content] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
+/* Fix for select viewport */
+[data-radix-select-viewport] {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Fix for RTL dropdown positioning */
+[dir="rtl"] [data-radix-select-content],
+[dir="rtl"] [data-radix-dropdown-menu-content],
+[dir="rtl"] [data-radix-popover-content] {
+  direction: rtl;
+}
+
+/* Improve dropdown item hover states */
+[data-radix-select-item],
+[data-radix-dropdown-menu-item] {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+[data-radix-select-item]:hover,
+[data-radix-dropdown-menu-item]:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+  cursor: pointer !important;
+}
+
+/* Fix for dropdown trigger buttons */
+[data-radix-select-trigger],
+[data-radix-dropdown-menu-trigger] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
 }

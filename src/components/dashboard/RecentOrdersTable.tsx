@@ -3,6 +3,8 @@ import { Order } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 
 interface RecentOrdersTableProps {
   orders: Order[];
@@ -75,6 +77,9 @@ export function RecentOrdersTable({ orders, onViewOrder }: RecentOrdersTableProp
               <th className="text-right px-6 py-4 text-sm font-bold text-gray-700 font-cairo">
                 التاريخ
               </th>
+              <th className="text-right px-6 py-4 text-sm font-bold text-gray-700 font-cairo">
+                الروشتة
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -112,6 +117,25 @@ export function RecentOrdersTable({ orders, onViewOrder }: RecentOrdersTableProp
                     <span className="text-sm text-gray-600">
                       {format(new Date(order.createdAt), 'dd MMM yyyy', { locale: ar })}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {order.orderStatus === 'delivered' && order.prescriptionUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-emerald-600 font-cairo hover:text-emerald-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(order.prescriptionUrl!, '_blank');
+                        }}
+                      >
+                        <FileText className="w-4 h-4 ml-1" />
+                        الروشتة
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                 </motion.tr>
               );

@@ -7,7 +7,9 @@ import {
   XCircle,
   Truck,
   Clock,
-  Package
+  Package,
+  FileText,
+  ReceiptText
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,8 @@ import {
 } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { AttachmentPreview } from '@/components/orders/AttachmentPreview';
+import { TableStateRow } from '@/components/utils/StateView';
 
 const statusConfig = {
   pending: { label: 'قيد الانتظار', class: 'badge-warning', icon: Clock },
@@ -39,11 +43,22 @@ const statusConfig = {
   cancelled: { label: 'ملغي', class: 'badge-danger', icon: XCircle },
 };
 
+const isImageFile = (url?: string) => {
+  if (!url) return false;
+  return /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0]);
+};
+
 export default function PharmacistOrders() {
   const { user } = useAuth();
-  const { orders, isLoading, updateOrderStatus } = useOrders(user?.pharmacyId);
+  const hasPharmacyId = user?.pharmacyId !== undefined && user?.pharmacyId !== null;
+  const { orders, isLoading, error, updateOrderStatus } = useOrders(user?.pharmacyId, { enabled: hasPharmacyId });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    type: 'prescription' | 'payment';
+    url: string;
+    title: string;
+  } | null>(null);
 
   const filteredOrders = orders.filter(order =>
     order.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -150,13 +165,25 @@ export default function PharmacistOrders() {
                       </td>
                     </tr>
                   ))
+                ) : !hasPharmacyId ? (
+                  <TableStateRow
+                    colSpan={6}
+                    variant="loading"
+                    title="جاري تحميل بيانات الصيدلية..."
+                    description="يرجى الانتظار"
+                  />
+                ) : error ? (
+                  <TableStateRow
+                    colSpan={6}
+                    variant="error"
+                    title="حدث خطأ أثناء تحميل الطلبات"
+                  />
                 ) : filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
-                      <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                      <p className="text-muted-foreground font-cairo">لا توجد طلبات</p>
-                    </td>
-                  </tr>
+                  <TableStateRow
+                    colSpan={6}
+                    variant="empty"
+                    title="لا توجد طلبات"
+                  />
                 ) : (
                   filteredOrders.map((order, index) => {
                     const status = statusConfig[order.orderStatus];
@@ -193,15 +220,17 @@ export default function PharmacistOrders() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedOrder(order)}
-                            className="font-cairo"
-                          >
-                            <Eye className="w-4 h-4 ml-1" />
-                            عرض
-                          </Button>
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedOrder(order)}
+                              className="font-cairo"
+                            >
+                              <Eye className="w-4 h-4 ml-1" />
+                              عرض
+                            </Button>
+                          </div>
                         </td>
                       </motion.tr>
                     );
@@ -217,7 +246,7 @@ export default function PharmacistOrders() {
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
-                تفاصيل الطلب #{selectedOrder?.orderId.slice(-8)}
+                تفاصيل الطلب #{selectedOrder?.orderId?.slice(-8) ?? ''}
               </DialogTitle>
             </DialogHeader>
             {selectedOrder && (
@@ -260,6 +289,116 @@ export default function PharmacistOrders() {
                     </div>
                   </div>
                 </div>
+
+                {/* Prescription */}
+                {(selectedOrder.prescriptionUrl || selectedOrder.paymentProofUrl) && (
+                  <div className="grid gap-4">
+                    {selectedOrder.prescriptionUrl && (
+                      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white shadow-sm overflow-hidden">
+                        <div className="p-4 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm text-emerald-600 font-semibold flex items-center gap-2">
+                              <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                                <FileText className="w-4 h-4" />
+                              </span>
+                              روشتة الطلب
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() =>
+                            setAttachmentPreview({
+                              type: 'prescription',
+                              url: selectedOrder.prescriptionUrl!,
+                              title: `روشتة الطلب #${selectedOrder.orderId.slice(-8)}`
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setAttachmentPreview({
+                                type: 'prescription',
+                                url: selectedOrder.prescriptionUrl!,
+                                title: `روشتة الطلب #${selectedOrder.orderId.slice(-8)}`
+                              });
+                            }
+                          }}
+                          className="relative border-t border-emerald-100 bg-white cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          {isImageFile(selectedOrder.prescriptionUrl) ? (
+                            <img
+                              src={selectedOrder.prescriptionUrl}
+                              alt="روشتة الطلب"
+                              className="w-full h-64 object-contain bg-white"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <iframe
+                              src={selectedOrder.prescriptionUrl}
+                              title="روشتة الطلب"
+                              className="w-full h-64 bg-white pointer-events-none"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/5 transition-colors" />
+                        </div>
+                      </div>
+                    )}
+                    {selectedOrder.paymentProofUrl && (
+                      <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm overflow-hidden">
+                        <div className="p-4 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm text-blue-600 font-semibold flex items-center gap-2">
+                              <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600">
+                                <ReceiptText className="w-4 h-4" />
+                              </span>
+                              إيصال الدفع
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() =>
+                            setAttachmentPreview({
+                              type: 'payment',
+                              url: selectedOrder.paymentProofUrl!,
+                              title: `إيصال الدفع #${selectedOrder.orderId.slice(-8)}`
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setAttachmentPreview({
+                                type: 'payment',
+                                url: selectedOrder.paymentProofUrl!,
+                                title: `إيصال الدفع #${selectedOrder.orderId.slice(-8)}`
+                              });
+                            }
+                          }}
+                          className="relative border-t border-blue-100 bg-white cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          {isImageFile(selectedOrder.paymentProofUrl) ? (
+                            <img
+                              src={selectedOrder.paymentProofUrl}
+                              alt="إيصال الدفع"
+                              className="w-full h-64 object-contain bg-white"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <iframe
+                              src={selectedOrder.paymentProofUrl}
+                              title="إيصال الدفع"
+                              className="w-full h-64 bg-white pointer-events-none"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/5 transition-colors" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Products */}
                 <div className="space-y-3">
@@ -311,6 +450,11 @@ export default function PharmacistOrders() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <AttachmentPreview
+        preview={attachmentPreview}
+        onClose={() => setAttachmentPreview(null)}
+      />
     </DashboardLayout>
   );
 }

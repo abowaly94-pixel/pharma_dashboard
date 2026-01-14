@@ -91,7 +91,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
                   <p className="text-sm text-amber-700 font-cairo font-medium">
-                    📊 بيانات تجريبية للعرض
+                    بيانات تجريبية للعرض
                   </p>
                 </div>
               </motion.div>
