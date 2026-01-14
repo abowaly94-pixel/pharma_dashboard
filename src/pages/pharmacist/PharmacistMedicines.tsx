@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { deleteImageFromSupabase } from '@/lib/supabase';
+import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 export default function PharmacistMedicines() {
@@ -51,6 +51,8 @@ export default function PharmacistMedicines() {
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -184,6 +186,79 @@ export default function PharmacistMedicines() {
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
       await deleteMedicine(id);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🎯 handleImageUpload called!');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    toast.info('جاري رفع الصورة...');
+    console.log('📤 Uploading file:', file.name);
+
+    try {
+      const result = await uploadImageToSupabase(file);
+      
+      if (result.success && result.url) {
+        setFormData({ ...formData, subabaseORImageUrl: result.url });
+        toast.success('تم رفع الصورة بنجاح!');
+        console.log('✅ Upload success:', result.url);
+      } else {
+        toast.error(result.error || 'فشل رفع الصورة');
+        console.error('❌ Upload failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!formData.subabaseORImageUrl) {
+      toast.error('لا توجد صورة لإزالة الخلفية منها');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    toast.info('جاري إزالة الخلفية... قد يستغرق بضع ثوانٍ');
+
+    try {
+      // Remove background
+      const result = await removeImageBackground(formData.subabaseORImageUrl);
+      
+      if (!result.success || !result.blob) {
+        toast.error(result.error || 'فشل إزالة الخلفية');
+        return;
+      }
+
+      // Convert blob to file
+      const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
+      
+      // Delete old image if it's from Supabase
+      if (formData.subabaseORImageUrl.includes('supabase.co/storage')) {
+        await deleteImageFromSupabase(formData.subabaseORImageUrl);
+      }
+      
+      // Upload new image without background
+      const uploadResult = await uploadImageToSupabase(file);
+      
+      if (uploadResult.success && uploadResult.url) {
+        setFormData({ ...formData, subabaseORImageUrl: uploadResult.url });
+        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
+      } else {
+        toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
+      }
+    } catch (error) {
+      console.error('Error removing background:', error);
+      toast.error('حدث خطأ أثناء إزالة الخلفية');
+    } finally {
+      setIsRemovingBg(false);
     }
   };
 
@@ -549,7 +624,7 @@ export default function PharmacistMedicines() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="code" className="font-cairo text-sm">الكود *</Label>
-                  <Input id="code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required className="h-9" />
+                  <Input id="code" value={formData.code} readOnly className="h-9 bg-gray-50 cursor-default" />
                 </div>
               </div>
 
@@ -624,26 +699,198 @@ export default function PharmacistMedicines() {
                 </div>
               </div>
 
-              {/* Image - Compact */}
-              <div className="space-y-1 p-2 bg-gray-50 rounded border border-gray-200">
-                <Label htmlFor="imageUrl" className="font-cairo text-xs flex items-center gap-1"><ImageIcon className="w-3 h-3" />صورة الدواء</Label>
-                <div className="space-y-2">
-                  <Input id="imageUrl" value={formData.subabaseORImageUrl} onChange={(e) => setFormData({ ...formData, subabaseORImageUrl: e.target.value })} placeholder="https://..." className="w-full h-8 text-xs" />
+              {/* Image Upload Section */}
+              <div className="space-y-2 p-3 bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg border-2 border-blue-200">
+                <Label className="font-cairo text-sm font-bold flex items-center gap-2 text-gray-700">
+                  <ImageIcon className="w-4 h-4 text-blue-600" />
+                  صورة الدواء
+                </Label>
+                
+                <div className="space-y-3">
+                  {/* Upload Button */}
+                  <div className="relative">
+                    <label className={`block ${formData.subabaseORImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
+                        formData.subabaseORImageUrl 
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                          : isUploading
+                            ? 'bg-blue-400 text-white cursor-wait'
+                            : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white hover:shadow-lg cursor-pointer'
+                      }`}>
+                        {isUploading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>جاري الرفع...</span>
+                          </>
+                        ) : formData.subabaseORImageUrl ? (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>يوجد صورة بالفعل - احذفها أولاً للتغيير</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>رفع صورة من الجهاز</span>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading || !!formData.subabaseORImageUrl}
+                        className="hidden"
+                      />
+                    </label>
+                    {formData.subabaseORImageUrl && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1 font-cairo">
+                        <span>💡</span>
+                        <span>لتغيير الصورة، احذف الصورة الحالية أولاً ثم ارفع صورة جديدة</span>
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Divider */}
+                  {!formData.subabaseORImageUrl && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-gray-300"></div>
+                      <span className="text-xs text-gray-500 font-cairo">أو</span>
+                      <div className="flex-1 h-px bg-gray-300"></div>
+                    </div>
+                  )}
+                  
+                  {/* URL Input - Only show if no image */}
+                  {!formData.subabaseORImageUrl && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-cairo text-gray-600">أضف رابط صورة من الإنترنت</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="imageUrlInput"
+                          type="url"
+                          placeholder="https://example.com/image.jpg"
+                          className="flex-1 h-9 text-sm"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.currentTarget as HTMLInputElement;
+                              if (input.value.trim()) {
+                                setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            const input = document.getElementById('imageUrlInput') as HTMLInputElement;
+                            if (input && input.value.trim()) {
+                              setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                              input.value = '';
+                              toast.success('تم إضافة رابط الصورة');
+                            } else {
+                              toast.error('الرجاء إدخال رابط صحيح');
+                            }
+                          }}
+                          className="h-9 px-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo font-bold"
+                        >
+                          إضافة
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500 font-cairo">💡 الصق رابط الصورة واضغط "إضافة" أو Enter</p>
+                    </div>
+                  )}
+                  
+                  {/* Display URL - Read only */}
                   {formData.subabaseORImageUrl && (
-                    <div className="relative w-full h-24 rounded border overflow-hidden bg-white group">
-                      <img src={formData.subabaseORImageUrl} alt="Preview" className="w-full h-full object-contain p-1" onError={(e) => { const target = e.currentTarget as HTMLImageElement; target.style.display = 'none'; const parent = target.parentElement; if (parent) { parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-xs text-gray-500">صورة غير صالحة</div>'; } }} />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm('هل تريد مسح الصورة؟\n\nسيتم حذف الصورة من قاعدة البيانات ومن التخزين عند الحفظ.')) {
-                            setFormData({ ...formData, subabaseORImageUrl: '' });
-                          }
-                        }}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all"
-                        title="مسح الصورة"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                        <span className="text-xs text-gray-500 font-cairo">رابط الصورة</span>
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                      </div>
+                      <div>
+                        <Input 
+                          id="imageUrl" 
+                          value={formData.subabaseORImageUrl} 
+                          readOnly
+                          placeholder="الرابط سيظهر هنا بعد رفع الصورة..." 
+                          className="w-full h-9 text-sm bg-gray-50 cursor-default" 
+                        />
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Image Preview */}
+                  {formData.subabaseORImageUrl && (
+                    <div className="relative w-full h-32 rounded-lg border-2 border-gray-300 overflow-hidden bg-white group">
+                      <img 
+                        src={formData.subabaseORImageUrl} 
+                        alt="Preview" 
+                        className="w-full h-full object-contain p-2"
+                        onError={(e) => { 
+                          const target = e.currentTarget as HTMLImageElement; 
+                          target.style.display = 'none'; 
+                          const parent = target.parentElement; 
+                          if (parent) { 
+                            parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo"><div class="text-center"><div class="text-3xl mb-2">⚠️</div><div>صورة غير صالحة أو الرابط لا يعمل</div><div class="text-xs mt-1">تأكد من صحة الرابط</div></div></div>'; 
+                          } 
+                        }} 
+                      />
+                      <div className="absolute top-2 right-2">
+                        <button
+                          type="button"
+                          onClick={handleRemoveBackground}
+                          disabled={isRemovingBg}
+                          className="px-2 h-7 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-full flex items-center justify-center gap-1 shadow-lg transition-all text-xs font-cairo font-bold"
+                          title="إزالة خلفية الصورة"
+                        >
+                          {isRemovingBg ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>جاري...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>✨</span>
+                              <span>حذف الخلفية</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="absolute top-2 left-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const imageUrl = formData.subabaseORImageUrl;
+                            const isSupabaseImage = imageUrl.includes('supabase.co/storage');
+                            
+                            if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
+                              // Delete from Supabase Storage only if it's a Supabase image
+                              if (isSupabaseImage) {
+                                toast.info('جاري حذف الصورة...');
+                                const result = await deleteImageFromSupabase(imageUrl);
+                                
+                                if (result.success) {
+                                  toast.success('تم حذف الصورة بنجاح');
+                                  setFormData({ ...formData, subabaseORImageUrl: '' });
+                                } else {
+                                  toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
+                                }
+                              } else {
+                                // Just remove the URL for external images
+                                setFormData({ ...formData, subabaseORImageUrl: '' });
+                                toast.success('تم إزالة الصورة');
+                              }
+                            }
+                          }}
+                          className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all"
+                          title="حذف الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

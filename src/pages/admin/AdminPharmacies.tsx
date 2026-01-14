@@ -226,91 +226,185 @@ export default function AdminPharmacies() {
                 {editingPharmacy ? 'تعديل الصيدلية' : 'إضافة صيدلية جديدة'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="font-cairo">اسم الصيدلية *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Section 1: Basic Info */}
+              <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  المعلومات الأساسية
+                </h3>
+                
+                <div className="grid grid-cols-[2fr,1fr] gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="font-cairo text-sm font-semibold text-gray-700">اسم الصيدلية *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      placeholder="أدخل اسم الصيدلية"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pharmacyId" className="font-cairo text-sm font-semibold text-gray-700">رقم الصيدلية</Label>
+                    <Input
+                      id="pharmacyId"
+                      value={formData.pharmacyId}
+                      readOnly
+                      disabled
+                      className="h-10 bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300"
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="font-cairo text-sm font-semibold text-gray-700">المدينة *</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      required
+                      placeholder="القاهرة، الإسكندرية..."
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseNumber" className="font-cairo text-sm font-semibold text-gray-700">رقم الترخيص *</Label>
+                    <Input
+                      id="licenseNumber"
+                      value={formData.licenseNumber}
+                      onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                      required
+                      placeholder="رقم الترخيص"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="city" className="font-cairo">المدينة *</Label>
+                  <Label htmlFor="address" className="font-cairo text-sm font-semibold text-gray-700 flex items-center gap-1">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                    العنوان بالتفصيل *
+                  </Label>
                   <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
+                    placeholder="الشارع، الحي، المنطقة..."
+                    className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address" className="font-cairo">العنوان *</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
+              {/* Section 2: Contact Info */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-purple-600" />
+                  معلومات الاتصال
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber" className="font-cairo text-sm font-semibold text-gray-700 flex items-center gap-1">
+                      <Phone className="w-4 h-4 text-purple-600" />
+                      رقم الهاتف *
+                    </Label>
+                    <Input
+                      id="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      required
+                      dir="ltr"
+                      placeholder="+20 123 456 7890"
+                      className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="font-cairo text-sm font-semibold text-gray-700 flex items-center gap-1">
+                      <Mail className="w-4 h-4 text-purple-600" />
+                      البريد الإلكتروني *
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      dir="ltr"
+                      placeholder="pharmacy@example.com"
+                      className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Section 3: Owner Info */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-green-600" />
+                  معلومات المالك
+                </h3>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber" className="font-cairo">رقم الهاتف *</Label>
-                  <Input
-                    id="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    required
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="font-cairo">البريد الإلكتروني *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ownerName" className="font-cairo">اسم المالك *</Label>
+                  <Label htmlFor="ownerName" className="font-cairo text-sm font-semibold text-gray-700">اسم المالك *</Label>
                   <Input
                     id="ownerName"
                     value={formData.ownerName}
                     onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
                     required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="licenseNumber" className="font-cairo">رقم الترخيص *</Label>
-                  <Input
-                    id="licenseNumber"
-                    value={formData.licenseNumber}
-                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
-                    required
+                    placeholder="الاسم الكامل للمالك"
+                    className="h-10 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              {/* Section 4: Status */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Power className="w-5 h-5 text-amber-600" />
+                  حالة الصيدلية
+                </h3>
+                
+                <div className="bg-white p-3 rounded-lg border-2 border-amber-200 hover:border-amber-400 transition-colors">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-bold font-cairo text-gray-900 block">
+                        صيدلية نشطة
+                      </span>
+                      <span className="text-xs text-amber-600 font-cairo">
+                        {formData.isActive ? 'الصيدلية تعمل حالياً' : 'الصيدلية متوقفة مؤقتاً'}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsDialogOpen(false)}
+                  className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
+                >
                   إلغاء
                 </Button>
-                <Button type="submit">
-                  {editingPharmacy ? 'حفظ التعديلات' : 'إضافة الصيدلية'}
+                <Button 
+                  type="submit"
+                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all"
+                >
+                  {editingPharmacy ? '💾 حفظ التعديلات' : '➕ إضافة الصيدلية'}
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
           </DialogContent>
         </Dialog>

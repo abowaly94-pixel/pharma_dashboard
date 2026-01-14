@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
+import { getFunctions } from 'firebase/functions';
 
 // Firebase configuration - using the exact config you provided
 const firebaseConfig = {
@@ -19,10 +20,10 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Services (force long polling to avoid network/proxy issues)
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  useFetchStreams: false
+  experimentalForceLongPolling: true
 });
 export const auth = getAuth(app);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+export const functions = getFunctions(app);
 
 export default app;

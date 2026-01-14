@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Settings, Bell, User, Mail, Phone, Shield } from 'lucide-react';
+import { Settings, Bell, User, Mail, Phone, Shield, LogOut } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +13,23 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useNavigate } from 'react-router-dom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function AdminSettings() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   
   // User Settings
   const [notifications, setNotifications] = useState(true);
@@ -59,6 +72,17 @@ export default function AdminSettings() {
       toast.error('فشل حفظ البيانات');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('تم تسجيل الخروج بنجاح');
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('فشل تسجيل الخروج');
     }
   };
 
@@ -263,6 +287,64 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Logout Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="border-destructive/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 font-cairo text-destructive">
+                <LogOut className="w-5 h-5" />
+                تسجيل الخروج
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-cairo font-medium mb-1">الخروج من الحساب</p>
+                  <p className="text-sm text-muted-foreground">
+                    سيتم تسجيل خروجك من النظام وإعادتك لصفحة تسجيل الدخول
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowLogoutDialog(true)}
+                  className="font-cairo"
+                >
+                  <LogOut className="w-4 h-4 ml-2" />
+                  تسجيل الخروج
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Logout Confirmation Dialog */}
+        <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo text-xl">تأكيد تسجيل الخروج</AlertDialogTitle>
+              <AlertDialogDescription className="font-cairo text-base">
+                هل أنت متأكد من تسجيل الخروج من حسابك؟
+                <br />
+                سيتم إعادتك إلى صفحة تسجيل الدخول.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="font-cairo">إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleLogout}
+                className="bg-destructive hover:bg-destructive/90 font-cairo"
+              >
+                <LogOut className="w-4 h-4 ml-2" />
+                تسجيل الخروج
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

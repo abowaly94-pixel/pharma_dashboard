@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Pharmacy } from '@/types';
+import { toast } from 'sonner';
 
 export function usePharmacies() {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
@@ -60,5 +61,69 @@ export function usePharmacies() {
     }
   }, []);
 
-  return { pharmacies, isLoading, error };
+  const addPharmacy = async (pharmacyData: Omit<Pharmacy, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await addDoc(collection(db, 'pharmacies'), {
+        ...pharmacyData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast.success('تم إضافة الصيدلية بنجاح');
+    } catch (error) {
+      console.error('Error adding pharmacy:', error);
+      toast.error('فشل في إضافة الصيدلية');
+      throw error;
+    }
+  };
+
+  const updatePharmacy = async (id: string, pharmacyData: Partial<Pharmacy>) => {
+    try {
+      const pharmacyRef = doc(db, 'pharmacies', id);
+      await updateDoc(pharmacyRef, {
+        ...pharmacyData,
+        updatedAt: serverTimestamp()
+      });
+      toast.success('تم تحديث الصيدلية بنجاح');
+    } catch (error) {
+      console.error('Error updating pharmacy:', error);
+      toast.error('فشل في تحديث الصيدلية');
+      throw error;
+    }
+  };
+
+  const deletePharmacy = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'pharmacies', id));
+      toast.success('تم حذف الصيدلية بنجاح');
+    } catch (error) {
+      console.error('Error deleting pharmacy:', error);
+      toast.error('فشل في حذف الصيدلية');
+      throw error;
+    }
+  };
+
+  const togglePharmacyStatus = async (id: string, isActive: boolean) => {
+    try {
+      const pharmacyRef = doc(db, 'pharmacies', id);
+      await updateDoc(pharmacyRef, {
+        isActive,
+        updatedAt: serverTimestamp()
+      });
+      toast.success(isActive ? 'تم تفعيل الصيدلية' : 'تم إيقاف الصيدلية');
+    } catch (error) {
+      console.error('Error toggling pharmacy status:', error);
+      toast.error('فشل في تغيير حالة الصيدلية');
+      throw error;
+    }
+  };
+
+  return { 
+    pharmacies, 
+    isLoading, 
+    error,
+    addPharmacy,
+    updatePharmacy,
+    deletePharmacy,
+    togglePharmacyStatus
+  };
 }

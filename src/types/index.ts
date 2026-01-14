@@ -95,6 +95,9 @@ export interface User {
   role?: 'admin' | 'pharmacist' | 'user';
   pharmacyId?: number;
   pharmacyName?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  isActive?: boolean;
 }
 
 export interface DashboardStats {
