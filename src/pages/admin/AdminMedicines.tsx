@@ -8,7 +8,9 @@ import {
   Eye,
   Package,
   Star,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Building2,
+  MapPin
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useMedicines } from '@/hooks/useMedicines';
+import { usePharmacies } from '@/hooks/usePharmacies';
 import { Medicine } from '@/types';
 import {
   Dialog,
@@ -24,11 +27,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { MedicinesDiagnostic } from '@/components/utils/MedicinesDiagnostic';
+import { deleteImageFromSupabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function AdminMedicines() {
   const { medicines, isLoading, addMedicine, updateMedicine, deleteMedicine, searchQuery, setSearchQuery } = useMedicines();
+  const { pharmacies } = usePharmacies();
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
@@ -67,7 +80,7 @@ export default function AdminMedicines() {
         pharmcyAddress: medicine.pharmcyAddress,
         category: medicine.category || '',
         manufacturer: medicine.manufacturer || '',
-        subabaseORImageUrl: medicine.subabaseORImageUrl,
+        subabaseORImageUrl: (medicine as any).subabaseImageUrl || medicine.subabaseORImageUrl || '',
         avgRating: medicine.avgRating,
         ratingCount: medicine.ratingCount,
         discountRating: medicine.discountRating,
@@ -77,15 +90,17 @@ export default function AdminMedicines() {
       });
     } else {
       setEditingMedicine(null);
+      // Get first pharmacy as default
+      const defaultPharmacy = pharmacies[0];
       setFormData({
         name: '',
         code: `MED-${Date.now()}`,
         description: '',
         price: 0,
         quantity: 0,
-        pharmacyId: 1,
-        pharmacyName: 'صيدلية النخيل',
-        pharmcyAddress: 'القاهرة',
+        pharmacyId: defaultPharmacy?.pharmacyId || 1,
+        pharmacyName: defaultPharmacy?.name || 'صيدلية النخيل',
+        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : 'القاهرة',
         category: '',
         manufacturer: '',
         subabaseORImageUrl: '',
@@ -102,15 +117,56 @@ export default function AdminMedicines() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🚀 handleSubmit called');
+    console.log('📝 Form data:', formData);
+    console.log('✏️ Editing medicine:', editingMedicine);
+    
     try {
-      if (editingMedicine) {
-        await updateMedicine(editingMedicine.id, formData);
+      // Check if image was deleted (empty string) and we're editing
+      const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
+      console.log('Checking deletion conditions:');
+      console.log('  - editingMedicine exists?', !!editingMedicine);
+      console.log('  - formData.subabaseORImageUrl is empty?', formData.subabaseORImageUrl === '');
+      console.log('  - editingMedicine.subabaseORImageUrl?', editingMedicine?.subabaseORImageUrl);
+      console.log('  - editingMedicine.subabaseImageUrl?', (editingMedicine as any)?.subabaseImageUrl);
+      console.log('  - oldImageUrl (combined)?', oldImageUrl);
+      
+      if (editingMedicine && formData.subabaseORImageUrl === '' && oldImageUrl) {
+        console.log('✅ All conditions met - proceeding with deletion');
+        // Delete the old image from Supabase Storage
+        const oldImageUrl = (editingMedicine as any).subabaseImageUrl || editingMedicine.subabaseORImageUrl;
+        console.log('🎯 Old image URL to delete:', oldImageUrl);
+        if (oldImageUrl) {
+          console.log('🔄 Attempting to delete image:', oldImageUrl);
+          toast.info('جاري حذف الصورة من التخزين...');
+          const result = await deleteImageFromSupabase(oldImageUrl);
+          console.log('📊 Deletion result:', result);
+          if (result.success) {
+            toast.success('تم حذف الصورة من التخزين بنجاح');
+          } else {
+            toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
+            console.error('❌ Deletion failed:', result.error);
+          }
+        }
       } else {
-        await addMedicine(formData);
+        console.log('❌ Deletion conditions NOT met - skipping deletion');
+      }
+      
+      // Prepare data with both image fields
+      const dataToSave = {
+        ...formData,
+        subabaseImageUrl: formData.subabaseORImageUrl, // Update both fields
+      };
+      
+      if (editingMedicine) {
+        await updateMedicine(editingMedicine.id, dataToSave);
+      } else {
+        await addMedicine(dataToSave);
       }
       setIsAddEditDialogOpen(false);
     } catch (error) {
       console.error('Error saving medicine:', error);
+      toast.error('حدث خطأ أثناء الحفظ');
     }
   };
 
@@ -342,40 +398,44 @@ export default function AdminMedicines() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="font-cairo">اسم الدواء *</Label>
+              {/* Basic Information */}
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="font-cairo text-sm">اسم الدواء *</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="code" className="font-cairo">الكود *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="code" className="font-cairo text-sm">الكود *</Label>
                   <Input
                     id="code"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     required
+                    className="h-9"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description" className="font-cairo">الوصف</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="description" className="font-cairo text-sm">الوصف</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
+                  rows={2}
+                  className="text-sm resize-none"
                 />
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price" className="font-cairo">السعر (ج.م) *</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="price" className="font-cairo text-sm">السعر (ج.م) *</Label>
                   <Input
                     id="price"
                     type="number"
@@ -384,10 +444,11 @@ export default function AdminMedicines() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
                     required
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity" className="font-cairo">الكمية *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="quantity" className="font-cairo text-sm">الكمية *</Label>
                   <Input
                     id="quantity"
                     type="number"
@@ -395,60 +456,183 @@ export default function AdminMedicines() {
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
                     required
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discountRating" className="font-cairo">نسبة الخصم (%)</Label>
-                  <Input
-                    id="discountRating"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.discountRating}
-                    onChange={(e) => setFormData({ ...formData, discountRating: parseInt(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="font-cairo">الفئة</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="category" className="font-cairo text-sm">الفئة</Label>
                   <Input
                     id="category"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="مثال: مسكنات، مضادات حيوية"
+                    placeholder="مسكنات"
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="manufacturer" className="font-cairo">الشركة المصنعة</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manufacturer" className="font-cairo text-sm">الشركة المصنعة</Label>
                   <Input
                     id="manufacturer"
                     value={formData.manufacturer}
                     onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                    className="h-9"
                   />
                 </div>
               </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="imageUrl" className="font-cairo">رابط الصورة</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="imageUrl"
-                      value={formData.subabaseORImageUrl}
-                      onChange={(e) => setFormData({ ...formData, subabaseORImageUrl: e.target.value })}
-                      placeholder="https://example.com/image.jpg"
-                    />
-                    <Button type="button" variant="outline" size="icon">
-                      <ImageIcon className="w-4 h-4" />
-                    </Button>
+              {/* Pharmacy Information - Compact */}
+              <div className="space-y-2 p-3 bg-purple-50/50 rounded-lg border border-purple-200">
+                <h3 className="text-sm font-semibold font-cairo text-gray-700 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-purple-600" />
+                  معلومات الصيدلية
+                </h3>
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pharmacy" className="font-cairo text-xs">اسم الصيدلية *</Label>
+                    <Select
+                      value={formData.pharmacyId.toString()}
+                      onValueChange={(value) => {
+                        const selectedPharmacy = pharmacies.find(p => p.pharmacyId.toString() === value);
+                        if (selectedPharmacy) {
+                          setFormData({
+                            ...formData,
+                            pharmacyId: selectedPharmacy.pharmacyId,
+                            pharmacyName: selectedPharmacy.name,
+                            pharmcyAddress: `${selectedPharmacy.address}, ${selectedPharmacy.city}`
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="اختر الصيدلية" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pharmacies.map((pharmacy) => (
+                          <SelectItem key={pharmacy.id} value={pharmacy.pharmacyId.toString()}>
+                            <span className="font-cairo text-sm">{pharmacy.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.pharmacyId > 0 && (
+                      <p className="text-xs text-purple-600 font-cairo">ID: {formData.pharmacyId}</p>
+                    )}
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pharmacyName" className="font-cairo text-xs">أو اكتب يدوياً</Label>
+                    <Input
+                      id="pharmacyName"
+                      value={formData.pharmacyName}
+                      onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
+                      placeholder="اسم الصيدلية"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pharmcyAddress" className="font-cairo text-xs flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-purple-600" />
+                    عنوان الصيدلية بالتفصيل *
+                  </Label>
+                  <Textarea
+                    id="pharmcyAddress"
+                    value={formData.pharmcyAddress}
+                    onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })}
+                    placeholder="ElSalam, El Menia, Minya Governorate 2441207"
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Additional Options - Compact */}
+              <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 className="text-sm font-semibold font-cairo text-gray-700 flex items-center gap-1.5">
+                  <Package className="w-4 h-4" />
+                  خيارات إضافية
+                </h3>
+                <div className="grid md:grid-cols-2 gap-2">
+                  {/* Is New Medicine */}
+                  <div className="bg-white p-2.5 rounded border border-blue-200">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.isNewProduct}
+                        onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 text-blue-600 rounded"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold font-cairo text-gray-900 block">
+                          هل هذا دواء جديد؟
+                        </span>
+                        <span className="text-xs text-blue-600 font-cairo">
+                          ضع علامة كمنتج جديد
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Apply Discount */}
+                  <div className="bg-white p-2.5 rounded border border-green-200">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.discountRating > 0}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          discountRating: e.target.checked ? 10 : 0 
+                        })}
+                        className="w-4 h-4 mt-0.5 text-green-600 rounded"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold font-cairo text-gray-900 block">
+                          تطبيق خصم
+                        </span>
+                        <span className="text-xs text-green-600 font-cairo">
+                          تفعيل تسعير الخصم
+                        </span>
+                      </div>
+                    </label>
+                    {formData.discountRating > 0 && (
+                      <div className="mt-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.discountRating}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            discountRating: parseInt(e.target.value) || 0 
+                          })}
+                          placeholder="نسبة الخصم %"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Medicine Image - Compact */}
+              <div className="space-y-2 p-3 bg-blue-50/50 rounded-lg border border-blue-200">
+                <h3 className="text-sm font-semibold font-cairo text-gray-700 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-blue-600" />
+                  صورة الدواء
+                </h3>
+                <div className="space-y-2">
+                  <Input
+                    id="imageUrl"
+                    value={formData.subabaseORImageUrl}
+                    onChange={(e) => setFormData({ ...formData, subabaseORImageUrl: e.target.value })}
+                    placeholder="https://example.com/medicine-image.jpg"
+                    className="w-full h-9 text-sm"
+                  />
                   {formData.subabaseORImageUrl && (
-                    <div className="mt-2 w-32 h-32 rounded-lg overflow-hidden border">
+                    <div className="relative w-full h-32 rounded-lg border-2 border-gray-300 overflow-hidden bg-white group">
                       <img 
                         src={formData.subabaseORImageUrl} 
                         alt="Preview" 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-2"
                         onError={(e) => {
                           const target = e.currentTarget as HTMLImageElement;
                           target.style.display = 'none';
@@ -458,27 +642,38 @@ export default function AdminMedicines() {
                           }
                         }}
                       />
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('هل تريد مسح الصورة؟\n\nسيتم حذف الصورة من قاعدة البيانات ومن Supabase Storage عند الحفظ.')) {
+                              setFormData({ ...formData, subabaseORImageUrl: '' });
+                            }
+                          }}
+                          className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all"
+                          title="مسح الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
-
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isNewProduct}
-                    onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm font-cairo">منتج جديد</span>
-                </label>
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddEditDialogOpen(false)}>
+              <DialogFooter className="gap-2 pt-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddEditDialogOpen(false)}
+                  className="h-9 font-cairo"
+                >
                   إلغاء
                 </Button>
-                <Button type="submit">
+                <Button 
+                  type="submit"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo h-9"
+                >
                   {editingMedicine ? 'حفظ التعديلات' : 'إضافة الدواء'}
                 </Button>
               </DialogFooter>

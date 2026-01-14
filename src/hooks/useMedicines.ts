@@ -9,11 +9,13 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  orderBy
+  orderBy,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Medicine } from '@/types';
 import { toast } from 'sonner';
+import { deleteImageFromSupabase } from '@/lib/supabase';
 
 export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -161,8 +163,18 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
   const updateMedicine = async (id: string, updates: Partial<Medicine>) => {
     try {
       const medicineRef = doc(db, 'medicines', id);
+      
+      // Clean up the updates object - explicitly set empty strings for deleted images
+      const cleanedUpdates: any = { ...updates };
+      
+      // If image URL is empty, explicitly set both fields to empty string
+      if ('subabaseORImageUrl' in cleanedUpdates && cleanedUpdates.subabaseORImageUrl === '') {
+        cleanedUpdates.subabaseORImageUrl = '';
+        cleanedUpdates.subabaseImageUrl = '';
+      }
+      
       await updateDoc(medicineRef, {
-        ...updates,
+        ...cleanedUpdates,
         updatedAt: serverTimestamp()
       });
       toast.success('تم تحديث بيانات الدواء بنجاح');
@@ -175,8 +187,31 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
 
   const deleteMedicine = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'medicines', id));
-      toast.success('تم حذف الدواء بنجاح');
+      // Get medicine data first to retrieve image URL
+      const medicineRef = doc(db, 'medicines', id);
+      const medicineDoc = await getDoc(medicineRef);
+      
+      if (medicineDoc.exists()) {
+        const medicineData = medicineDoc.data();
+        const imageUrl = medicineData.subabaseORImageUrl || medicineData.subabaseImageUrl;
+        
+        // Delete image from Supabase Storage if exists
+        if (imageUrl) {
+          console.log('🗑️ حذف الصورة من Supabase Storage:', imageUrl);
+          const deleteResult = await deleteImageFromSupabase(imageUrl);
+          
+          if (deleteResult.success) {
+            console.log('✅ تم حذف الصورة من Supabase بنجاح');
+          } else {
+            console.warn('⚠️ فشل حذف الصورة من Supabase:', deleteResult.error);
+            // Continue with medicine deletion even if image deletion fails
+          }
+        }
+      }
+      
+      // Delete medicine document from Firestore
+      await deleteDoc(medicineRef);
+      toast.success('تم حذف الدواء والصورة بنجاح');
     } catch (err) {
       console.error('Error deleting medicine:', err);
       toast.error('فشل في حذف الدواء');

@@ -10,12 +10,18 @@ import {
   Star,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Image as ImageIcon,
+  Building2,
+  MapPin
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useMedicines } from '@/hooks/useMedicines';
+import { usePharmacies } from '@/hooks/usePharmacies';
 import { useAuth } from '@/contexts/AuthContext';
 import { Medicine } from '@/types';
 import {
@@ -23,20 +29,157 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { deleteImageFromSupabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
   const hasPharmacyId = user?.pharmacyId !== undefined && user?.pharmacyId !== null;
-  const { medicines, isLoading, deleteMedicine } = useMedicines(user?.pharmacyId, { enabled: hasPharmacyId });
+  const { medicines, isLoading, addMedicine, updateMedicine, deleteMedicine } = useMedicines(user?.pharmacyId, { enabled: hasPharmacyId });
+  const { pharmacies } = usePharmacies();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+    price: 0,
+    quantity: 0,
+    pharmacyId: user?.pharmacyId || 0,
+    pharmacyName: user?.pharmacyName || '',
+    pharmcyAddress: '',
+    category: '',
+    manufacturer: '',
+    subabaseORImageUrl: '',
+    avgRating: 0,
+    ratingCount: 0,
+    discountRating: 0,
+    isNewProduct: false,
+    sellingCount: 0,
+    reviews: []
+  });
 
   const filteredMedicines = medicines.filter(medicine =>
     medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (medicine.code && medicine.code.includes(searchQuery))
   );
+
+  const handleOpenAddEdit = (medicine?: Medicine) => {
+    if (medicine) {
+      setEditingMedicine(medicine);
+      setFormData({
+        name: medicine.name,
+        code: medicine.code,
+        description: medicine.description,
+        price: medicine.price,
+        quantity: medicine.quantity,
+        pharmacyId: medicine.pharmacyId,
+        pharmacyName: medicine.pharmacyName,
+        pharmcyAddress: medicine.pharmcyAddress,
+        category: medicine.category || '',
+        manufacturer: medicine.manufacturer || '',
+        subabaseORImageUrl: (medicine as any).subabaseImageUrl || medicine.subabaseORImageUrl || '',
+        avgRating: medicine.avgRating,
+        ratingCount: medicine.ratingCount,
+        discountRating: medicine.discountRating,
+        isNewProduct: medicine.isNewProduct,
+        sellingCount: medicine.sellingCount,
+        reviews: medicine.reviews
+      });
+    } else {
+      setEditingMedicine(null);
+      // Get default pharmacy from user or first pharmacy in list
+      const defaultPharmacy = pharmacies.find(p => p.pharmacyId === user?.pharmacyId) || pharmacies[0];
+      setFormData({
+        name: '',
+        code: `MED-${Date.now()}`,
+        description: '',
+        price: 0,
+        quantity: 0,
+        pharmacyId: defaultPharmacy?.pharmacyId || user?.pharmacyId || 0,
+        pharmacyName: defaultPharmacy?.name || user?.pharmacyName || '',
+        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
+        category: '',
+        manufacturer: '',
+        subabaseORImageUrl: '',
+        avgRating: 0,
+        ratingCount: 0,
+        discountRating: 0,
+        isNewProduct: false,
+        sellingCount: 0,
+        reviews: []
+      });
+    }
+    setIsAddEditDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('🚀 handleSubmit called');
+    console.log('📝 Form data:', formData);
+    console.log('✏️ Editing medicine:', editingMedicine);
+    
+    try {
+      // Check if image was deleted (empty string) and we're editing
+      console.log('🔍 Checking deletion conditions:');
+      const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
+      console.log('Checking deletion conditions:');
+      console.log('  - editingMedicine exists?', !!editingMedicine);
+      console.log('  - formData.subabaseORImageUrl is empty?', formData.subabaseORImageUrl === '');
+      console.log('  - editingMedicine.subabaseORImageUrl?', editingMedicine?.subabaseORImageUrl);
+      console.log('  - editingMedicine.subabaseImageUrl?', (editingMedicine as any)?.subabaseImageUrl);
+      console.log('  - oldImageUrl (combined)?', oldImageUrl);
+      
+      if (editingMedicine && formData.subabaseORImageUrl === '' && oldImageUrl) {
+        console.log('✅ All conditions met - proceeding with deletion');
+        // Delete the old image from Supabase Storage
+        const oldImageUrl = (editingMedicine as any).subabaseImageUrl || editingMedicine.subabaseORImageUrl;
+        console.log('🎯 Old image URL to delete:', oldImageUrl);
+        if (oldImageUrl) {
+          console.log('🔄 Attempting to delete image:', oldImageUrl);
+          toast.info('جاري حذف الصورة من التخزين...');
+          const result = await deleteImageFromSupabase(oldImageUrl);
+          console.log('📊 Deletion result:', result);
+          if (result.success) {
+            toast.success('تم حذف الصورة من التخزين بنجاح');
+          } else {
+            toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
+            console.error('❌ Deletion failed:', result.error);
+          }
+        }
+      } else {
+        console.log('❌ Deletion conditions NOT met - skipping deletion');
+      }
+      
+      // Prepare data with both image fields
+      const dataToSave = {
+        ...formData,
+        subabaseImageUrl: formData.subabaseORImageUrl, // Update both fields
+      };
+      
+      if (editingMedicine) {
+        await updateMedicine(editingMedicine.id, dataToSave);
+      } else {
+        await addMedicine(dataToSave);
+      }
+      setIsAddEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving medicine:', error);
+      toast.error('حدث خطأ أثناء الحفظ');
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
@@ -62,7 +205,10 @@ export default function PharmacistMedicines() {
             </h1>
             <p className="text-gray-600 text-lg">إدارة منتجات صيدليتك بكل سهولة</p>
           </div>
-          <Button className="bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all duration-300 h-12 px-6">
+          <Button 
+            onClick={() => handleOpenAddEdit()}
+            className="bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all duration-300 h-12 px-6"
+          >
             <Plus className="w-5 h-5 ml-2" />
             إضافة دواء جديد
           </Button>
@@ -366,6 +512,7 @@ export default function PharmacistMedicines() {
                     <Button 
                       variant="outline" 
                       size="sm"
+                      onClick={() => handleOpenAddEdit(medicine)}
                       className="h-10 w-10 p-0 border-2 border-green-200 hover:bg-green-50 hover:border-green-400 text-green-600 transition-all duration-200"
                     >
                       <Edit className="w-4 h-4" />
@@ -384,6 +531,131 @@ export default function PharmacistMedicines() {
             ))
           )}
         </div>
+
+        {/* Add/Edit Medicine Dialog */}
+        <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border-2 border-white/40 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-cairo text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Basic Info - Compact */}
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="font-cairo text-sm">اسم الدواء *</Label>
+                  <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="code" className="font-cairo text-sm">الكود *</Label>
+                  <Input id="code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required className="h-9" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="description" className="font-cairo text-sm">الوصف</Label>
+                <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="text-sm resize-none" />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="price" className="font-cairo text-xs">السعر (ج.م) *</Label>
+                  <Input id="price" type="number" min="0" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })} required className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="quantity" className="font-cairo text-xs">الكمية *</Label>
+                  <Input id="quantity" type="number" min="0" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })} required className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="category" className="font-cairo text-xs">الفئة</Label>
+                  <Input id="category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} placeholder="مسكنات" className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="manufacturer" className="font-cairo text-xs">الشركة</Label>
+                  <Input id="manufacturer" value={formData.manufacturer} onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })} className="h-9" />
+                </div>
+              </div>
+
+              {/* Pharmacy Info - Compact */}
+              <div className="space-y-2 p-2.5 bg-purple-50/50 rounded border border-purple-200">
+                <h3 className="text-xs font-semibold font-cairo text-gray-700 flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                  معلومات الصيدلية
+                </h3>
+                <div className="grid md:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="pharmacy" className="font-cairo text-xs">اسم الصيدلية *</Label>
+                    <Select value={formData.pharmacyId.toString()} onValueChange={(value) => { const selectedPharmacy = pharmacies.find(p => p.pharmacyId.toString() === value); if (selectedPharmacy) { setFormData({ ...formData, pharmacyId: selectedPharmacy.pharmacyId, pharmacyName: selectedPharmacy.name, pharmcyAddress: `${selectedPharmacy.address}, ${selectedPharmacy.city}` }); } }}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="اختر" /></SelectTrigger>
+                      <SelectContent>{pharmacies.map((pharmacy) => (<SelectItem key={pharmacy.id} value={pharmacy.pharmacyId.toString()}><span className="font-cairo text-xs">{pharmacy.name}</span></SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pharmacyName" className="font-cairo text-xs">أو اكتب يدوياً</Label>
+                    <Input id="pharmacyName" value={formData.pharmacyName} onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })} placeholder="اسم الصيدلية" className="h-8 text-xs" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="pharmcyAddress" className="font-cairo text-xs flex items-center gap-1"><MapPin className="w-3 h-3" />عنوان الصيدلية *</Label>
+                  <Textarea id="pharmcyAddress" value={formData.pharmcyAddress} onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })} placeholder="ElSalam, El Menia, Minya Governorate 2441207" rows={2} className="text-xs resize-none" />
+                </div>
+              </div>
+
+              {/* Options - Compact */}
+              <div className="grid md:grid-cols-2 gap-2">
+                <div className="bg-blue-50/50 p-2 rounded border border-blue-200">
+                  <label className="flex items-start gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.isNewProduct} onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })} className="w-3.5 h-3.5 mt-0.5 text-blue-600 rounded" />
+                    <div className="flex-1">
+                      <span className="text-xs font-semibold font-cairo text-gray-900 block">دواء جديد؟</span>
+                      <span className="text-[10px] text-blue-600 font-cairo">ضع علامة كمنتج جديد</span>
+                    </div>
+                  </label>
+                </div>
+                <div className="bg-green-50/50 p-2 rounded border border-green-200">
+                  <label className="flex items-start gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.discountRating > 0} onChange={(e) => setFormData({ ...formData, discountRating: e.target.checked ? 10 : 0 })} className="w-3.5 h-3.5 mt-0.5 text-green-600 rounded" />
+                    <div className="flex-1">
+                      <span className="text-xs font-semibold font-cairo text-gray-900 block">تطبيق خصم</span>
+                      {formData.discountRating > 0 && (<Input type="number" min="0" max="100" value={formData.discountRating} onChange={(e) => setFormData({ ...formData, discountRating: parseInt(e.target.value) || 0 })} placeholder="%" className="h-7 text-xs mt-1" />)}
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Image - Compact */}
+              <div className="space-y-1 p-2 bg-gray-50 rounded border border-gray-200">
+                <Label htmlFor="imageUrl" className="font-cairo text-xs flex items-center gap-1"><ImageIcon className="w-3 h-3" />صورة الدواء</Label>
+                <div className="space-y-2">
+                  <Input id="imageUrl" value={formData.subabaseORImageUrl} onChange={(e) => setFormData({ ...formData, subabaseORImageUrl: e.target.value })} placeholder="https://..." className="w-full h-8 text-xs" />
+                  {formData.subabaseORImageUrl && (
+                    <div className="relative w-full h-24 rounded border overflow-hidden bg-white group">
+                      <img src={formData.subabaseORImageUrl} alt="Preview" className="w-full h-full object-contain p-1" onError={(e) => { const target = e.currentTarget as HTMLImageElement; target.style.display = 'none'; const parent = target.parentElement; if (parent) { parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-xs text-gray-500">صورة غير صالحة</div>'; } }} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('هل تريد مسح الصورة؟\n\nسيتم حذف الصورة من قاعدة البيانات ومن التخزين عند الحفظ.')) {
+                            setFormData({ ...formData, subabaseORImageUrl: '' });
+                          }
+                        }}
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all"
+                        title="مسح الصورة"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setIsAddEditDialogOpen(false)} className="h-8 text-sm font-cairo">إلغاء</Button>
+                <Button type="submit" className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo h-8 text-sm">{editingMedicine ? 'حفظ' : 'إضافة'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Medicine Details Dialog */}
         <Dialog open={!!selectedMedicine} onOpenChange={() => setSelectedMedicine(null)}>
@@ -499,6 +771,10 @@ export default function PharmacistMedicines() {
                 {/* Actions */}
                 <div className="flex gap-3 pt-4 border-t-2 border-gray-100">
                   <Button 
+                    onClick={() => {
+                      setSelectedMedicine(null);
+                      handleOpenAddEdit(selectedMedicine);
+                    }}
                     className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo font-bold h-12 shadow-lg hover:shadow-xl transition-all"
                   >
                     <Edit className="w-5 h-5 ml-2" />
@@ -506,7 +782,10 @@ export default function PharmacistMedicines() {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => handleDelete(selectedMedicine.id)}
+                    onClick={() => {
+                      setSelectedMedicine(null);
+                      handleDelete(selectedMedicine.id);
+                    }}
                     className="border-2 border-red-200 hover:bg-red-50 hover:border-red-400 text-red-600 font-cairo font-bold h-12"
                   >
                     <Trash2 className="w-5 h-5 ml-2" />
