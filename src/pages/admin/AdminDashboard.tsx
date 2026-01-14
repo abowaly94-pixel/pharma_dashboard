@@ -28,11 +28,18 @@ export default function AdminDashboard() {
   // Calculate real statistics from Firebase data
   const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
   const pendingOrders = orders.filter(o => o.orderStatus === 'pending').length;
+  
+  // Count orders delivered today (must be delivered status AND updated today)
   const deliveredToday = orders.filter(o => {
+    if (o.orderStatus !== 'delivered') return false;
+    
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     const orderDate = new Date(o.updatedAt);
-    return o.orderStatus === 'delivered' && 
-           orderDate.toDateString() === today.toDateString();
+    orderDate.setHours(0, 0, 0, 0);
+    
+    return orderDate.getTime() === today.getTime();
   }).length;
 
   // Calculate trends (compare with previous period)
@@ -46,21 +53,26 @@ export default function AdminDashboard() {
     return orderDate >= twoMonthsAgo && orderDate < lastMonth;
   }).length;
   
-  const ordersTrend = ordersLastMonth > 0 
-    ? Math.round(((ordersThisMonth - ordersLastMonth) / ordersLastMonth) * 100)
-    : 0;
+  // Calculate trend percentage
+  let ordersTrend = 0;
+  if (ordersLastMonth > 0) {
+    // Normal calculation when we have previous data
+    ordersTrend = Math.round(((ordersThisMonth - ordersLastMonth) / ordersLastMonth) * 100);
+  }
+  // If no previous orders and no current orders, trend is 0
+  // If no previous orders but have current orders, don't show trend (it's misleading)
 
   const isLoading = medicinesLoading || ordersLoading || usersLoading;
 
-  // Use sample data if no real data exists
+  // Always use real data from Firebase
   const displayStats = {
-    medicines: medicines.length || 45,
-    orders: orders.length || 128,
-    users: users.length || 67,
-    revenue: totalRevenue || 45750,
-    pending: pendingOrders || 12,
-    delivered: deliveredToday || 8,
-    trend: ordersTrend || 15
+    medicines: medicines.length,
+    orders: orders.length,
+    users: users.length,
+    revenue: totalRevenue,
+    pending: pendingOrders,
+    delivered: deliveredToday,
+    trend: ordersTrend
   };
 
   const hasRealData = medicines.length > 0 || orders.length > 0 || users.length > 0;
@@ -115,7 +127,6 @@ export default function AdminDashboard() {
               value={displayStats.medicines}
               icon={Pill}
               color="primary"
-              trend={displayStats.medicines > 0 ? { value: 12, isPositive: true } : undefined}
               delay={0}
             />
             <StatCard
@@ -123,7 +134,7 @@ export default function AdminDashboard() {
               value={displayStats.orders}
               icon={ShoppingCart}
               color="accent"
-              trend={displayStats.trend !== 0 ? { value: Math.abs(displayStats.trend), isPositive: displayStats.trend > 0 } : undefined}
+              trend={ordersLastMonth > 0 && displayStats.trend !== 0 ? { value: Math.abs(displayStats.trend), isPositive: displayStats.trend > 0 } : undefined}
               delay={1}
             />
             <StatCard

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -11,7 +11,6 @@ import {
   Menu,
   X,
   Bell,
-  Search,
   ChevronDown,
   Building2
 } from 'lucide-react';
@@ -19,7 +18,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,8 +50,6 @@ const pharmacistNavItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,16 +63,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   useEffect(() => {
     setMobileMenuOpen(false);
-    setSearchOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-    const id = window.setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, [searchOpen]);
 
   const isItemActive = (itemPath: string) => {
     if (location.pathname === itemPath) return true;
@@ -246,30 +233,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <div className="flex items-center gap-4">
             <NotificationBell />
-
-            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="بحث"
-                >
-                  <Search className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-3" dir="rtl">
-                <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
-                  <Search className="w-4 h-4 text-muted-foreground" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="بحث..."
-                    className="bg-transparent border-none outline-none text-sm w-full font-cairo"
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

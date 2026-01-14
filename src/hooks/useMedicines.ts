@@ -51,8 +51,6 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
 
       const unsubscribe = onSnapshot(medicinesQuery,
         (snapshot) => {
-          console.log(`📊 تم جلب ${snapshot.size} دواء من Firebase`);
-          
           const medicinesList = snapshot.docs.map(doc => {
             const data = doc.data();
             
@@ -89,7 +87,6 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
             return dateB.getTime() - dateA.getTime();
           });
 
-          console.log('✅ تم تحميل الأدوية بنجاح:', medicinesList.map(m => m.name));
           setMedicines(medicinesList);
           setFilteredMedicines(medicinesList);
           setIsLoading(false);
