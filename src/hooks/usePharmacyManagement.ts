@@ -23,11 +23,6 @@ import {
   getPharmacyStats,
   sendPharmacyPasswordReset,
 } from '@/services/pharmacyService';
-import {
-  logPharmacyCreated,
-  logPharmacyStatusChange,
-  logMedicineLimitUpdated,
-} from '@/services/auditService';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -160,9 +155,6 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
         setIsLoading(true);
         const pharmacy = await createPharmacy(data, user.uid);
         
-        // Log the action
-        await logPharmacyCreated(user.uid, user.email, pharmacy.id, pharmacy.name);
-        
         toast.success('تم إنشاء الصيدلية بنجاح');
         return pharmacy;
       } catch (err) {
@@ -189,9 +181,6 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
         const oldStatus = pharmacy?.status || 'inactive';
         
         await updatePharmacyStatus(id, status);
-        
-        // Log the action
-        await logPharmacyStatusChange(user.uid, user.email, id, oldStatus, status);
         
         const statusMessages = {
           active: 'تم تفعيل الصيدلية',
@@ -221,9 +210,6 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
         const oldLimit = pharmacy?.medicineLimit || 100;
         
         await updateMedicineLimit(id, limit);
-        
-        // Log the action
-        await logMedicineLimitUpdated(user.uid, user.email, id, oldLimit, limit);
         
         toast.success('تم تحديث حد الأدوية');
         return true;

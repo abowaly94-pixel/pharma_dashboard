@@ -5,7 +5,7 @@
  * Requirements: 10.1, 10.2, 10.3
  */
 
-import { PharmacyAccount, MedicineWithApproval, AuditLog } from '@/types';
+import { PharmacyAccount, MedicineWithApproval } from '@/types';
 
 /**
  * تحويل البيانات إلى صيغة CSV
@@ -133,37 +133,6 @@ export async function exportMedicines(medicines: MedicineWithApproval[]): Promis
   
   const csv = convertToCSV(data, headers);
   const filename = `medicines_${new Date().toISOString().split('T')[0]}.csv`;
-  
-  downloadCSV(csv, filename);
-}
-
-/**
- * تصدير سجلات المراجعة إلى CSV
- * Requirement: 10.3
- */
-export async function exportAuditLogs(logs: AuditLog[]): Promise<void> {
-  const headers = [
-    'id',
-    'action',
-    'actorEmail',
-    'actorRole',
-    'targetId',
-    'targetType',
-    'timestamp',
-  ];
-  
-  const data = logs.map(log => ({
-    id: log.id,
-    action: log.action,
-    actorEmail: log.actorEmail,
-    actorRole: log.actorRole,
-    targetId: log.targetId,
-    targetType: log.targetType,
-    timestamp: log.timestamp.toISOString(),
-  }));
-  
-  const csv = convertToCSV(data, headers);
-  const filename = `audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
   
   downloadCSV(csv, filename);
 }

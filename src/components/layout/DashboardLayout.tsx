@@ -13,8 +13,7 @@ import {
   Bell,
   ChevronDown,
   Building2,
-  ClipboardCheck,
-  FileText
+  ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -39,7 +38,6 @@ const adminNavItems = [
   { icon: Users, label: 'المستخدمين', path: '/admin/users' },
   { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
   { icon: ClipboardCheck, label: 'مراجعة الأدوية', path: '/admin/medicine-review' },
-  { icon: FileText, label: 'سجلات المراجعة', path: '/admin/audit-logs' },
   { icon: Bell, label: 'الإشعارات', path: '/admin/notifications' },
   { icon: Settings, label: 'الإعدادات', path: '/admin/settings' },
 ];

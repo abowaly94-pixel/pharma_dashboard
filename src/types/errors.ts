@@ -218,7 +218,6 @@ export class NotFoundError extends Error {
       medicine: 'الدواء',
       user: 'المستخدم',
       order: 'الطلب',
-      auditLog: 'سجل المراجعة',
     };
 
     const resourceName = resourceNames[this.resourceType] || this.resourceType;

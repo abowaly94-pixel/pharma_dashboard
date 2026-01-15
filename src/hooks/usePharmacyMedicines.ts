@@ -64,10 +64,13 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   // Real-time listener for pharmacy medicines
   useEffect(() => {
     if (!effectivePharmacyIdNumber) {
+      console.log('⚠️ No pharmacy ID found');
       setMedicines([]);
       setIsLoading(false);
       return;
     }
+
+    console.log('🔍 Setting up real-time listener for pharmacyId:', effectivePharmacyIdNumber);
 
     const q = query(
       collection(db, 'medicines'),
@@ -78,8 +81,17 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        console.log('📦 Received medicines update:', snapshot.docs.length, 'medicines');
+        
         const medicineList: MedicineWithApproval[] = snapshot.docs.map((doc) => {
           const data = doc.data();
+          console.log('💊 Medicine:', {
+            id: doc.id,
+            name: data.name,
+            pharmacyId: data.pharmacyId,
+            status: data.status
+          });
+          
           return {
             id: doc.id,
             name: data.name,
@@ -102,11 +114,12 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           };
         });
 
+        console.log('✅ Setting medicines state:', medicineList.length, 'medicines');
         setMedicines(medicineList);
         setIsLoading(false);
       },
       (err) => {
-        console.error('Error listening to medicines:', err);
+        console.error('❌ Error listening to medicines:', err);
         setError(err as Error);
         setIsLoading(false);
       }
@@ -116,7 +129,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   }, [effectivePharmacyId]);
 
 
-  // Update limit info when pharmacy changes
+  // Update limit info when pharmacy changes or medicines count changes
   useEffect(() => {
     if (!effectivePharmacyId) {
       setLimitInfo({
@@ -147,7 +160,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     };
 
     updateLimitInfo();
-  }, [effectivePharmacyId]); // Only update when pharmacyId changes, not medicines.length
+  }, [effectivePharmacyId, medicines.length]); // Update when pharmacyId or medicines count changes
 
   // Group medicines by status
   const groupedMedicines: GroupedMedicines = {
@@ -177,14 +190,42 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
       }
 
       try {
+        console.log('🔍 Adding medicine with data:', {
+          pharmacyId: effectivePharmacyId,
+          pharmacyName: user.pharmacyName,
+          data
+        });
+        
         const pharmacyName = user.pharmacyName || 'صيدلية';
         const medicine = await createMedicine(data, effectivePharmacyId, pharmacyName);
         
+        console.log('✅ Medicine added successfully:', medicine);
         toast.success('تم إضافة الدواء بنجاح وهو في انتظار المراجعة');
         return medicine;
       } catch (err) {
         const error = err as Error;
-        toast.error(error.message || 'فشل في إضافة الدواء');
+        console.error('❌ Error adding medicine:', error);
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        // رسائل خطأ أكثر وضوحاً
+        if (error.message.includes('اسم الدواء')) {
+          toast.error('اسم الدواء مطلوب (حرفين على الأقل)');
+        } else if (error.message.includes('وصف الدواء')) {
+          toast.error('وصف الدواء مطلوب (10 أحرف على الأقل)');
+        } else if (error.message.includes('فئة الدواء')) {
+          toast.error('فئة الدواء مطلوبة');
+        } else if (error.message.includes('السعر')) {
+          toast.error('السعر يجب أن يكون أكبر من صفر');
+        } else if (error.message.includes('الكمية')) {
+          toast.error('الكمية يجب أن تكون صفر أو أكثر');
+        } else {
+          toast.error(error.message || 'فشل في إضافة الدواء');
+        }
+        
         setError(error);
         return null;
       }

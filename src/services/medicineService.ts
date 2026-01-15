@@ -99,8 +99,18 @@ export async function createMedicine(
   validateMedicineInput(input);
   
   try {
-    // Check if pharmacy can add more medicines
-    const pharmacy = await getPharmacyById(pharmacyId);
+    // Convert pharmacyId to number for lookup
+    const pharmacyIdNum = parseInt(pharmacyId);
+    if (isNaN(pharmacyIdNum)) {
+      throw new ValidationError('معرف الصيدلية غير صحيح', 'pharmacyId', 'INVALID_FORMAT');
+    }
+    
+    // Check if pharmacy can add more medicines using pharmacyId (number)
+    const pharmacy = await getPharmacyByPharmacyId(pharmacyIdNum);
+    if (!pharmacy) {
+      throw new NotFoundError('pharmacy', pharmacyId);
+    }
+    
     if (pharmacy.currentMedicineCount >= pharmacy.medicineLimit) {
       throw new AuthorizationError(
         'تم الوصول للحد الأقصى من الأدوية المسموح بها',
@@ -121,7 +131,7 @@ export async function createMedicine(
       manufacturer: input.manufacturer || '',
       expiryDate: Timestamp.fromDate(input.expiryDate),
       imageUrl: input.imageUrl || '',
-      pharmacyId,
+      pharmacyId: pharmacyIdNum, // Store as number
       pharmacyName,
       status: 'pending' as MedicineStatus, // Always pending
       rejectionNotes: null,
@@ -132,10 +142,21 @@ export async function createMedicine(
       updatedAt: serverTimestamp(),
     };
     
+    console.log('💾 Saving medicine to Firebase:', {
+      medicineId,
+      pharmacyId: pharmacyIdNum,
+      pharmacyName,
+      name: input.name
+    });
+    
     await setDoc(doc(db, MEDICINES_COLLECTION, medicineId), medicineData);
     
-    // Update pharmacy medicine count
-    await updateMedicineCount(pharmacyId, 1);
+    console.log('✅ Medicine saved successfully');
+    
+    // Update pharmacy medicine count using the pharmacy document ID
+    await updateMedicineCount(pharmacy.id, 1);
+    
+    console.log('✅ Medicine count updated');
     
     return mapFirestoreToMedicine(medicineId, {
       ...medicineData,
@@ -143,7 +164,7 @@ export async function createMedicine(
       updatedAt: Timestamp.now(),
     });
   } catch (error) {
-    if (error instanceof ValidationError || error instanceof AuthorizationError) {
+    if (error instanceof ValidationError || error instanceof AuthorizationError || error instanceof NotFoundError) {
       throw error;
     }
     console.error('Error creating medicine:', error);
@@ -439,7 +460,7 @@ export async function deleteMedicine(
     if (medicine.status === 'approved') {
       throw new AuthorizationError(
         'لا يمكن حذف الأدوية المعتمدة',
-        'DELETE_NOT_ALLOWED'
+        'ACTION_NOT_ALLOWED'
       );
     }
     

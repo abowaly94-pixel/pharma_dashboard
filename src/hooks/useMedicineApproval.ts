@@ -15,10 +15,6 @@ import {
   filterMedicines,
   getMedicineStats,
 } from '@/services/medicineService';
-import {
-  logMedicineApproved,
-  logMedicineRejected,
-} from '@/services/auditService';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -146,11 +142,6 @@ export function useMedicineApproval(): UseMedicineApprovalReturn {
         const medicine = allMedicines.find(m => m.id === id);
         await approveMedicine(id, user.uid);
         
-        // Log the action
-        if (medicine) {
-          await logMedicineApproved(user.uid, user.email, id, medicine.name);
-        }
-        
         toast.success('تمت الموافقة على الدواء');
         return true;
       } catch (err) {
@@ -177,11 +168,6 @@ export function useMedicineApproval(): UseMedicineApprovalReturn {
       try {
         const medicine = allMedicines.find(m => m.id === id);
         await rejectMedicine(id, user.uid, notes);
-        
-        // Log the action
-        if (medicine) {
-          await logMedicineRejected(user.uid, user.email, id, medicine.name, notes);
-        }
         
         toast.success('تم رفض الدواء');
         return true;

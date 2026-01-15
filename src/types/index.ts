@@ -6,21 +6,6 @@ export type PharmacyStatus = 'active' | 'inactive' | 'suspended';
 /** حالة الدواء في نظام المراجعة */
 export type MedicineStatus = 'pending' | 'approved' | 'rejected';
 
-/** أنواع الإجراءات المسجلة في سجل المراجعة */
-export type AuditAction =
-  | 'pharmacy_created'
-  | 'pharmacy_activated'
-  | 'pharmacy_deactivated'
-  | 'pharmacy_suspended'
-  | 'medicine_created'
-  | 'medicine_approved'
-  | 'medicine_rejected'
-  | 'medicine_updated'
-  | 'limit_updated'
-  | 'login_success'
-  | 'login_failed'
-  | 'logout';
-
 // ==================== Core Interfaces ====================
 
 export interface Medicine {
@@ -242,32 +227,6 @@ export interface UpdateMedicineInput {
   imageUrl?: string;
 }
 
-// ==================== Audit Log Interfaces ====================
-
-/** سجل المراجعة */
-export interface AuditLog {
-  id: string;
-  action: AuditAction;
-  actorId: string;
-  actorEmail: string;
-  actorRole: 'admin' | 'pharmacist';
-  targetId: string;
-  targetType: 'pharmacy' | 'medicine' | 'user';
-  details: Record<string, unknown>;
-  timestamp: Date;
-}
-
-/** بيانات إنشاء سجل مراجعة */
-export interface CreateAuditLogInput {
-  action: AuditAction;
-  actorId: string;
-  actorEmail: string;
-  actorRole: 'admin' | 'pharmacist';
-  targetId: string;
-  targetType: 'pharmacy' | 'medicine' | 'user';
-  details?: Record<string, unknown>;
-}
-
 // ==================== Filter Interfaces ====================
 
 /** فلاتر البحث عن الصيدليات */
@@ -284,14 +243,6 @@ export interface MedicineFilters {
   pharmacyId?: string;
   dateRange?: { start: Date; end: Date };
   category?: string;
-}
-
-/** فلاتر سجلات المراجعة */
-export interface AuditFilters {
-  action?: AuditAction | 'all';
-  actorId?: string;
-  dateRange?: { start: Date; end: Date };
-  targetType?: 'pharmacy' | 'medicine' | 'user' | 'all';
 }
 
 // ==================== Session Interface ====================

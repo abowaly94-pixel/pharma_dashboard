@@ -123,6 +123,12 @@ export default function AdminMedicines() {
     console.log('📝 Form data:', formData);
     console.log('✏️ Editing medicine:', editingMedicine);
     
+    // التحقق من وجود صورة
+    if (!formData.subabaseORImageUrl || formData.subabaseORImageUrl.trim() === '') {
+      toast.error('يجب رفع صورة للدواء قبل الحفظ');
+      return;
+    }
+    
     try {
       // Check if image was deleted (empty string) and we're editing
       const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
@@ -702,8 +708,9 @@ export default function AdminMedicines() {
               <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
                 <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
                   <ImageIcon className="w-5 h-5 text-amber-600" />
-                  صورة الدواء
+                  صورة الدواء *
                 </h3>
+                <p className="text-xs text-red-600 font-cairo font-bold">⚠️ يجب رفع صورة للدواء قبل الحفظ - هذا الحقل إلزامي</p>
                 
                 <div className="space-y-3">
                   {/* Upload Button */}
@@ -889,7 +896,9 @@ export default function AdminMedicines() {
                 </Button>
                 <Button 
                   type="submit"
-                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all"
+                  disabled={!formData.subabaseORImageUrl}
+                  title={!formData.subabaseORImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
+                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}
                 </Button>

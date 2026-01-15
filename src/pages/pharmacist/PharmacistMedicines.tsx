@@ -1,7 +1,18 @@
 import { useState } from 'react';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { Search, Plus, Edit, Trash2, Package, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Package,
+  AlertCircle,
+  Image as ImageIcon,
+  Star,
+  Clock,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +22,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { usePharmacyMedicines } from '@/hooks/usePharmacyMedicines';
 import { useAuth } from '@/contexts/AuthContext';
-import { Medicine, MedicineWithApproval } from '@/types';
+import { MedicineWithApproval } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { deleteImageFromSupabase, uploadImageToSupabase } from '@/lib/supabase';
+import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
@@ -28,10 +41,20 @@ export default function PharmacistMedicines() {
     editMedicine,
   } = usePharmacyMedicines(user?.pharmacyId?.toString());
   
+  console.log('🏥 PharmacistMedicines Component:', {
+    userEmail: user?.email,
+    pharmacyId: user?.pharmacyId,
+    medicinesCount: medicines.length,
+    isLoading,
+    medicines: medicines.map(m => ({ id: m.id, name: m.name, status: m.status }))
+  });
+  
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
-  const [editingMedicine, setEditingMedicine] = useState<Medicine | MedicineWithApproval | null>(null);
+  const [editingMedicine, setEditingMedicine] = useState<MedicineWithApproval | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -41,17 +64,27 @@ export default function PharmacistMedicines() {
     category: '',
     manufacturer: '',
     subabaseORImageUrl: '',
+    avgRating: 0,
+    ratingCount: 0,
+    discountRating: 0,
+    isNewProduct: false,
+    sellingCount: 0,
   });
 
-  const filteredMedicines = medicines.filter(medicine =>
-    medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (medicine.code && medicine.code.includes(searchQuery))
-  );
+  const filteredMedicines = medicines.filter(medicine => {
+    // Filter by search query
+    const matchesSearch = medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (medicine.code && medicine.code.includes(searchQuery));
+    
+    // Filter by status
+    const matchesStatus = statusFilter === 'all' || medicine.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
-  const handleOpenAddEdit = (medicine?: Medicine | MedicineWithApproval) => {
+  const handleOpenAddEdit = (medicine?: MedicineWithApproval) => {
     if (medicine) {
       setEditingMedicine(medicine);
-      const imageUrl = 'imageUrl' in medicine ? medicine.imageUrl : '';
       setFormData({
         name: medicine.name,
         code: medicine.code,
@@ -60,7 +93,12 @@ export default function PharmacistMedicines() {
         quantity: medicine.quantity,
         category: medicine.category || '',
         manufacturer: medicine.manufacturer || '',
-        subabaseORImageUrl: imageUrl,
+        subabaseORImageUrl: medicine.imageUrl || '',
+        avgRating: medicine.avgRating || 0,
+        ratingCount: medicine.ratingCount || 0,
+        discountRating: medicine.discountRating || 0,
+        isNewProduct: medicine.isNewProduct || false,
+        sellingCount: medicine.sellingCount || 0,
       });
     } else {
       setEditingMedicine(null);
@@ -73,6 +111,11 @@ export default function PharmacistMedicines() {
         category: '',
         manufacturer: '',
         subabaseORImageUrl: '',
+        avgRating: 0,
+        ratingCount: 0,
+        discountRating: 0,
+        isNewProduct: false,
+        sellingCount: 0,
       });
     }
     setIsAddEditDialogOpen(true);
@@ -81,27 +124,73 @@ export default function PharmacistMedicines() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('📝 Form submitted with data:', formData);
+    
+    // التحقق من وجود صورة
+    if (!formData.subabaseORImageUrl || formData.subabaseORImageUrl.trim() === '') {
+      toast.error('يجب رفع صورة للدواء قبل الحفظ');
+      return;
+    }
+    
+    // التحقق من البيانات المطلوبة
+    if (!formData.name || formData.name.trim().length < 2) {
+      toast.error('اسم الدواء مطلوب (حرفين على الأقل)');
+      return;
+    }
+    
+    if (!formData.description || formData.description.trim().length < 10) {
+      toast.error('وصف الدواء مطلوب (10 أحرف على الأقل)');
+      return;
+    }
+    
+    if (!formData.category || formData.category.trim() === '') {
+      toast.error('فئة الدواء مطلوبة');
+      return;
+    }
+    
+    if (formData.price <= 0) {
+      toast.error('السعر يجب أن يكون أكبر من صفر');
+      return;
+    }
+    
+    if (formData.quantity < 0) {
+      toast.error('الكمية يجب أن تكون صفر أو أكثر');
+      return;
+    }
+    
+    console.log('✅ All validations passed');
+    
     try {
       const dataToSave = {
-        name: formData.name,
+        name: formData.name.trim(),
         code: formData.code,
-        description: formData.description,
+        description: formData.description.trim(),
         price: formData.price,
         quantity: formData.quantity,
-        category: formData.category,
-        manufacturer: formData.manufacturer,
+        category: formData.category.trim(),
+        manufacturer: formData.manufacturer.trim(),
         imageUrl: formData.subabaseORImageUrl,
         expiryDate: new Date(),
       };
       
+      console.log('💾 Saving medicine:', dataToSave);
+      
       if (editingMedicine) {
-        await editMedicine(editingMedicine.id, dataToSave);
+        const success = await editMedicine(editingMedicine.id, dataToSave);
+        if (success) {
+          setIsAddEditDialogOpen(false);
+        }
       } else {
-        await addMedicineFromHook(dataToSave);
+        const newMedicine = await addMedicineFromHook(dataToSave);
+        console.log('🎉 Medicine creation result:', newMedicine);
+        if (newMedicine) {
+          setIsAddEditDialogOpen(false);
+          // الدواء الجديد سيظهر تلقائياً بفضل real-time listener
+          // وسيتم تحديث limitInfo تلقائياً
+        }
       }
-      setIsAddEditDialogOpen(false);
     } catch (error) {
-      console.error('Error saving medicine:', error);
+      console.error('❌ Error in handleSubmit:', error);
       toast.error('حدث خطأ أثناء الحفظ');
     }
   };
@@ -110,11 +199,8 @@ export default function PharmacistMedicines() {
     if (window.confirm('هل أنت متأكد من حذف هذا الدواء؟')) {
       try {
         const medicine = medicines.find(m => m.id === id);
-        if (medicine) {
-          const imageUrl = 'imageUrl' in medicine ? medicine.imageUrl : '';
-          if (imageUrl) {
-            await deleteImageFromSupabase(imageUrl);
-          }
+        if (medicine && medicine.imageUrl) {
+          await deleteImageFromSupabase(medicine.imageUrl);
         }
         await deleteDoc(doc(db, 'medicines', id));
         toast.success('تم حذف الدواء بنجاح');
@@ -149,42 +235,117 @@ export default function PharmacistMedicines() {
     }
   };
 
+  const handleRemoveBackground = async () => {
+    if (!formData.subabaseORImageUrl) {
+      toast.error('لا توجد صورة لإزالة الخلفية منها');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    toast.info('جاري إزالة الخلفية... قد يستغرق بضع ثوانٍ');
+
+    try {
+      const result = await removeImageBackground(formData.subabaseORImageUrl);
+      
+      if (!result.success || !result.blob) {
+        toast.error(result.error || 'فشل إزالة الخلفية');
+        return;
+      }
+
+      const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
+      
+      if (formData.subabaseORImageUrl.includes('supabase.co/storage')) {
+        await deleteImageFromSupabase(formData.subabaseORImageUrl);
+      }
+      
+      const uploadResult = await uploadImageToSupabase(file);
+      
+      if (uploadResult.success && uploadResult.url) {
+        setFormData({ ...formData, subabaseORImageUrl: uploadResult.url });
+        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
+      } else {
+        toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
+      }
+    } catch (error) {
+      console.error('Error removing background:', error);
+      toast.error('حدث خطأ أثناء إزالة الخلفية');
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold font-cairo">أدويتي</h1>
-          <Button onClick={() => handleOpenAddEdit()} className="font-cairo">
-            <Plus className="w-4 h-4 ml-2" />
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+          <div>
+            <h1 className="text-3xl font-bold font-cairo">أدويتي</h1>
+            <p className="text-muted-foreground">إدارة أدوية الصيدلية ({medicines.length} دواء)</p>
+          </div>
+          <Button 
+            onClick={() => handleOpenAddEdit()} 
+            className="gradient-primary text-primary-foreground font-cairo"
+            disabled={limitInfo && medicines.length >= limitInfo.limit}
+          >
+            <Plus className="w-5 h-5 ml-2" />
             إضافة دواء جديد
           </Button>
-        </div>
+        </motion.div>
 
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'}`}
+            onClick={() => setStatusFilter('all')}
+          >
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-cairo mb-1">إجمالي الأدوية</p>
               <p className="text-2xl font-bold">{medicines.length}</p>
+              {statusFilter === 'all' && <p className="text-xs text-blue-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
+            onClick={() => setStatusFilter('pending')}
+          >
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-cairo mb-1">قيد المراجعة</p>
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-orange-600" />
+                <p className="text-sm text-gray-600 font-cairo">قيد المراجعة</p>
+              </div>
               <p className="text-2xl font-bold text-orange-600">{medicineStats.pending}</p>
+              {statusFilter === 'pending' && <p className="text-xs text-orange-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-green-500 shadow-lg' : 'hover:shadow-md'}`}
+            onClick={() => setStatusFilter('approved')}
+          >
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-cairo mb-1">موافق عليها</p>
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <p className="text-sm text-gray-600 font-cairo">موافق عليها</p>
+              </div>
               <p className="text-2xl font-bold text-green-600">{medicineStats.approved}</p>
+              {statusFilter === 'approved' && <p className="text-xs text-green-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${statusFilter === 'rejected' ? 'ring-2 ring-red-500 shadow-lg' : 'hover:shadow-md'}`}
+            onClick={() => setStatusFilter('rejected')}
+          >
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-cairo mb-1">مرفوضة</p>
+              <div className="flex items-center gap-2 mb-1">
+                <XCircle className="w-4 h-4 text-red-600" />
+                <p className="text-sm text-gray-600 font-cairo">مرفوضة</p>
+              </div>
               <p className="text-2xl font-bold text-red-600">{medicineStats.rejected}</p>
+              {statusFilter === 'rejected' && <p className="text-xs text-red-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
         </div>
@@ -218,91 +379,216 @@ export default function PharmacistMedicines() {
         )}
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            placeholder="ابحث عن دواء بالاسم أو الكود..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10 font-cairo"
-          />
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-3"
+        >
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              placeholder="بحث بالاسم، الكود، الفئة..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10 font-cairo"
+            />
+          </div>
+          
+          {/* Status Filter Info */}
+          {statusFilter !== 'all' && (
+            <Alert className={`
+              ${statusFilter === 'pending' ? 'bg-orange-50 border-orange-200' : ''}
+              ${statusFilter === 'approved' ? 'bg-green-50 border-green-200' : ''}
+              ${statusFilter === 'rejected' ? 'bg-red-50 border-red-200' : ''}
+            `}>
+              <AlertCircle className={`w-4 h-4 
+                ${statusFilter === 'pending' ? 'text-orange-600' : ''}
+                ${statusFilter === 'approved' ? 'text-green-600' : ''}
+                ${statusFilter === 'rejected' ? 'text-red-600' : ''}
+              `} />
+              <AlertDescription className={`font-cairo flex items-center justify-between
+                ${statusFilter === 'pending' ? 'text-orange-700' : ''}
+                ${statusFilter === 'approved' ? 'text-green-700' : ''}
+                ${statusFilter === 'rejected' ? 'text-red-700' : ''}
+              `}>
+                <span>
+                  {statusFilter === 'pending' && '⏳ عرض الأدوية قيد المراجعة فقط'}
+                  {statusFilter === 'approved' && '✅ عرض الأدوية الموافق عليها فقط'}
+                  {statusFilter === 'rejected' && '❌ عرض الأدوية المرفوضة فقط'}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setStatusFilter('all')}
+                  className="h-6 text-xs"
+                >
+                  إلغاء الفلتر
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+        </motion.div>
 
         {/* Medicines Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {isLoading ? (
-            [...Array(8)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="h-32 bg-gray-200" />
-                <CardContent className="p-4 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </CardContent>
-              </Card>
-            ))
-          ) : filteredMedicines.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-800 font-cairo mb-2">
-                {searchQuery ? 'لم يتم العثور على نتائج' : 'لا توجد أدوية حتى الآن'}
-              </h3>
-              <p className="text-gray-600 font-cairo">
-                {searchQuery ? 'جرب البحث بكلمات مختلفة' : 'ابدأ بإضافة أدوية جديدة'}
-              </p>
+        {isLoading ? (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="inline-flex items-center gap-2 text-muted-foreground">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                جاري تحميل الأدوية...
+              </div>
             </div>
-          ) : (
-            filteredMedicines.map((medicine) => {
-              const medicineStatus = 'status' in medicine ? medicine.status : 'approved';
-              const rejectionNotes = 'rejectionNotes' in medicine ? medicine.rejectionNotes : null;
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl p-4 animate-pulse border border-gray-200">
+                  <div className="w-full h-32 bg-gray-200 rounded-lg mb-4" />
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : filteredMedicines.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2">
+              {searchQuery ? 'لم يتم العثور على نتائج' : 'لا توجد أدوية حتى الآن'}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery ? 'جرب البحث بكلمات مختلفة' : 'ابدأ بإضافة أدوية جديدة'}
+            </p>
+            {!searchQuery && (
+              <Button 
+                onClick={() => handleOpenAddEdit()} 
+                className="gradient-primary text-primary-foreground font-cairo"
+                disabled={limitInfo && medicines.length >= limitInfo.limit}
+              >
+                <Plus className="w-4 h-4 ml-2" />
+                إضافة أول دواء
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredMedicines.map((medicine, index) => {
+              const medicineStatus = medicine.status;
+              const rejectionNotes = medicine.rejectionNotes;
               
               return (
-                <Card key={medicine.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <motion.div
+                  key={medicine.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden group hover:shadow-md hover:border-blue-200 transition-all duration-300"
+                >
                   {/* Image */}
-                  <div className="relative h-32 bg-gray-100">
-                    {('imageUrl' in medicine && medicine.imageUrl) ? (
+                  <div className="relative h-32 bg-muted overflow-hidden rounded-t-xl">
+                    {medicine.imageUrl ? (
                       <img
                         src={medicine.imageUrl}
                         alt={medicine.name}
-                        className="w-full h-full object-contain p-2"
+                        className="w-full h-full object-contain bg-white p-2 group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+                                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                </svg>
+                              </div>
+                            `;
+                          }
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
                         <Package className="w-12 h-12 text-gray-400" />
                       </div>
                     )}
                     
-                    {/* Status Badge */}
-                    <div className="absolute top-2 right-2">
+                    {/* Status Badge - أكبر وأوضح */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-1">
                       {medicineStatus === 'pending' && (
-                        <Badge className="bg-orange-500 text-white text-xs">قيد المراجعة</Badge>
+                        <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 font-bold shadow-lg flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          قيد المراجعة
+                        </Badge>
                       )}
                       {medicineStatus === 'rejected' && (
-                        <Badge className="bg-red-500 text-white text-xs">مرفوض</Badge>
+                        <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 font-bold shadow-lg flex items-center gap-1">
+                          <XCircle className="w-3 h-3" />
+                          مرفوض
+                        </Badge>
+                      )}
+                      {medicineStatus === 'approved' && (
+                        <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 font-bold shadow-lg flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          موافق عليه
+                        </Badge>
                       )}
                     </div>
                     
                     {/* Out of Stock */}
                     {medicine.quantity === 0 && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-xl">
                         <span className="text-white font-semibold text-sm bg-red-600 px-3 py-1 rounded-full">نفذت الكمية</span>
                       </div>
                     )}
                   </div>
 
                   {/* Content */}
-                  <CardContent className="p-4 space-y-2">
-                    <h3 className="font-semibold text-sm line-clamp-1">{medicine.name}</h3>
-                    <p className="text-xs text-gray-500">#{medicine.code}</p>
-                    
+                  <CardContent className="p-4 space-y-3">
+                    {/* Status Bar - شريط الحالة الكبير */}
+                    <div className="mb-3">
+                      {medicineStatus === 'pending' && (
+                        <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                          <Clock className="w-4 h-4 text-orange-600" />
+                          <span className="text-xs font-bold text-orange-700 font-cairo">⏳ في انتظار موافقة الأدمن</span>
+                        </div>
+                      )}
+                      {medicineStatus === 'rejected' && (
+                        <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                          <XCircle className="w-4 h-4 text-red-600" />
+                          <span className="text-xs font-bold text-red-700 font-cairo">❌ تم الرفض من الأدمن</span>
+                        </div>
+                      )}
+                      {medicineStatus === 'approved' && (
+                        <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span className="text-xs font-bold text-green-700 font-cairo">✅ موافق عليه ومتاح</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 mb-1">{medicine.name}</h3>
+                        <p className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md inline-block">#{medicine.code}</p>
+                      </div>
+                    </div>
+
                     {medicine.category && (
-                      <Badge variant="outline" className="text-xs">{medicine.category}</Badge>
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">{medicine.category}</Badge>
                     )}
 
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
-                      <span className={`text-sm font-medium ${medicine.quantity > 10 ? 'text-green-600' : medicine.quantity > 0 ? 'text-orange-500' : 'text-red-500'}`}>
-                        الكمية: {medicine.quantity}
-                      </span>
+                    <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                      {medicine.description || 'لا يوجد وصف'}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex flex-col">
+                        <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm font-medium ${medicine.quantity > 10 ? 'text-green-600' : medicine.quantity > 0 ? 'text-orange-500' : 'text-red-500'}`}>
+                          الكمية: {medicine.quantity}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Rejection Notes */}
@@ -316,11 +602,11 @@ export default function PharmacistMedicines() {
                     )}
 
                     {/* Actions */}
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
+                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                      <Button 
+                        variant="outline" 
                         size="sm"
-                        className="flex-1 text-xs"
+                        className="flex-1 text-xs h-8 border-gray-200 hover:bg-green-50 hover:border-green-300"
                         onClick={() => handleOpenAddEdit(medicine)}
                       >
                         <Edit className="w-3 h-3 ml-1" />
@@ -329,153 +615,394 @@ export default function PharmacistMedicines() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="text-xs text-red-500 hover:text-red-600"
+                        className="h-8 w-8 p-0 border-gray-200 hover:bg-red-50 hover:border-red-300 text-red-500 hover:text-red-600"
                         onClick={() => handleDelete(medicine.id)}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </CardContent>
-                </Card>
+                </motion.div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
 
-        {/* Add/Edit Dialog */}
+        {/* Add/Edit Dialog - نفس القائمة التي يستخدمها الأدمن */}
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name" className="font-cairo">اسم الدواء *</Label>
-                  <Input 
-                    id="name" 
-                    value={formData.name} 
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                    required 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="code" className="font-cairo">الكود *</Label>
-                  <Input id="code" value={formData.code} readOnly className="bg-gray-50" />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="description" className="font-cairo">الوصف</Label>
-                <Textarea 
-                  id="description" 
-                  value={formData.description} 
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                  rows={3} 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="price" className="font-cairo">السعر (ج.م) *</Label>
-                  <Input 
-                    id="price" 
-                    type="number" 
-                    min="0" 
-                    step="0.01" 
-                    value={formData.price} 
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })} 
-                    required 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="quantity" className="font-cairo">الكمية *</Label>
-                  <Input 
-                    id="quantity" 
-                    type="number" 
-                    min="0" 
-                    value={formData.quantity} 
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })} 
-                    required 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category" className="font-cairo">الفئة</Label>
-                  <Input 
-                    id="category" 
-                    value={formData.category} 
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
-                    placeholder="مسكنات" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="manufacturer" className="font-cairo">الشركة</Label>
-                  <Input 
-                    id="manufacturer" 
-                    value={formData.manufacturer} 
-                    onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })} 
-                  />
-                </div>
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label className="font-cairo">صورة الدواء</Label>
-                <div className="space-y-2">
-                  <label className={`block ${formData.subabaseORImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                    <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-cairo border-2 border-dashed transition-all ${
-                      formData.subabaseORImageUrl 
-                        ? 'bg-gray-100 text-gray-500 border-gray-300' 
-                        : isUploading
-                          ? 'bg-blue-50 text-blue-600 border-blue-300'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-                    }`}>
-                      {isUploading ? 'جاري الرفع...' : formData.subabaseORImageUrl ? 'تم رفع الصورة' : 'رفع صورة'}
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={isUploading || !!formData.subabaseORImageUrl}
-                      className="hidden"
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Section 1: Basic Info */}
+              <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  المعلومات الأساسية
+                </h3>
+                
+                <div className="grid grid-cols-[2fr,1fr] gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="font-cairo text-sm font-semibold text-gray-700">اسم الدواء *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      placeholder="أدخل اسم الدواء"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
-                  </label>
-                  
-                  {formData.subabaseORImageUrl && (
-                    <div className="relative w-full h-32 rounded-lg border overflow-hidden bg-gray-50">
-                      <img 
-                        src={formData.subabaseORImageUrl} 
-                        alt="Preview" 
-                        className="w-full h-full object-contain p-2"
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="code" className="font-cairo text-sm font-semibold text-gray-700">الكود</Label>
+                    <Input
+                      id="code"
+                      value={formData.code}
+                      readOnly
+                      disabled
+                      className="h-10 bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="font-cairo text-sm font-semibold text-gray-700">
+                    الوصف * <span className="text-xs text-red-600">(10 أحرف على الأقل)</span>
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    required
+                    minLength={10}
+                    placeholder="أضف وصف تفصيلي للدواء (10 أحرف على الأقل)..."
+                    className="text-sm resize-none bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500">
+                    {formData.description.length} / 10 أحرف كحد أدنى
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="font-cairo text-sm font-semibold text-gray-700">السعر (ج.م) *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                      required
+                      placeholder="0.00"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity" className="font-cairo text-sm font-semibold text-gray-700">الكمية *</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="0"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+                      required
+                      placeholder="0"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="font-cairo text-sm font-semibold text-gray-700">الفئة *</Label>
+                    <Input
+                      id="category"
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      placeholder="مسكنات، مضادات..."
+                      required
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manufacturer" className="font-cairo text-sm font-semibold text-gray-700">الشركة المصنعة</Label>
+                    <Input
+                      id="manufacturer"
+                      value={formData.manufacturer}
+                      onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                      placeholder="اسم الشركة"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Additional Options */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-green-600" />
+                  خيارات إضافية
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div className="bg-white p-3 rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.isNewProduct}
+                        onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                       />
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm('هل تريد حذف الصورة؟')) {
-                            if (formData.subabaseORImageUrl.includes('supabase.co/storage')) {
-                              await deleteImageFromSupabase(formData.subabaseORImageUrl);
+                      <div className="flex-1">
+                        <span className="text-sm font-bold font-cairo text-gray-900 block">
+                          منتج جديد
+                        </span>
+                        <span className="text-xs text-blue-600 font-cairo">
+                          سيظهر بشارة "جديد"
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.discountRating > 0}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          discountRating: e.target.checked ? 10 : 0 
+                        })}
+                        className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-bold font-cairo text-gray-900 block">
+                          تطبيق خصم
+                        </span>
+                        <span className="text-xs text-green-600 font-cairo">
+                          إضافة نسبة خصم
+                        </span>
+                      </div>
+                    </label>
+                    {formData.discountRating > 0 && (
+                      <div className="mt-3">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.discountRating}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            discountRating: parseInt(e.target.value) || 0 
+                          })}
+                          placeholder="نسبة الخصم %"
+                          className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Medicine Image - إلزامي */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-amber-600" />
+                  صورة الدواء *
+                </h3>
+                <p className="text-xs text-red-600 font-cairo font-bold">⚠️ يجب رفع صورة للدواء قبل الحفظ - هذا الحقل إلزامي</p>
+                
+                <div className="space-y-3">
+                  {/* Upload Button */}
+                  <div className="relative">
+                    <label className={`block ${formData.subabaseORImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
+                        formData.subabaseORImageUrl 
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                          : isUploading
+                            ? 'bg-amber-400 text-white cursor-wait'
+                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
+                      }`}>
+                        {isUploading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>جاري الرفع...</span>
+                          </>
+                        ) : formData.subabaseORImageUrl ? (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>يوجد صورة - احذفها للتغيير</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>📤 رفع صورة من الجهاز (إلزامي)</span>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading || !!formData.subabaseORImageUrl}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  
+                  {/* Divider */}
+                  {!formData.subabaseORImageUrl && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-amber-300"></div>
+                      <span className="text-sm text-gray-600 font-cairo font-semibold">أو</span>
+                      <div className="flex-1 h-px bg-amber-300"></div>
+                    </div>
+                  )}
+                  
+                  {/* URL Input */}
+                  {!formData.subabaseORImageUrl && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="imageUrlInputPharmacist"
+                          type="url"
+                          placeholder="https://example.com/image.jpg"
+                          className="flex-1 h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.currentTarget as HTMLInputElement;
+                              if (input.value.trim()) {
+                                setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                                input.value = '';
+                                toast.success('تم إضافة رابط الصورة');
+                              }
                             }
-                            setFormData({ ...formData, subabaseORImageUrl: '' });
-                            toast.success('تم حذف الصورة');
-                          }
-                        }}
-                        className="absolute top-2 left-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
-                      >
-                        ×
-                      </button>
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            const input = document.getElementById('imageUrlInputPharmacist') as HTMLInputElement;
+                            if (input && input.value.trim()) {
+                              setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                              input.value = '';
+                              toast.success('تم إضافة رابط الصورة');
+                            } else {
+                              toast.error('الرجاء إدخال رابط صحيح');
+                            }
+                          }}
+                          className="h-10 px-5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo font-bold shadow-md"
+                        >
+                          إضافة
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Image Preview */}
+                  {formData.subabaseORImageUrl && (
+                    <div className="space-y-3">
+                      <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
+                        <img 
+                          src={formData.subabaseORImageUrl} 
+                          alt="Preview" 
+                          className="w-full h-full object-contain p-3"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo"><div class="text-center"><div class="text-4xl mb-2">⚠️</div><div class="font-bold">صورة غير صالحة</div><div class="text-xs mt-1">تأكد من صحة الرابط</div></div></div>';
+                            }
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleRemoveBackground}
+                            disabled={isRemovingBg}
+                            className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
+                            title="إزالة خلفية الصورة"
+                          >
+                            {isRemovingBg ? (
+                              <>
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>جاري...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>✨</span>
+                                <span>حذف الخلفية</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const imageUrl = formData.subabaseORImageUrl;
+                              const isSupabaseImage = imageUrl.includes('supabase.co/storage');
+                              
+                              if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
+                                if (isSupabaseImage) {
+                                  toast.info('جاري حذف الصورة...');
+                                  const result = await deleteImageFromSupabase(imageUrl);
+                                  
+                                  if (result.success) {
+                                    toast.success('تم حذف الصورة بنجاح');
+                                    setFormData({ ...formData, subabaseORImageUrl: '' });
+                                  } else {
+                                    toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
+                                  }
+                                } else {
+                                  setFormData({ ...formData, subabaseORImageUrl: '' });
+                                  toast.success('تم إزالة الصورة');
+                                }
+                              }
+                            }}
+                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
+                            title="حذف الصورة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* URL Display */}
+                      <div className="space-y-1">
+                        <Label className="text-xs font-cairo text-gray-600">رابط الصورة</Label>
+                        <Input
+                          value={formData.subabaseORImageUrl}
+                          readOnly
+                          className="h-9 text-xs bg-gray-50 cursor-default border-gray-300"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => setIsAddEditDialogOpen(false)} className="font-cairo">
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddEditDialogOpen(false)}
+                  className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
+                >
                   إلغاء
                 </Button>
-                <Button type="submit" className="font-cairo">
-                  {editingMedicine ? 'حفظ' : 'إضافة'}
+                <Button 
+                  type="submit"
+                  disabled={!formData.subabaseORImageUrl}
+                  title={!formData.subabaseORImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
+                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}
                 </Button>
               </div>
             </form>
