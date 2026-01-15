@@ -18,7 +18,7 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import {
   PharmacyAccount,
@@ -489,5 +489,18 @@ export async function getPharmacyStats(): Promise<{
   } catch (error) {
     console.error('Error fetching pharmacy stats:', error);
     throw new DatabaseError('فشل في جلب إحصائيات الصيدليات', 'getPharmacyStats', error as Error);
+  }
+}
+
+/**
+ * إرسال رابط إعادة تعيين كلمة المرور للصيدلية
+ * Send password reset email to pharmacy
+ */
+export async function sendPharmacyPasswordReset(email: string): Promise<void> {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw new DatabaseError('فشل في إرسال رابط إعادة تعيين كلمة المرور', 'sendPharmacyPasswordReset', error as Error);
   }
 }

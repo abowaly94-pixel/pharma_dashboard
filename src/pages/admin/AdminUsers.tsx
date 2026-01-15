@@ -10,8 +10,6 @@ import {
   User as UserIcon,
   Store,
   Calendar,
-  ShoppingCart,
-  Heart,
   Trash2,
   Eye
 } from 'lucide-react';
@@ -258,22 +256,7 @@ export default function AdminUsers() {
                     )}
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="w-4 h-4 text-primary" />
-                      <div>
-                        <p className="text-xs text-muted-foreground font-cairo">السلة</p>
-                        <p className="font-medium">{user.cart?.length || 0}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Heart className="w-4 h-4 text-red-500" />
-                      <div>
-                        <p className="text-xs text-muted-foreground font-cairo">المفضلة</p>
-                        <p className="font-medium">{user.favorites?.length || 0}</p>
-                      </div>
-                    </div>
-                  </div>
+
                 </motion.div>
               );
             })
@@ -353,32 +336,6 @@ export default function AdminUsers() {
                     </div>
                   </div>
                 )}
-
-                {/* Activity Statistics */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold font-cairo text-lg flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5 text-primary" />
-                    إحصائيات النشاط
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3 pr-7">
-                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <ShoppingCart className="w-5 h-5 text-primary" />
-                        <span className="text-sm text-muted-foreground font-cairo">السلة</span>
-                      </div>
-                      <p className="text-2xl font-bold">{selectedUser.cart?.length || 0}</p>
-                      <p className="text-xs text-muted-foreground font-cairo mt-1">منتج</p>
-                    </div>
-                    <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Heart className="w-5 h-5 text-red-500" />
-                        <span className="text-sm text-muted-foreground font-cairo">المفضلة</span>
-                      </div>
-                      <p className="text-2xl font-bold">{selectedUser.favorites?.length || 0}</p>
-                      <p className="text-xs text-muted-foreground font-cairo mt-1">منتج</p>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Account Information */}
                 <div className="space-y-3">

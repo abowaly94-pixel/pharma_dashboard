@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Plus, Search, Building2, Phone, Mail, MapPin, Edit, 
-  Power, CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff
+  CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,26 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -37,14 +56,18 @@ export default function AdminPharmacies() {
     createNewPharmacy, 
     changePharmacyStatus,
     changeMedicineLimit,
-    updatePharmacyData 
+    updatePharmacyData,
+    resetPharmacyPassword
   } = usePharmacyManagement();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [editingPharmacy, setEditingPharmacy] = useState<PharmacyAccount | null>(null);
   const [selectedPharmacy, setSelectedPharmacy] = useState<PharmacyAccount | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<PharmacyStatus | null>(null);
   const [newLimit, setNewLimit] = useState(100);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<CreatePharmacyInput>({
@@ -58,6 +81,36 @@ export default function AdminPharmacies() {
     licenseNumber: '',
     medicineLimit: 100,
   });
+
+  const handleOpenStatusDialog = (pharmacy: PharmacyAccount, status: PharmacyStatus) => {
+    setSelectedPharmacy(pharmacy);
+    setPendingStatus(status);
+    setIsStatusDialogOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (selectedPharmacy && pendingStatus) {
+      await changePharmacyStatus(selectedPharmacy.id, pendingStatus);
+      setIsStatusDialogOpen(false);
+      setSelectedPharmacy(null);
+      setPendingStatus(null);
+    }
+  };
+
+  const handleOpenResetPasswordDialog = (pharmacy: PharmacyAccount) => {
+    setSelectedPharmacy(pharmacy);
+    setIsResetPasswordDialogOpen(true);
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (selectedPharmacy) {
+      const success = await resetPharmacyPassword(selectedPharmacy.email);
+      if (success) {
+        setIsResetPasswordDialogOpen(false);
+        setSelectedPharmacy(null);
+      }
+    }
+  };
 
   const handleOpenDialog = (pharmacy?: PharmacyAccount) => {
     if (pharmacy) {
@@ -172,11 +225,30 @@ export default function AdminPharmacies() {
   const getStatusBadge = (status: PharmacyStatus) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle className="w-3 h-3 ml-1" />نشط</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="w-3 h-3 ml-1" />نشط</Badge>;
       case 'inactive':
-        return <Badge variant="secondary"><XCircle className="w-3 h-3 ml-1" />غير نشط</Badge>;
+        return <Badge variant="secondary" className="bg-gray-200"><XCircle className="w-3 h-3 ml-1" />غير نشط</Badge>;
       case 'suspended':
         return <Badge variant="destructive"><AlertTriangle className="w-3 h-3 ml-1" />معلق</Badge>;
+    }
+  };
+
+  const getStatusText = (status: PharmacyStatus) => {
+    switch (status) {
+      case 'active': return 'تفعيل';
+      case 'inactive': return 'إلغاء التفعيل';
+      case 'suspended': return 'تعليق';
+    }
+  };
+
+  const getStatusDescription = (status: PharmacyStatus, pharmacyName: string) => {
+    switch (status) {
+      case 'active': 
+        return `سيتم تفعيل صيدلية "${pharmacyName}" وستتمكن من تسجيل الدخول وإدارة الأدوية.`;
+      case 'inactive': 
+        return `سيتم إلغاء تفعيل صيدلية "${pharmacyName}" ولن تتمكن من تسجيل الدخول.`;
+      case 'suspended': 
+        return `سيتم تعليق صيدلية "${pharmacyName}" مؤقتاً. يمكنك إعادة تفعيلها لاحقاً.`;
     }
   };
 
@@ -284,113 +356,126 @@ export default function AdminPharmacies() {
             <p className="text-muted-foreground">لا توجد صيدليات</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPharmacies.map((pharmacy, index) => (
               <motion.div
                 key={pharmacy.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="stat-card hover:shadow-lg transition-shadow"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-primary" />
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-cairo">{pharmacy.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground">{pharmacy.city}</p>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => handleOpenDetailsDialog(pharmacy)}>
+                            <Eye className="w-4 h-4 ml-2" />
+                            عرض التفاصيل
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenDialog(pharmacy)}>
+                            <Edit className="w-4 h-4 ml-2" />
+                            تعديل البيانات
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenLimitDialog(pharmacy)}>
+                            <Pill className="w-4 h-4 ml-2" />
+                            تعديل حد الأدوية
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenResetPasswordDialog(pharmacy)}>
+                            <KeyRound className="w-4 h-4 ml-2" />
+                            إعادة تعيين كلمة المرور
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {pharmacy.status !== 'active' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenStatusDialog(pharmacy, 'active')}
+                              className="text-green-600"
+                            >
+                              <CheckCircle className="w-4 h-4 ml-2" />
+                              تفعيل الصيدلية
+                            </DropdownMenuItem>
+                          )}
+                          {pharmacy.status === 'active' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenStatusDialog(pharmacy, 'inactive')}
+                              className="text-gray-600"
+                            >
+                              <XCircle className="w-4 h-4 ml-2" />
+                              إلغاء التفعيل
+                            </DropdownMenuItem>
+                          )}
+                          {pharmacy.status !== 'suspended' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenStatusDialog(pharmacy, 'suspended')}
+                              className="text-red-600"
+                            >
+                              <AlertTriangle className="w-4 h-4 ml-2" />
+                              تعليق الصيدلية
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <div>
-                      <h3 className="font-bold font-cairo">{pharmacy.name}</h3>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">الحالة</span>
                       {getStatusBadge(pharmacy.status)}
                     </div>
-                  </div>
-                </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Mail className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate" dir="ltr">{pharmacy.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="w-4 h-4 flex-shrink-0" />
+                        <span dir="ltr">{pharmacy.phoneNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">{pharmacy.address}</span>
+                      </div>
+                    </div>
 
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
-                    <span>{pharmacy.city} - {pharmacy.address}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Phone className="w-4 h-4" />
-                    <span dir="ltr">{pharmacy.phoneNumber}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="w-4 h-4" />
-                    <span dir="ltr">{pharmacy.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Pill className="w-4 h-4" />
-                    <span>الأدوية: {pharmacy.currentMedicineCount} / {pharmacy.medicineLimit}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">المالك: </span>
-                    <span className="font-semibold">{pharmacy.ownerName}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {pharmacy.status !== 'active' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => changePharmacyStatus(pharmacy.id, 'active')}
-                      className="text-green-600 border-green-300 hover:bg-green-50"
-                    >
-                      <CheckCircle className="w-4 h-4 ml-1" />
-                      تفعيل
-                    </Button>
-                  )}
-                  {pharmacy.status === 'active' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => changePharmacyStatus(pharmacy.id, 'inactive')}
-                      className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                    >
-                      <XCircle className="w-4 h-4 ml-1" />
-                      إلغاء التفعيل
-                    </Button>
-                  )}
-                  {pharmacy.status !== 'suspended' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => changePharmacyStatus(pharmacy.id, 'suspended')}
-                      className="text-red-600 border-red-300 hover:bg-red-50"
-                    >
-                      <AlertTriangle className="w-4 h-4 ml-1" />
-                      تعليق
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenLimitDialog(pharmacy)}
-                  >
-                    <Pill className="w-4 h-4 ml-1" />
-                    تعديل الحد
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenDialog(pharmacy)}
-                  >
-                    <Edit className="w-4 h-4 ml-1" />
-                    تعديل
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenDetailsDialog(pharmacy)}
-                  >
-                    <Eye className="w-4 h-4 ml-1" />
-                    التفاصيل
-                  </Button>
-                </div>
+                    <div className="pt-3 border-t">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">الأدوية</span>
+                        <span className="font-semibold">
+                          {pharmacy.currentMedicineCount} / {pharmacy.medicineLimit}
+                        </span>
+                      </div>
+                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            pharmacy.currentMedicineCount >= pharmacy.medicineLimit 
+                              ? 'bg-red-500' 
+                              : pharmacy.currentMedicineCount >= pharmacy.medicineLimit * 0.8
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min((pharmacy.currentMedicineCount / pharmacy.medicineLimit) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
@@ -400,93 +485,87 @@ export default function AdminPharmacies() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-cairo">
-                {editingPharmacy ? 'تعديل الصيدلية' : 'إضافة صيدلية جديدة'}
+              <DialogTitle className="font-cairo text-xl">
+                {editingPharmacy ? 'تعديل بيانات الصيدلية' : 'إضافة صيدلية جديدة'}
               </DialogTitle>
+              <DialogDescription>
+                {editingPharmacy 
+                  ? 'قم بتعديل البيانات المطلوبة ثم احفظ التغييرات' 
+                  : 'املأ جميع البيانات المطلوبة لإنشاء حساب صيدلية جديد'}
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Basic Info */}
-              <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  المعلومات الأساسية
-                </h3>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-700 font-cairo">المعلومات الأساسية</h3>
                 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="font-cairo text-sm font-semibold">اسم الصيدلية *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name" className="text-sm">اسم الصيدلية *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
-                      placeholder="أدخل اسم الصيدلية"
-                      className="h-10 bg-white"
+                      placeholder="صيدلية النور"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="licenseNumber" className="font-cairo text-sm font-semibold">رقم الترخيص *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="licenseNumber" className="text-sm">رقم الترخيص *</Label>
                     <Input
                       id="licenseNumber"
                       value={formData.licenseNumber}
                       onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                       required
                       minLength={5}
-                      placeholder="رقم الترخيص (5 أحرف على الأقل)"
-                      className="h-10 bg-white"
+                      placeholder="12345"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="city" className="font-cairo text-sm font-semibold">المدينة *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ownerName" className="text-sm">اسم المالك *</Label>
+                    <Input
+                      id="ownerName"
+                      value={formData.ownerName}
+                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+                      required
+                      placeholder="أحمد محمد"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="city" className="text-sm">المدينة *</Label>
                     <Input
                       id="city"
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       required
-                      placeholder="القاهرة، الإسكندرية..."
-                      className="h-10 bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="medicineLimit" className="font-cairo text-sm font-semibold">حد الأدوية</Label>
-                    <Input
-                      id="medicineLimit"
-                      type="number"
-                      min={1}
-                      value={formData.medicineLimit}
-                      onChange={(e) => setFormData({ ...formData, medicineLimit: parseInt(e.target.value) || 100 })}
-                      className="h-10 bg-white"
+                      placeholder="القاهرة"
                     />
                   </div>
                 </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="font-cairo text-sm font-semibold">العنوان بالتفصيل *</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      required
-                      minLength={5}
-                      placeholder="الشارع، الحي، المنطقة... (5 أحرف على الأقل)"
-                      className="h-10 bg-white"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="address" className="text-sm">العنوان بالتفصيل *</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                    minLength={5}
+                    placeholder="شارع الجمهورية، المعادي"
+                  />
+                </div>
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-purple-600" />
-                  معلومات الاتصال
-                </h3>
+              <div className="space-y-3 pt-3 border-t">
+                <h3 className="text-sm font-semibold text-gray-700 font-cairo">معلومات الاتصال</h3>
                 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber" className="font-cairo text-sm font-semibold">رقم الهاتف *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phoneNumber" className="text-sm">رقم الهاتف *</Label>
                     <Input
                       id="phoneNumber"
                       value={formData.phoneNumber}
@@ -495,27 +574,26 @@ export default function AdminPharmacies() {
                       minLength={10}
                       dir="ltr"
                       placeholder="+20 123 456 7890"
-                      className="h-10 bg-white"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="font-cairo text-sm font-semibold">البريد الإلكتروني *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-sm">البريد الإلكتروني *</Label>
                     <Input
                       id="email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
+                      disabled={!!editingPharmacy}
                       dir="ltr"
                       placeholder="pharmacy@example.com"
-                      className="h-10 bg-white"
                     />
                   </div>
                 </div>
 
                 {!editingPharmacy && (
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="font-cairo text-sm font-semibold">كلمة المرور *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="password" className="text-sm">كلمة المرور *</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -523,8 +601,9 @@ export default function AdminPharmacies() {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required={!editingPharmacy}
+                        minLength={8}
                         placeholder="كلمة مرور قوية (8 أحرف على الأقل)"
-                        className="h-10 bg-white pl-10"
+                        className="pl-10"
                         dir="ltr"
                       />
                       <button
@@ -532,69 +611,90 @@ export default function AdminPharmacies() {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      يجب أن تحتوي على 8 أحرف على الأقل
-                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Owner Info */}
-              <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-green-600" />
-                  معلومات المالك
-                </h3>
+              {/* Settings */}
+              <div className="space-y-3 pt-3 border-t">
+                <h3 className="text-sm font-semibold text-gray-700 font-cairo">الإعدادات</h3>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="ownerName" className="font-cairo text-sm font-semibold">اسم المالك *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="medicineLimit" className="text-sm">الحد الأقصى للأدوية</Label>
                   <Input
-                    id="ownerName"
-                    value={formData.ownerName}
-                    onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
-                    required
-                    placeholder="الاسم الكامل للمالك"
-                    className="h-10 bg-white"
+                    id="medicineLimit"
+                    type="number"
+                    min={1}
+                    value={formData.medicineLimit}
+                    onChange={(e) => setFormData({ ...formData, medicineLimit: parseInt(e.target.value) || 100 })}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    عدد الأدوية التي يمكن للصيدلية إضافتها (الافتراضي: 100)
+                  </p>
                 </div>
               </div>
 
-              {/* Footer Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t">
+              {/* Footer */}
+              <DialogFooter className="gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   إلغاء
                 </Button>
-                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-indigo-500">
+                <Button type="submit">
                   {editingPharmacy ? 'حفظ التعديلات' : 'إضافة الصيدلية'}
                 </Button>
-              </div>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Status Change Confirmation Dialog */}
+        <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo">
+                تأكيد {pendingStatus && getStatusText(pendingStatus)}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-base">
+                {selectedPharmacy && pendingStatus && getStatusDescription(pendingStatus, selectedPharmacy.name)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmStatusChange}>
+                تأكيد
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Medicine Limit Dialog */}
         <Dialog open={isLimitDialogOpen} onOpenChange={setIsLimitDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="font-cairo">تعديل حد الأدوية</DialogTitle>
+              <DialogDescription>
+                تحديد الحد الأقصى لعدد الأدوية التي يمكن للصيدلية إضافتها
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                الصيدلية: <span className="font-semibold">{selectedPharmacy?.name}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                الحد الحالي: <span className="font-semibold">{selectedPharmacy?.medicineLimit}</span> دواء
-              </p>
-              <p className="text-sm text-muted-foreground">
-                الأدوية الحالية: <span className="font-semibold">{selectedPharmacy?.currentMedicineCount}</span> دواء
-              </p>
+              <div className="p-3 bg-gray-50 rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">الصيدلية:</span>
+                  <span className="font-semibold">{selectedPharmacy?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">الحد الحالي:</span>
+                  <span className="font-semibold">{selectedPharmacy?.medicineLimit} دواء</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">الأدوية المضافة:</span>
+                  <span className="font-semibold">{selectedPharmacy?.currentMedicineCount} دواء</span>
+                </div>
+              </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="newLimit">الحد الجديد</Label>
                 <Input
@@ -604,16 +704,19 @@ export default function AdminPharmacies() {
                   value={newLimit}
                   onChange={(e) => setNewLimit(parseInt(e.target.value) || 100)}
                 />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setIsLimitDialogOpen(false)}>
-                  إلغاء
-                </Button>
-                <Button onClick={handleUpdateLimit}>
-                  حفظ
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  يجب أن يكون الحد الجديد أكبر من أو يساوي عدد الأدوية الحالية
+                </p>
               </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsLimitDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleUpdateLimit}>
+                حفظ
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -625,55 +728,52 @@ export default function AdminPharmacies() {
             </DialogHeader>
             {selectedPharmacy && (
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Building2 className="w-8 h-8 text-primary" />
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="w-7 h-7 text-primary" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold">{selectedPharmacy.name}</h3>
-                    {getStatusBadge(selectedPharmacy.status)}
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold">{selectedPharmacy.name}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedPharmacy.city}</p>
                   </div>
+                  {getStatusBadge(selectedPharmacy.status)}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">البريد الإلكتروني:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">البريد الإلكتروني</span>
                     <p className="font-semibold" dir="ltr">{selectedPharmacy.email}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">رقم الهاتف:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">رقم الهاتف</span>
                     <p className="font-semibold" dir="ltr">{selectedPharmacy.phoneNumber}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">المدينة:</span>
-                    <p className="font-semibold">{selectedPharmacy.city}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">رقم الترخيص:</span>
-                    <p className="font-semibold">{selectedPharmacy.licenseNumber}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">العنوان:</span>
-                    <p className="font-semibold">{selectedPharmacy.address}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">المالك:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">المالك</span>
                     <p className="font-semibold">{selectedPharmacy.ownerName}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">حد الأدوية:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">رقم الترخيص</span>
+                    <p className="font-semibold">{selectedPharmacy.licenseNumber}</p>
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <span className="text-muted-foreground">العنوان</span>
+                    <p className="font-semibold">{selectedPharmacy.address}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">حد الأدوية</span>
                     <p className="font-semibold">{selectedPharmacy.currentMedicineCount} / {selectedPharmacy.medicineLimit}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">التقييم:</span>
-                    <p className="font-semibold">{selectedPharmacy.rating} ⭐</p>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">التقييم</span>
+                    <p className="font-semibold">{selectedPharmacy.rating.toFixed(1)} ⭐</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">إجمالي الطلبات:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">إجمالي الطلبات</span>
                     <p className="font-semibold">{selectedPharmacy.totalOrders}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">تاريخ الإنشاء:</span>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground">تاريخ الإنشاء</span>
                     <p className="font-semibold">{selectedPharmacy.createdAt.toLocaleDateString('ar-EG')}</p>
                   </div>
                 </div>
@@ -681,6 +781,34 @@ export default function AdminPharmacies() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Reset Password Dialog */}
+        <AlertDialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo">
+                إعادة تعيين كلمة المرور
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-base">
+                {selectedPharmacy && (
+                  <>
+                    سيتم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني:
+                    <br />
+                    <span className="font-semibold text-foreground" dir="ltr">{selectedPharmacy.email}</span>
+                    <br /><br />
+                    ستتمكن الصيدلية من إنشاء كلمة مرور جديدة عبر الرابط المرسل.
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmResetPassword}>
+                إرسال الرابط
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

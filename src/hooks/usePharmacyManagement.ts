@@ -21,6 +21,7 @@ import {
   updateMedicineLimit,
   updatePharmacy,
   getPharmacyStats,
+  sendPharmacyPasswordReset,
 } from '@/services/pharmacyService';
 import {
   logPharmacyCreated,
@@ -47,6 +48,7 @@ interface UsePharmacyManagementReturn {
   changePharmacyStatus: (id: string, status: PharmacyStatus) => Promise<boolean>;
   changeMedicineLimit: (id: string, limit: number) => Promise<boolean>;
   updatePharmacyData: (id: string, data: Partial<CreatePharmacyInput>) => Promise<boolean>;
+  resetPharmacyPassword: (email: string) => Promise<boolean>;
   refreshPharmacies: () => Promise<void>;
 }
 
@@ -249,6 +251,21 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
     []
   );
 
+  const resetPharmacyPassword = useCallback(
+    async (email: string): Promise<boolean> => {
+      try {
+        await sendPharmacyPasswordReset(email);
+        toast.success('تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني');
+        return true;
+      } catch (err) {
+        const error = err as Error;
+        toast.error(error.message || 'فشل في إرسال رابط إعادة تعيين كلمة المرور');
+        return false;
+      }
+    },
+    []
+  );
+
   const refreshPharmacies = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -275,6 +292,7 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
     changePharmacyStatus,
     changeMedicineLimit,
     updatePharmacyData,
+    resetPharmacyPassword,
     refreshPharmacies,
   };
 }
