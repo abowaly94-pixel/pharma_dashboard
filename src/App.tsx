@@ -16,6 +16,8 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPharmacies from "./pages/admin/AdminPharmacies";
+import AdminMedicineReview from "./pages/admin/AdminMedicineReview";
+import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
 import AdminSettings from "./pages/admin/AdminSettings";
 import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
@@ -141,6 +143,22 @@ const App = () => {
                     element={
                       <ProtectedRoute requiredRole="admin">
                         <AdminPharmacies />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/medicine-review"
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminMedicineReview />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/audit-logs"
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminAuditLogs />
                       </ProtectedRoute>
                     }
                   />

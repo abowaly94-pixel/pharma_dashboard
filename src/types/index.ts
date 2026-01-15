@@ -1,3 +1,28 @@
+// ==================== Status Types ====================
+
+/** حالة الصيدلية في النظام */
+export type PharmacyStatus = 'active' | 'inactive' | 'suspended';
+
+/** حالة الدواء في نظام المراجعة */
+export type MedicineStatus = 'pending' | 'approved' | 'rejected';
+
+/** أنواع الإجراءات المسجلة في سجل المراجعة */
+export type AuditAction =
+  | 'pharmacy_created'
+  | 'pharmacy_activated'
+  | 'pharmacy_deactivated'
+  | 'pharmacy_suspended'
+  | 'medicine_created'
+  | 'medicine_approved'
+  | 'medicine_rejected'
+  | 'medicine_updated'
+  | 'limit_updated'
+  | 'login_success'
+  | 'login_failed'
+  | 'logout';
+
+// ==================== Core Interfaces ====================
+
 export interface Medicine {
   id: string;
   name: string;
@@ -107,4 +132,196 @@ export interface DashboardStats {
   totalRevenue: number;
   pendingOrders: number;
   todayOrders: number;
+}
+
+// ==================== Pharmacy Management Interfaces ====================
+
+/** حساب الصيدلية الموسع مع إدارة الحدود والحالة */
+export interface PharmacyAccount {
+  id: string;
+  pharmacyId: number;
+  name: string;
+  email: string;
+  address: string;
+  city: string;
+  phoneNumber: string;
+  ownerName: string;
+  licenseNumber: string;
+  status: PharmacyStatus;
+  medicineLimit: number;
+  currentMedicineCount: number;
+  emailVerified: boolean;
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+  rating: number;
+  totalOrders: number;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string; // Admin ID who created this pharmacy
+}
+
+/** بيانات إنشاء صيدلية جديدة */
+export interface CreatePharmacyInput {
+  name: string;
+  email: string;
+  password: string;
+  address: string;
+  city: string;
+  phoneNumber: string;
+  ownerName: string;
+  licenseNumber: string;
+  medicineLimit?: number;
+}
+
+/** بيانات تحديث الصيدلية */
+export interface UpdatePharmacyInput {
+  name?: string;
+  address?: string;
+  city?: string;
+  phoneNumber?: string;
+  ownerName?: string;
+  licenseNumber?: string;
+}
+
+// ==================== Medicine with Approval Interfaces ====================
+
+/** الدواء مع نظام الموافقة */
+export interface MedicineWithApproval {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  price: number;
+  quantity: number;
+  category: string;
+  manufacturer: string;
+  expiryDate: Date;
+  imageUrl: string;
+  pharmacyId: string;
+  pharmacyName: string;
+  status: MedicineStatus;
+  rejectionNotes: string | null;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  // Additional fields from Medicine
+  avgRating?: number;
+  ratingCount?: number;
+  discountRating?: number;
+  isNewProduct?: boolean;
+  sellingCount?: number;
+  reviews?: Review[];
+  subabaseORImageUrl?: string;
+  pharmcyAddress?: string;
+}
+
+/** بيانات إنشاء دواء جديد */
+export interface CreateMedicineInput {
+  name: string;
+  code: string;
+  description: string;
+  price: number;
+  quantity: number;
+  category: string;
+  manufacturer: string;
+  expiryDate: Date;
+  imageUrl: string;
+}
+
+/** بيانات تحديث الدواء */
+export interface UpdateMedicineInput {
+  name?: string;
+  code?: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+  category?: string;
+  manufacturer?: string;
+  expiryDate?: Date;
+  imageUrl?: string;
+}
+
+// ==================== Audit Log Interfaces ====================
+
+/** سجل المراجعة */
+export interface AuditLog {
+  id: string;
+  action: AuditAction;
+  actorId: string;
+  actorEmail: string;
+  actorRole: 'admin' | 'pharmacist';
+  targetId: string;
+  targetType: 'pharmacy' | 'medicine' | 'user';
+  details: Record<string, unknown>;
+  timestamp: Date;
+}
+
+/** بيانات إنشاء سجل مراجعة */
+export interface CreateAuditLogInput {
+  action: AuditAction;
+  actorId: string;
+  actorEmail: string;
+  actorRole: 'admin' | 'pharmacist';
+  targetId: string;
+  targetType: 'pharmacy' | 'medicine' | 'user';
+  details?: Record<string, unknown>;
+}
+
+// ==================== Filter Interfaces ====================
+
+/** فلاتر البحث عن الصيدليات */
+export interface PharmacyFilters {
+  status?: PharmacyStatus | 'all';
+  searchQuery?: string;
+  sortBy?: 'name' | 'createdAt' | 'medicineCount';
+  sortOrder?: 'asc' | 'desc';
+}
+
+/** فلاتر البحث عن الأدوية */
+export interface MedicineFilters {
+  status?: MedicineStatus | 'all';
+  pharmacyId?: string;
+  dateRange?: { start: Date; end: Date };
+  category?: string;
+}
+
+/** فلاتر سجلات المراجعة */
+export interface AuditFilters {
+  action?: AuditAction | 'all';
+  actorId?: string;
+  dateRange?: { start: Date; end: Date };
+  targetType?: 'pharmacy' | 'medicine' | 'user' | 'all';
+}
+
+// ==================== Session Interface ====================
+
+/** جلسة الصيدلية */
+export interface PharmacySession {
+  sessionId: string;
+  pharmacyId: string;
+  userId: string;
+  createdAt: Date;
+  expiresAt: Date;
+  isValid: boolean;
+}
+
+// ==================== Dashboard Stats Extended ====================
+
+/** إحصائيات لوحة التحكم الموسعة */
+export interface AdminDashboardStats extends DashboardStats {
+  totalPharmacies: number;
+  activePharmacies: number;
+  inactivePharmacies: number;
+  suspendedPharmacies: number;
+  pendingMedicines: number;
+  approvedMedicines: number;
+  rejectedMedicines: number;
+}
+
+/** الأدوية مجمعة حسب الحالة */
+export interface GroupedMedicines {
+  pending: MedicineWithApproval[];
+  approved: MedicineWithApproval[];
+  rejected: MedicineWithApproval[];
 }

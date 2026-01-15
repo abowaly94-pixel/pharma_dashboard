@@ -5,7 +5,7 @@ import {
   signOut,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User } from '@/types';
 
@@ -75,6 +75,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
+        
+        // If user is a pharmacist, check pharmacy status
+        if (userData.role === 'pharmacist') {
+          const pharmacyDoc = await getDoc(doc(db, 'pharmacies', firebaseUser.uid));
+          
+          if (pharmacyDoc.exists()) {
+            const pharmacyData = pharmacyDoc.data();
+            const pharmacyStatus = pharmacyData.status;
+            
+            // Check if pharmacy is active
+            if (pharmacyStatus !== 'active') {
+              await signOut(auth);
+              setIsLoading(false);
+              throw new Error('الصيدلية غير مفعلة. يرجى التواصل مع الإدارة لتفعيل حسابك');
+            }
+            
+            // Check if account is locked
+            const lockedUntil = pharmacyData.lockedUntil;
+            if (lockedUntil) {
+              const lockTime = lockedUntil.toDate();
+              const now = new Date();
+              if (now < lockTime) {
+                await signOut(auth);
+                setIsLoading(false);
+                throw new Error('تم قفل الحساب مؤقتاً. يرجى المحاولة بعد 15 دقيقة');
+              }
+            }
+            
+            // Reset failed login attempts on successful login
+            await updateDoc(doc(db, 'pharmacies', firebaseUser.uid), {
+              failedLoginAttempts: 0,
+              lockedUntil: null,
+            });
+          }
+        }
+        
         const fullUser = {
           ...userData,
           uid: firebaseUser.uid,
@@ -100,6 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       setIsLoading(false);
+      
+      // Re-throw the error so it can be caught in LoginPage
+      if (error instanceof Error && error.message.includes('الصيدلية غير مفعلة')) {
+        throw error;
+      }
+      if (error instanceof Error && error.message.includes('تم قفل الحساب')) {
+        throw error;
+      }
+      
       return null;
     }
   };
