@@ -3,8 +3,6 @@ import { collection, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from 'fire
 import { db } from '@/lib/firebase';
 import { User } from '@/types';
 import { toast } from 'sonner';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -120,16 +118,6 @@ export function useUsers() {
     try {
       // حذف المستخدم من Firestore
       await deleteDoc(doc(db, 'users', userId));
-      
-      // محاولة حذف المستخدم من Firebase Auth
-      // ملاحظة: يتطلب هذا Cloud Function لأن حذف المستخدمين من Auth يتطلب صلاحيات Admin
-      try {
-        const deleteUserAuth = httpsCallable(functions, 'deleteUserAuth');
-        await deleteUserAuth({ uid: userId });
-      } catch (authError) {
-        console.warn('Could not delete user from Auth (requires Cloud Function):', authError);
-        // نستمر حتى لو فشل حذف Auth لأن Firestore تم حذفه
-      }
       
       toast.success('تم حذف المستخدم بنجاح');
     } catch (err) {
