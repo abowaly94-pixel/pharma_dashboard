@@ -10,7 +10,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Order } from '@/types';
+import { Order, CartItem } from '@/types';
 import { toast } from 'sonner';
 
 export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) {
@@ -29,24 +29,16 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
     setIsLoading(true);
     setError(null);
 
-    // Create base query
-    let ordersQuery = query(
+    // Create base query - get all orders then filter client-side for pharmacy
+    // This handles cases where orders contain items from multiple pharmacies
+    const ordersQuery = query(
       collection(db, 'orders'),
       orderBy('createdAt', 'desc')
     );
 
-    // Filter by pharmacyId if provided
-    if (pharmacyId !== undefined && pharmacyId !== null) {
-      ordersQuery = query(
-        collection(db, 'orders'),
-        where('pharmacyId', '==', pharmacyId),
-        orderBy('createdAt', 'desc')
-      );
-    }
-
     const unsubscribe = onSnapshot(ordersQuery,
       (snapshot) => {
-        const ordersList = snapshot.docs.map(doc => {
+        let ordersList = snapshot.docs.map(doc => {
           const data = doc.data();
           try {
             return {
@@ -74,6 +66,7 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
               pharmacyWalletNumber: data.pharmacyWalletNumber || null,
               paymentProofUrl: data.paymentProofUrl || null,
               prescriptionUrl: data.prescriptionUrl || '',
+              pharmacyId: data.pharmacyId,
               createdAt: data.createdAt instanceof Timestamp 
                 ? data.createdAt.toDate() 
                 : (data.createdAt ? new Date(data.createdAt) : new Date()),
@@ -87,6 +80,40 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
             return null;
           }
         }).filter((order): order is Order => order !== null);
+
+        // Filter orders for specific pharmacy
+        // Check both order.pharmacyId AND items inside cartItem
+        if (pharmacyId !== undefined && pharmacyId !== null) {
+          ordersList = ordersList.filter(order => {
+            // Check if order has pharmacyId field matching
+            if (order.pharmacyId === pharmacyId) {
+              return true;
+            }
+            // Check if any cart item belongs to this pharmacy
+            const hasPharmacyItems = order.cartItem.some(
+              (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
+            );
+            return hasPharmacyItems;
+          }).map(order => {
+            // Filter cart items to show only this pharmacy's items
+            const filteredCartItems = order.cartItem.filter(
+              (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
+            );
+            
+            // Recalculate totals for this pharmacy's items only
+            const pharmacySubtotal = filteredCartItems.reduce(
+              (sum, item) => sum + (item.medicineEntity.price * item.count), 0
+            );
+            
+            return {
+              ...order,
+              cartItem: filteredCartItems,
+              subtotal: pharmacySubtotal,
+              // Keep original total for reference, but show pharmacy-specific subtotal
+              totalAmount: pharmacySubtotal + order.deliveryFee
+            };
+          });
+        }
 
         setOrders(ordersList);
         setError(null);
