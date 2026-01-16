@@ -72,8 +72,8 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
               isNewProduct: data.isNewProduct || false,
               sellingCount: data.sellingCount || 0,
               reviews: data.reviews || [],
-              subabaseORImageUrl: data.subabaseORImageUrl || '',
-              subabaseImageUrl: data.subabaseImageUrl || '', // الحقل الصحيح
+              subabaseImageUrl: data.subabaseImageUrl || data.subabaseORImageUrl || '', // الحقل الأساسي
+              subabaseORImageUrl: data.subabaseORImageUrl || '', // للتوافق مع البيانات القديمة
               category: data.category || '',
               manufacturer: data.manufacturer || '',
               expiryDate: data.expiryDate?.toDate(),
@@ -168,9 +168,9 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
       const cleanedUpdates: any = { ...updates };
       
       // If image URL is empty, explicitly set both fields to empty string
-      if ('subabaseORImageUrl' in cleanedUpdates && cleanedUpdates.subabaseORImageUrl === '') {
-        cleanedUpdates.subabaseORImageUrl = '';
+      if ('subabaseImageUrl' in cleanedUpdates && cleanedUpdates.subabaseImageUrl === '') {
         cleanedUpdates.subabaseImageUrl = '';
+        cleanedUpdates.subabaseORImageUrl = '';
       }
       
       await updateDoc(medicineRef, {
@@ -193,7 +193,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
       
       if (medicineDoc.exists()) {
         const medicineData = medicineDoc.data();
-        const imageUrl = medicineData.subabaseORImageUrl || medicineData.subabaseImageUrl;
+        const imageUrl = medicineData.subabaseImageUrl || medicineData.subabaseORImageUrl;
         
         // Delete image from Supabase Storage if exists
         if (imageUrl) {

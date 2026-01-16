@@ -17,6 +17,7 @@ import {
 import {
   createMedicine,
   updateMedicine,
+  deleteMedicine,
   getMedicinesGroupedByStatus,
   canPharmacyAddMedicine,
 } from '@/services/medicineService';
@@ -42,6 +43,7 @@ interface UsePharmacyMedicinesReturn {
   };
   addMedicine: (data: CreateMedicineInput) => Promise<MedicineWithApproval | null>;
   editMedicine: (id: string, data: UpdateMedicineInput) => Promise<boolean>;
+  deleteMedicine: (id: string) => Promise<boolean>;
   refreshMedicines: () => Promise<void>;
   checkCanAdd: () => Promise<boolean>;
 }
@@ -58,7 +60,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     remaining: 0,
   });
 
-  // Real-time listener for pharmacy medicines
+  // Real-time listener for pharmacy medicines from both collections
   useEffect(() => {
     const effectivePharmacyIdNumber = pharmacyId ? parseInt(pharmacyId) : user?.pharmacyId;
     
@@ -74,66 +76,103 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
       return;
     }
 
-    console.log('🔍 Setting up real-time listener for pharmacyId:', effectivePharmacyIdNumber, {
+    console.log('🔍 Setting up real-time listeners for pharmacyId:', effectivePharmacyIdNumber, {
       user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
     });
     setIsLoading(true);
 
-    // Query without orderBy to avoid index requirement
-    // TODO: Add orderBy('createdAt', 'desc') after creating the composite index
-    const q = query(
+    // Query for approved medicines from 'medicines' collection
+    const approvedQuery = query(
       collection(db, 'medicines'),
-      where('pharmacyId', '==', effectivePharmacyIdNumber)
+      where('pharmacyId', '==', effectivePharmacyIdNumber),
+      where('deleted', '==', false)
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        console.log('📦 Received medicines update:', snapshot.docs.length, 'medicines');
-        
-        const medicineList: MedicineWithApproval[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          console.log('💊 Medicine:', {
-            id: doc.id,
-            name: data.name,
-            pharmacyId: data.pharmacyId,
-            status: data.status
-          });
-          
-          return {
-            id: doc.id,
-            name: data.name,
-            code: data.code,
-            description: data.description,
-            price: data.price,
-            quantity: data.quantity,
-            category: data.category,
-            manufacturer: data.manufacturer || '',
-            expiryDate: data.expiryDate?.toDate() || new Date(),
-            imageUrl: data.imageUrl || data.subabaseORImageUrl || '',
-            pharmacyId: data.pharmacyId,
-            pharmacyName: data.pharmacyName,
-            status: data.status || 'pending',
-            rejectionNotes: data.rejectionNotes || null,
-            reviewedBy: data.reviewedBy || null,
-            reviewedAt: data.reviewedAt?.toDate() || null,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          };
-        });
+    // Query for pending/rejected medicines from 'pending_medicines' collection
+    const pendingQuery = query(
+      collection(db, 'pending_medicines'),
+      where('pharmacyId', '==', effectivePharmacyIdNumber),
+      where('deleted', '==', false)
+    );
 
-        console.log('✅ Setting medicines state:', medicineList.length, 'medicines');
-        setMedicines(medicineList);
+    let approvedMedicines: MedicineWithApproval[] = [];
+    let pendingMedicines: MedicineWithApproval[] = [];
+    let approvedLoaded = false;
+    let pendingLoaded = false;
+
+    const updateMedicinesList = () => {
+      if (approvedLoaded && pendingLoaded) {
+        const allMedicines = [...approvedMedicines, ...pendingMedicines];
+        allMedicines.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        console.log('✅ Setting medicines state:', allMedicines.length, 'medicines (approved:', approvedMedicines.length, ', pending/rejected:', pendingMedicines.length, ')');
+        setMedicines(allMedicines);
         setIsLoading(false);
+      }
+    };
+
+    const mapDocToMedicine = (doc: any): MedicineWithApproval => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        price: data.price,
+        quantity: data.quantity,
+        category: data.category,
+        manufacturer: data.manufacturer || '',
+        expiryDate: data.expiryDate?.toDate() || new Date(),
+        subabaseImageUrl: data.subabaseImageUrl || data.subabaseORImageUrl || '',
+        subabaseORImageUrl: data.subabaseORImageUrl || data.subabaseImageUrl || '',
+        pharmacyId: data.pharmacyId,
+        pharmacyName: data.pharmacyName,
+        status: data.status || 'pending',
+        rejectionNotes: data.rejectionNotes || null,
+        reviewedBy: data.reviewedBy || null,
+        reviewedAt: data.reviewedAt?.toDate() || null,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      };
+    };
+
+    // Listen to approved medicines
+    const unsubscribeApproved = onSnapshot(
+      approvedQuery,
+      (snapshot) => {
+        console.log('📦 Received approved medicines update:', snapshot.docs.length, 'medicines');
+        approvedMedicines = snapshot.docs.map(mapDocToMedicine);
+        approvedLoaded = true;
+        updateMedicinesList();
       },
       (err) => {
-        console.error('❌ Error listening to medicines:', err);
+        console.error('❌ Error listening to approved medicines:', err);
         setError(err as Error);
-        setIsLoading(false);
+        approvedLoaded = true;
+        updateMedicinesList();
       }
     );
 
-    return () => unsubscribe();
+    // Listen to pending/rejected medicines
+    const unsubscribePending = onSnapshot(
+      pendingQuery,
+      (snapshot) => {
+        console.log('📦 Received pending medicines update:', snapshot.docs.length, 'medicines');
+        pendingMedicines = snapshot.docs.map(mapDocToMedicine);
+        pendingLoaded = true;
+        updateMedicinesList();
+      },
+      (err) => {
+        console.error('❌ Error listening to pending medicines:', err);
+        setError(err as Error);
+        pendingLoaded = true;
+        updateMedicinesList();
+      }
+    );
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribePending();
+    };
   }, [pharmacyId, user?.pharmacyId]);
 
 
@@ -268,6 +307,28 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     [pharmacyId, user]
   );
 
+  const deleteMedicineHandler = useCallback(
+    async (id: string): Promise<boolean> => {
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      
+      if (!effectivePharmacyId) {
+        toast.error('يجب تسجيل الدخول أولاً');
+        return false;
+      }
+
+      try {
+        await deleteMedicine(id, effectivePharmacyId);
+        toast.success('تم حذف الدواء والصورة بنجاح');
+        return true;
+      } catch (err) {
+        const error = err as Error;
+        toast.error(error.message || 'فشل في حذف الدواء');
+        return false;
+      }
+    },
+    [pharmacyId, user]
+  );
+
   const refreshMedicines = useCallback(async () => {
     const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
     
@@ -315,6 +376,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     limitInfo,
     addMedicine,
     editMedicine,
+    deleteMedicine: deleteMedicineHandler,
     refreshMedicines,
     checkCanAdd,
   };

@@ -243,9 +243,9 @@ export default function AdminMedicineReview() {
               >
                 {/* Image */}
                 <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg overflow-hidden mb-4">
-                  {medicine.imageUrl ? (
+                  {medicine.subabaseImageUrl ? (
                     <img
-                      src={medicine.imageUrl}
+                      src={medicine.subabaseImageUrl}
                       alt={medicine.name}
                       className="w-full h-full object-contain p-4"
                     />

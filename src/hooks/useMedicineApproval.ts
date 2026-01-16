@@ -52,60 +52,112 @@ export function useMedicineApproval(): UseMedicineApprovalReturn {
     rejected: 0,
   });
 
-  // Real-time listener for medicines
+  // Real-time listener for medicines from both collections
   useEffect(() => {
-    const q = query(
+    setIsLoading(true);
+    
+    // Query for approved medicines from 'medicines' collection
+    const approvedQuery = query(
       collection(db, 'medicines'),
-      orderBy('createdAt', 'desc')
+      where('deleted', '==', false)
     );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const medicineList: MedicineWithApproval[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name,
-            code: data.code,
-            description: data.description,
-            price: data.price,
-            quantity: data.quantity,
-            category: data.category,
-            manufacturer: data.manufacturer || '',
-            expiryDate: data.expiryDate?.toDate() || new Date(),
-            imageUrl: data.imageUrl || data.subabaseORImageUrl || '',
-            pharmacyId: data.pharmacyId,
-            pharmacyName: data.pharmacyName,
-            status: data.status || 'pending',
-            rejectionNotes: data.rejectionNotes || null,
-            reviewedBy: data.reviewedBy || null,
-            reviewedAt: data.reviewedAt?.toDate() || null,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          };
-        });
+    // Query for pending/rejected medicines from 'pending_medicines' collection
+    const pendingQuery = query(
+      collection(db, 'pending_medicines'),
+      where('deleted', '==', false)
+    );
 
-        setAllMedicines(medicineList);
+    let approvedMedicines: MedicineWithApproval[] = [];
+    let pendingMedicines: MedicineWithApproval[] = [];
+    let approvedLoaded = false;
+    let pendingLoaded = false;
+
+    const mapDocToMedicine = (doc: any): MedicineWithApproval => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        price: data.price,
+        quantity: data.quantity,
+        category: data.category,
+        manufacturer: data.manufacturer || '',
+        expiryDate: data.expiryDate?.toDate() || new Date(),
+        subabaseImageUrl: data.subabaseImageUrl || data.subabaseORImageUrl || '',
+        subabaseORImageUrl: data.subabaseORImageUrl || data.subabaseImageUrl || '',
+        pharmacyId: data.pharmacyId,
+        pharmacyName: data.pharmacyName,
+        status: data.status || 'pending',
+        rejectionNotes: data.rejectionNotes || null,
+        reviewedBy: data.reviewedBy || null,
+        reviewedAt: data.reviewedAt?.toDate() || null,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      };
+    };
+
+    const updateMedicinesList = () => {
+      if (approvedLoaded && pendingLoaded) {
+        const allMeds = [...approvedMedicines, ...pendingMedicines];
+        allMeds.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        
+        setAllMedicines(allMeds);
         
         // Update stats
+        const pendingCount = pendingMedicines.filter(m => m.status === 'pending').length;
+        const rejectedCount = pendingMedicines.filter(m => m.status === 'rejected').length;
+        
         setStats({
-          total: medicineList.length,
-          pending: medicineList.filter(m => m.status === 'pending').length,
-          approved: medicineList.filter(m => m.status === 'approved').length,
-          rejected: medicineList.filter(m => m.status === 'rejected').length,
+          total: allMeds.length,
+          pending: pendingCount,
+          approved: approvedMedicines.length,
+          rejected: rejectedCount,
         });
         
         setIsLoading(false);
+      }
+    };
+
+    // Listen to approved medicines
+    const unsubscribeApproved = onSnapshot(
+      approvedQuery,
+      (snapshot) => {
+        console.log('📦 Admin: Received approved medicines:', snapshot.docs.length);
+        approvedMedicines = snapshot.docs.map(mapDocToMedicine);
+        approvedLoaded = true;
+        updateMedicinesList();
       },
       (err) => {
-        console.error('Error listening to medicines:', err);
+        console.error('Error listening to approved medicines:', err);
         setError(err as Error);
-        setIsLoading(false);
+        approvedLoaded = true;
+        updateMedicinesList();
       }
     );
 
-    return () => unsubscribe();
+    // Listen to pending/rejected medicines
+    const unsubscribePending = onSnapshot(
+      pendingQuery,
+      (snapshot) => {
+        console.log('📦 Admin: Received pending medicines:', snapshot.docs.length);
+        pendingMedicines = snapshot.docs.map(mapDocToMedicine);
+        pendingLoaded = true;
+        updateMedicinesList();
+      },
+      (err) => {
+        console.error('Error listening to pending medicines:', err);
+        setError(err as Error);
+        pendingLoaded = true;
+        updateMedicinesList();
+      }
+    );
+
+    return () => {
+      unsubscribeApproved();
+      unsubscribePending();
+    };
   }, []);
 
   // Filter medicines

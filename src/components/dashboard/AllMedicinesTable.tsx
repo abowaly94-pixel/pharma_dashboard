@@ -78,9 +78,9 @@ export function AllMedicinesTable({ medicines }: AllMedicinesTableProps) {
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    {medicine.subabaseORImageUrl ? (
+                    {(medicine.subabaseImageUrl || medicine.subabaseORImageUrl) ? (
                       <img 
-                        src={medicine.subabaseORImageUrl} 
+                        src={medicine.subabaseImageUrl || medicine.subabaseORImageUrl} 
                         alt={medicine.name} 
                         className="w-12 h-12 rounded-xl object-cover shadow-sm border border-gray-100"
                       />

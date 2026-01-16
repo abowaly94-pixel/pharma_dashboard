@@ -17,20 +17,31 @@ export interface Medicine {
   quantity: number;
   pharmacyId: number;
   pharmacyName: string;
-  pharmcyAddress: string;
+  pharmcyAddress: string; // تم الاحتفاظ بالاسم الحالي للتوافق
   avgRating: number;
   ratingCount: number;
   discountRating: number;
   isNewProduct: boolean;
   sellingCount: number;
   reviews: Review[];
-  subabaseORImageUrl: string;
-  subabaseImageUrl?: string; // الحقل الصحيح من Supabase
+  subabaseImageUrl: string; // الحقل الأساسي للصور من Supabase
+  subabaseORImageUrl?: string; // حقل قديم للتوافق مع البيانات القديمة
   category?: string;
   manufacturer?: string;
   expiryDate?: Date;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+/** 
+ * واجهة الدواء المعلق - يتم إنشاؤها عندما يرفع الصيدلي دواء جديد
+ * Pending Medicine Interface - Created when pharmacist uploads a new medicine
+ */
+export interface PendingMedicine extends Medicine {
+  status: 'pending';
+  rejectionNotes?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: Date | null;
 }
 
 export interface Pharmacy {
@@ -181,7 +192,8 @@ export interface MedicineWithApproval {
   category: string;
   manufacturer: string;
   expiryDate: Date;
-  imageUrl: string;
+  subabaseImageUrl: string;
+  subabaseORImageUrl: string;
   pharmacyId: string;
   pharmacyName: string;
   status: MedicineStatus;
@@ -197,7 +209,6 @@ export interface MedicineWithApproval {
   isNewProduct?: boolean;
   sellingCount?: number;
   reviews?: Review[];
-  subabaseORImageUrl?: string;
   pharmcyAddress?: string;
 }
 
@@ -211,7 +222,8 @@ export interface CreateMedicineInput {
   category: string;
   manufacturer: string;
   expiryDate: Date;
-  imageUrl: string;
+  subabaseImageUrl: string;
+  subabaseORImageUrl?: string;
 }
 
 /** بيانات تحديث الدواء */
@@ -224,7 +236,8 @@ export interface UpdateMedicineInput {
   category?: string;
   manufacturer?: string;
   expiryDate?: Date;
-  imageUrl?: string;
+  subabaseImageUrl?: string;
+  subabaseORImageUrl?: string;
 }
 
 // ==================== Filter Interfaces ====================

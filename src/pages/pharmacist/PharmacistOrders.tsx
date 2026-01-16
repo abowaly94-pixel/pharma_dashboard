@@ -276,9 +276,9 @@ export default function PharmacistOrders() {
                     {selectedOrder.cartItem.map((item, index) => (
                       <div key={index} className="flex items-center gap-4 p-4">
                         <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                          {item.medicineEntity.subabaseORImageUrl ? (
+                          {(item.medicineEntity.subabaseImageUrl || item.medicineEntity.subabaseORImageUrl) ? (
                             <img
-                              src={item.medicineEntity.subabaseORImageUrl}
+                              src={item.medicineEntity.subabaseImageUrl || item.medicineEntity.subabaseORImageUrl}
                               alt={item.medicineEntity.name}
                               className="w-full h-full object-cover"
                             />

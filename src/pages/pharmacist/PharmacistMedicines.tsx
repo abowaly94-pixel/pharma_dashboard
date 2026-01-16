@@ -27,8 +27,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
@@ -39,6 +37,7 @@ export default function PharmacistMedicines() {
     isLoading,
     addMedicine: addMedicineFromHook,
     editMedicine,
+    deleteMedicine: deleteMedicineFromHook,
   } = usePharmacyMedicines(user?.pharmacyId?.toString());
   
   console.log('🏥 PharmacistMedicines Component:', {
@@ -63,7 +62,7 @@ export default function PharmacistMedicines() {
     quantity: 0,
     category: '',
     manufacturer: '',
-    subabaseORImageUrl: '',
+    subabaseImageUrl: '',
     avgRating: 0,
     ratingCount: 0,
     discountRating: 0,
@@ -93,7 +92,7 @@ export default function PharmacistMedicines() {
         quantity: medicine.quantity,
         category: medicine.category || '',
         manufacturer: medicine.manufacturer || '',
-        subabaseORImageUrl: medicine.imageUrl || '',
+        subabaseImageUrl: medicine.subabaseImageUrl || medicine.subabaseORImageUrl || '',
         avgRating: medicine.avgRating || 0,
         ratingCount: medicine.ratingCount || 0,
         discountRating: medicine.discountRating || 0,
@@ -110,7 +109,7 @@ export default function PharmacistMedicines() {
         quantity: 0,
         category: '',
         manufacturer: '',
-        subabaseORImageUrl: '',
+        subabaseImageUrl: '',
         avgRating: 0,
         ratingCount: 0,
         discountRating: 0,
@@ -127,7 +126,7 @@ export default function PharmacistMedicines() {
     console.log('📝 Form submitted with data:', formData);
     
     // التحقق من وجود صورة
-    if (!formData.subabaseORImageUrl || formData.subabaseORImageUrl.trim() === '') {
+    if (!formData.subabaseImageUrl || formData.subabaseImageUrl.trim() === '') {
       toast.error('يجب رفع صورة للدواء قبل الحفظ');
       return;
     }
@@ -169,7 +168,8 @@ export default function PharmacistMedicines() {
         quantity: formData.quantity,
         category: formData.category.trim(),
         manufacturer: formData.manufacturer.trim(),
-        imageUrl: formData.subabaseORImageUrl,
+        subabaseImageUrl: formData.subabaseImageUrl,
+        subabaseORImageUrl: formData.subabaseImageUrl,
         expiryDate: new Date(),
       };
       
@@ -196,17 +196,11 @@ export default function PharmacistMedicines() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا الدواء؟')) {
-      try {
-        const medicine = medicines.find(m => m.id === id);
-        if (medicine && medicine.imageUrl) {
-          await deleteImageFromSupabase(medicine.imageUrl);
-        }
-        await deleteDoc(doc(db, 'medicines', id));
-        toast.success('تم حذف الدواء بنجاح');
-      } catch (error) {
-        console.error('Error deleting medicine:', error);
-        toast.error('فشل في حذف الدواء');
+    if (window.confirm('هل أنت متأكد من حذف هذا الدواء؟ سيتم حذف الصورة أيضاً من التخزين.')) {
+      const success = await deleteMedicineFromHook(id);
+      if (!success) {
+        // Error message already shown by the hook
+        console.error('Failed to delete medicine');
       }
     }
   };
@@ -221,7 +215,7 @@ export default function PharmacistMedicines() {
     try {
       const result = await uploadImageToSupabase(file);
       if (result.success && result.url) {
-        setFormData({ ...formData, subabaseORImageUrl: result.url });
+        setFormData({ ...formData, subabaseImageUrl: result.url });
         toast.success('تم رفع الصورة بنجاح!');
       } else {
         toast.error(result.error || 'فشل رفع الصورة');
@@ -236,7 +230,7 @@ export default function PharmacistMedicines() {
   };
 
   const handleRemoveBackground = async () => {
-    if (!formData.subabaseORImageUrl) {
+    if (!formData.subabaseImageUrl) {
       toast.error('لا توجد صورة لإزالة الخلفية منها');
       return;
     }
@@ -245,7 +239,7 @@ export default function PharmacistMedicines() {
     toast.info('جاري إزالة الخلفية... قد يستغرق بضع ثوانٍ');
 
     try {
-      const result = await removeImageBackground(formData.subabaseORImageUrl);
+      const result = await removeImageBackground(formData.subabaseImageUrl);
       
       if (!result.success || !result.blob) {
         toast.error(result.error || 'فشل إزالة الخلفية');
@@ -254,14 +248,14 @@ export default function PharmacistMedicines() {
 
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
       
-      if (formData.subabaseORImageUrl.includes('supabase.co/storage')) {
-        await deleteImageFromSupabase(formData.subabaseORImageUrl);
+      if (formData.subabaseImageUrl.includes('supabase.co/storage')) {
+        await deleteImageFromSupabase(formData.subabaseImageUrl);
       }
       
       const uploadResult = await uploadImageToSupabase(file);
       
       if (uploadResult.success && uploadResult.url) {
-        setFormData({ ...formData, subabaseORImageUrl: uploadResult.url });
+        setFormData({ ...formData, subabaseImageUrl: uploadResult.url });
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
       } else {
         toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
@@ -475,9 +469,9 @@ export default function PharmacistMedicines() {
                 >
                   {/* Image */}
                   <div className="relative h-32 bg-muted overflow-hidden rounded-t-xl">
-                    {medicine.imageUrl ? (
+                    {medicine.subabaseImageUrl ? (
                       <img
-                        src={medicine.imageUrl}
+                        src={medicine.subabaseImageUrl}
                         alt={medicine.name}
                         className="w-full h-full object-contain bg-white p-2 group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
@@ -808,9 +802,9 @@ export default function PharmacistMedicines() {
                 <div className="space-y-3">
                   {/* Upload Button */}
                   <div className="relative">
-                    <label className={`block ${formData.subabaseORImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
-                        formData.subabaseORImageUrl 
+                        formData.subabaseImageUrl 
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                           : isUploading
                             ? 'bg-amber-400 text-white cursor-wait'
@@ -821,7 +815,7 @@ export default function PharmacistMedicines() {
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             <span>جاري الرفع...</span>
                           </>
-                        ) : formData.subabaseORImageUrl ? (
+                        ) : formData.subabaseImageUrl ? (
                           <>
                             <ImageIcon className="w-4 h-4" />
                             <span>يوجد صورة - احذفها للتغيير</span>
@@ -837,14 +831,14 @@ export default function PharmacistMedicines() {
                         type="file"
                         accept="image/*"
                         onChange={handleImageUpload}
-                        disabled={isUploading || !!formData.subabaseORImageUrl}
+                        disabled={isUploading || !!formData.subabaseImageUrl}
                         className="hidden"
                       />
                     </label>
                   </div>
                   
                   {/* Divider */}
-                  {!formData.subabaseORImageUrl && (
+                  {!formData.subabaseImageUrl && (
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-px bg-amber-300"></div>
                       <span className="text-sm text-gray-600 font-cairo font-semibold">أو</span>
@@ -853,7 +847,7 @@ export default function PharmacistMedicines() {
                   )}
                   
                   {/* URL Input */}
-                  {!formData.subabaseORImageUrl && (
+                  {!formData.subabaseImageUrl && (
                     <div className="space-y-2">
                       <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
                       <div className="flex gap-2">
@@ -867,7 +861,7 @@ export default function PharmacistMedicines() {
                               e.preventDefault();
                               const input = e.currentTarget as HTMLInputElement;
                               if (input.value.trim()) {
-                                setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                                setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
                                 input.value = '';
                                 toast.success('تم إضافة رابط الصورة');
                               }
@@ -880,7 +874,7 @@ export default function PharmacistMedicines() {
                           onClick={() => {
                             const input = document.getElementById('imageUrlInputPharmacist') as HTMLInputElement;
                             if (input && input.value.trim()) {
-                              setFormData({ ...formData, subabaseORImageUrl: input.value.trim() });
+                              setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
                               input.value = '';
                               toast.success('تم إضافة رابط الصورة');
                             } else {
@@ -896,11 +890,11 @@ export default function PharmacistMedicines() {
                   )}
                   
                   {/* Image Preview */}
-                  {formData.subabaseORImageUrl && (
+                  {formData.subabaseImageUrl && (
                     <div className="space-y-3">
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         <img 
-                          src={formData.subabaseORImageUrl} 
+                          src={formData.subabaseImageUrl} 
                           alt="Preview" 
                           className="w-full h-full object-contain p-3"
                           onError={(e) => {
@@ -935,7 +929,7 @@ export default function PharmacistMedicines() {
                           <button
                             type="button"
                             onClick={async () => {
-                              const imageUrl = formData.subabaseORImageUrl;
+                              const imageUrl = formData.subabaseImageUrl;
                               const isSupabaseImage = imageUrl.includes('supabase.co/storage');
                               
                               if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
@@ -945,12 +939,12 @@ export default function PharmacistMedicines() {
                                   
                                   if (result.success) {
                                     toast.success('تم حذف الصورة بنجاح');
-                                    setFormData({ ...formData, subabaseORImageUrl: '' });
+                                    setFormData({ ...formData, subabaseImageUrl: '' });
                                   } else {
                                     toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
                                   }
                                 } else {
-                                  setFormData({ ...formData, subabaseORImageUrl: '' });
+                                  setFormData({ ...formData, subabaseImageUrl: '' });
                                   toast.success('تم إزالة الصورة');
                                 }
                               }
@@ -967,7 +961,7 @@ export default function PharmacistMedicines() {
                       <div className="space-y-1">
                         <Label className="text-xs font-cairo text-gray-600">رابط الصورة</Label>
                         <Input
-                          value={formData.subabaseORImageUrl}
+                          value={formData.subabaseImageUrl}
                           readOnly
                           className="h-9 text-xs bg-gray-50 cursor-default border-gray-300"
                         />
@@ -989,8 +983,8 @@ export default function PharmacistMedicines() {
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={!formData.subabaseORImageUrl}
-                  title={!formData.subabaseORImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
+                  disabled={!formData.subabaseImageUrl}
+                  title={!formData.subabaseImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}
