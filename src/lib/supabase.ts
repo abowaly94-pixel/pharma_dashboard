@@ -1,13 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+// Create a dummy client if env vars are missing (prevents app crash)
+const createSupabaseClient = (): SupabaseClient => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('⚠️ Missing Supabase environment variables. Image features will not work.');
+    // Return a minimal client that won't crash the app
+    return createClient('https://placeholder.supabase.co', 'placeholder-key');
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createSupabaseClient();
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
 /**
  * Delete an image from Supabase Storage
@@ -20,6 +27,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * @returns Promise<{success: boolean, url?: string, error?: string}> - Result with URL if successful
  */
 export async function uploadImageToSupabase(file: File): Promise<{success: boolean, url?: string, error?: string}> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Supabase غير مُعد. يرجى إضافة متغيرات البيئة.' };
+  }
+  
   try {
     console.log('📤 Starting image upload process...');
     console.log('  File name:', file.name);
@@ -131,6 +142,10 @@ export async function removeImageBackground(imageUrl: string | File): Promise<{s
 }
 
 export async function deleteImageFromSupabase(imageUrl: string): Promise<{success: boolean, error?: string}> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Supabase غير مُعد. يرجى إضافة متغيرات البيئة.' };
+  }
+  
   if (!imageUrl) {
     return { success: false, error: 'No image URL provided' };
   }
