@@ -35,11 +35,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
-            setUser({
-              ...userData,
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || userData.email,
-            });
+            
+            // If user is a pharmacist, fetch pharmacy data
+            if (userData.role === 'pharmacist') {
+              const pharmacyDoc = await getDoc(doc(db, 'pharmacies', firebaseUser.uid));
+              if (pharmacyDoc.exists()) {
+                const pharmacyData = pharmacyDoc.data();
+                setUser({
+                  ...userData,
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || userData.email,
+                  pharmacyId: pharmacyData.pharmacyId,
+                  pharmacyName: pharmacyData.name,
+                });
+              } else {
+                setUser({
+                  ...userData,
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || userData.email,
+                });
+              }
+            } else {
+              setUser({
+                ...userData,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || userData.email,
+              });
+            }
           } else {
             // Fallback for users without a database record yet
             setUser({
@@ -76,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
         
-        // If user is a pharmacist, check pharmacy status
+        // If user is a pharmacist, check pharmacy status and get pharmacy data
         if (userData.role === 'pharmacist') {
           const pharmacyDoc = await getDoc(doc(db, 'pharmacies', firebaseUser.uid));
           
@@ -108,6 +130,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               failedLoginAttempts: 0,
               lockedUntil: null,
             });
+            
+            // Set user with pharmacy data
+            const fullUser = {
+              ...userData,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || userData.email,
+              pharmacyId: pharmacyData.pharmacyId,
+              pharmacyName: pharmacyData.name,
+            };
+            setUser(fullUser);
+            setIsLoading(false);
+            return fullUser;
           }
         }
         
@@ -164,11 +198,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
-          setUser({
-            ...userData,
-            uid: currentUser.uid,
-            email: currentUser.email || userData.email,
-          });
+          
+          // If user is a pharmacist, fetch pharmacy data
+          if (userData.role === 'pharmacist') {
+            const pharmacyDoc = await getDoc(doc(db, 'pharmacies', currentUser.uid));
+            if (pharmacyDoc.exists()) {
+              const pharmacyData = pharmacyDoc.data();
+              setUser({
+                ...userData,
+                uid: currentUser.uid,
+                email: currentUser.email || userData.email,
+                pharmacyId: pharmacyData.pharmacyId,
+                pharmacyName: pharmacyData.name,
+              });
+            } else {
+              setUser({
+                ...userData,
+                uid: currentUser.uid,
+                email: currentUser.email || userData.email,
+              });
+            }
+          } else {
+            setUser({
+              ...userData,
+              uid: currentUser.uid,
+              email: currentUser.email || userData.email,
+            });
+          }
         }
       } catch (error) {
         console.error('Error refreshing user data:', error);

@@ -35,7 +35,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { MedicinesDiagnostic } from '@/components/utils/MedicinesDiagnostic';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -292,23 +291,6 @@ export default function AdminMedicines() {
             />
           </div>
         </motion.div>
-
-        {/* تشخيص سريع - يظهر فقط إذا لم توجد أدوية */}
-        {!isLoading && medicines.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <MedicinesDiagnostic 
-              onMedicinesAdded={() => {
-                // إعادة تحميل الصفحة أو تحديث البيانات
-                setRefreshKey(prev => prev + 1);
-                window.location.reload();
-              }} 
-            />
-          </motion.div>
-        )}
 
         {/* Medicines Grid */}
         {isLoading ? (

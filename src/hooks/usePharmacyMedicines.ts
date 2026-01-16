@@ -54,28 +54,36 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   const [limitInfo, setLimitInfo] = useState({
     canAdd: true,
     currentCount: 0,
-    limit: 0, // Start with 0 instead of 100
+    limit: 0, // Start with 0 to indicate not loaded yet
     remaining: 0,
   });
 
-  const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-  const effectivePharmacyIdNumber = pharmacyId ? parseInt(pharmacyId) : user?.pharmacyId;
-
   // Real-time listener for pharmacy medicines
   useEffect(() => {
+    const effectivePharmacyIdNumber = pharmacyId ? parseInt(pharmacyId) : user?.pharmacyId;
+    
     if (!effectivePharmacyIdNumber) {
-      console.log('⚠️ No pharmacy ID found');
+      console.log('⚠️ No pharmacy ID found', { 
+        pharmacyId, 
+        userPharmacyId: user?.pharmacyId,
+        effectivePharmacyIdNumber,
+        user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
+      });
       setMedicines([]);
       setIsLoading(false);
       return;
     }
 
-    console.log('🔍 Setting up real-time listener for pharmacyId:', effectivePharmacyIdNumber);
+    console.log('🔍 Setting up real-time listener for pharmacyId:', effectivePharmacyIdNumber, {
+      user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
+    });
+    setIsLoading(true);
 
+    // Query without orderBy to avoid index requirement
+    // TODO: Add orderBy('createdAt', 'desc') after creating the composite index
     const q = query(
       collection(db, 'medicines'),
-      where('pharmacyId', '==', effectivePharmacyIdNumber),
-      orderBy('createdAt', 'desc')
+      where('pharmacyId', '==', effectivePharmacyIdNumber)
     );
 
     const unsubscribe = onSnapshot(
@@ -126,17 +134,19 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     );
 
     return () => unsubscribe();
-  }, [effectivePharmacyId]);
+  }, [pharmacyId, user?.pharmacyId]);
 
 
   // Update limit info when pharmacy changes or medicines count changes
   useEffect(() => {
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    
     if (!effectivePharmacyId) {
       setLimitInfo({
         canAdd: false,
         currentCount: 0,
-        limit: 100,
-        remaining: 100,
+        limit: 0,
+        remaining: 0,
       });
       return;
     }
@@ -150,17 +160,18 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         });
       } catch (err) {
         console.error('Error fetching limit info:', err);
+        // On error, set reasonable defaults but don't show fake numbers
         setLimitInfo({
-          canAdd: true,
-          currentCount: 0,
-          limit: 100,
-          remaining: 100,
+          canAdd: false,
+          currentCount: medicines.length,
+          limit: 0,
+          remaining: 0,
         });
       }
     };
 
     updateLimitInfo();
-  }, [effectivePharmacyId, medicines.length]); // Update when pharmacyId or medicines count changes
+  }, [pharmacyId, user?.pharmacyId, medicines.length]); // Update when pharmacyId or medicines count changes
 
   // Group medicines by status
   const groupedMedicines: GroupedMedicines = {
@@ -179,6 +190,8 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const addMedicine = useCallback(
     async (data: CreateMedicineInput): Promise<MedicineWithApproval | null> => {
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      
       if (!effectivePharmacyId || !user) {
         toast.error('يجب تسجيل الدخول أولاً');
         return null;
@@ -230,11 +243,13 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         return null;
       }
     },
-    [effectivePharmacyId, user, limitInfo.canAdd]
+    [pharmacyId, user, limitInfo.canAdd]
   );
 
   const editMedicine = useCallback(
     async (id: string, data: UpdateMedicineInput): Promise<boolean> => {
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      
       if (!effectivePharmacyId) {
         toast.error('يجب تسجيل الدخول أولاً');
         return false;
@@ -250,10 +265,12 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         return false;
       }
     },
-    [effectivePharmacyId]
+    [pharmacyId, user]
   );
 
   const refreshMedicines = useCallback(async () => {
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    
     if (!effectivePharmacyId) return;
     
     try {
@@ -270,9 +287,11 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     } finally {
       setIsLoading(false);
     }
-  }, [effectivePharmacyId]);
+  }, [pharmacyId, user]);
 
   const checkCanAdd = useCallback(async (): Promise<boolean> => {
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    
     if (!effectivePharmacyId) return false;
     
     try {
@@ -285,7 +304,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     } catch {
       return false;
     }
-  }, [effectivePharmacyId]);
+  }, [pharmacyId, user]);
 
   return {
     medicines,

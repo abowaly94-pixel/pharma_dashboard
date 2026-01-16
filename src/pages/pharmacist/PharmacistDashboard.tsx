@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import {
   Pill,
   ShoppingCart,
-  Package,
   DollarSign
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -14,13 +13,21 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function PharmacistDashboard() {
   const { user } = useAuth();
   const hasPharmacyId = user?.pharmacyId !== undefined && user?.pharmacyId !== null;
+  
   const { medicines } = useMedicines(user?.pharmacyId, { enabled: hasPharmacyId });
   const { orders } = useOrders(user?.pharmacyId, { enabled: hasPharmacyId });
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const totalStock = medicines.reduce((sum, med) => sum + med.quantity, 0);
+  // Calculate statistics with validation
+  const totalRevenue = orders.reduce((sum, order) => {
+    const amount = typeof order.totalAmount === 'number' && !isNaN(order.totalAmount) ? order.totalAmount : 0;
+    return sum + amount;
+  }, 0);
+  
   const pendingOrders = orders.filter(o => o.orderStatus === 'pending').length;
-  const lowStockMedicines = medicines.filter(m => m.quantity < 10).length;
+  const lowStockMedicines = medicines.filter(m => {
+    const qty = typeof m.quantity === 'number' && !isNaN(m.quantity) ? m.quantity : 0;
+    return qty > 0 && qty < 10;
+  }).length;
 
   return (
     <DashboardLayout>
@@ -35,7 +42,7 @@ export default function PharmacistDashboard() {
         </motion.div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -86,25 +93,6 @@ export default function PharmacistDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-          >
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  إجمالي المخزون
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalStock}</div>
-                <p className="text-xs text-muted-foreground mt-1">وحدة</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
           >
             <Card>
               <CardHeader className="pb-3">

@@ -22,8 +22,15 @@ export default function AdminDashboard() {
   const { users, isLoading: usersLoading } = useUsers();
 
   // Calculate real statistics from Firebase data
-  const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+  const totalRevenue = orders.reduce((sum, order) => {
+    const amount = typeof order.totalAmount === 'number' && !isNaN(order.totalAmount) ? order.totalAmount : 0;
+    return sum + amount;
+  }, 0);
+  
   const pendingOrders = orders.filter(o => o.orderStatus === 'pending').length;
+  
+  // Filter only regular users (exclude admins and pharmacists)
+  const regularUsers = users.filter(u => !u.role || u.role === 'user');
   
   // Count orders delivered today
   const deliveredToday = orders.filter(o => {
@@ -59,7 +66,7 @@ export default function AdminDashboard() {
   const displayStats = {
     medicines: medicines.length,
     orders: orders.length,
-    users: users.length,
+    users: regularUsers.length,
     revenue: totalRevenue,
     pending: pendingOrders,
     delivered: deliveredToday,

@@ -290,7 +290,7 @@ export default function PharmacistMedicines() {
           <Button 
             onClick={() => handleOpenAddEdit()} 
             className="gradient-primary text-primary-foreground font-cairo"
-            disabled={limitInfo && medicines.length >= limitInfo.limit}
+            disabled={limitInfo && limitInfo.limit > 0 && medicines.length >= limitInfo.limit}
           >
             <Plus className="w-5 h-5 ml-2" />
             إضافة دواء جديد
@@ -458,16 +458,6 @@ export default function PharmacistMedicines() {
             <p className="text-muted-foreground mb-4">
               {searchQuery ? 'جرب البحث بكلمات مختلفة' : 'ابدأ بإضافة أدوية جديدة'}
             </p>
-            {!searchQuery && (
-              <Button 
-                onClick={() => handleOpenAddEdit()} 
-                className="gradient-primary text-primary-foreground font-cairo"
-                disabled={limitInfo && medicines.length >= limitInfo.limit}
-              >
-                <Plus className="w-4 h-4 ml-2" />
-                إضافة أول دواء
-              </Button>
-            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -495,13 +485,14 @@ export default function PharmacistMedicines() {
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent) {
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-                                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                                </svg>
-                              </div>
+                            const placeholder = document.createElement('div');
+                            placeholder.className = 'w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100';
+                            placeholder.innerHTML = `
+                              <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                              </svg>
                             `;
+                            parent.insertBefore(placeholder, parent.firstChild);
                           }
                         }}
                       />
@@ -511,8 +502,8 @@ export default function PharmacistMedicines() {
                       </div>
                     )}
                     
-                    {/* Status Badge - أكبر وأوضح */}
-                    <div className="absolute top-2 right-2 flex flex-col gap-1">
+                    {/* Status Badge - Always visible on top */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
                       {medicineStatus === 'pending' && (
                         <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 font-bold shadow-lg flex items-center gap-1">
                           <Clock className="w-3 h-3" />

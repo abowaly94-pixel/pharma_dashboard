@@ -33,7 +33,6 @@ import {
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { AttachmentPreview } from '@/components/orders/AttachmentPreview';
-import { TableStateRow } from '@/components/utils/StateView';
 
 const statusConfig = {
   pending: { label: 'قيد الانتظار', class: 'badge-warning', icon: Clock },
@@ -152,17 +151,17 @@ export default function AdminOrders() {
                     </tr>
                   ))
                 ) : error ? (
-                  <TableStateRow
-                    colSpan={8}
-                    variant="error"
-                    title="حدث خطأ أثناء تحميل الطلبات"
-                  />
+                  <tr>
+                    <td colSpan={8} className="text-center py-8 text-red-600">
+                      حدث خطأ أثناء تحميل الطلبات
+                    </td>
+                  </tr>
                 ) : filteredOrders.length === 0 ? (
-                  <TableStateRow
-                    colSpan={8}
-                    variant="empty"
-                    title="لا توجد طلبات"
-                  />
+                  <tr>
+                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                      لا توجد طلبات
+                    </td>
+                  </tr>
                 ) : (
                   filteredOrders.map((order, index) => {
                     const status = statusConfig[order.orderStatus];
