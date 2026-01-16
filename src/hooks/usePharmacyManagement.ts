@@ -22,7 +22,9 @@ import {
   updatePharmacy,
   getPharmacyStats,
   sendPharmacyPasswordReset,
+  deletePharmacyPermanently,
 } from '@/services/pharmacyService';
+import { getArabicErrorMessage } from '@/types/errors';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -44,6 +46,7 @@ interface UsePharmacyManagementReturn {
   changeMedicineLimit: (id: string, limit: number) => Promise<boolean>;
   updatePharmacyData: (id: string, data: Partial<CreatePharmacyInput>) => Promise<boolean>;
   resetPharmacyPassword: (email: string) => Promise<boolean>;
+  deletePharmacy: (id: string) => Promise<{ success: boolean; deletedMedicinesCount: number; deletedPendingCount: number } | null>;
   refreshPharmacies: () => Promise<void>;
 }
 
@@ -155,12 +158,13 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
         setIsLoading(true);
         const pharmacy = await createPharmacy(data, user.uid);
         
-        toast.success('تم إنشاء الصيدلية بنجاح');
+        toast.success('تم إنشاء الصيدلية بنجاح ✅');
         return pharmacy;
       } catch (err) {
-        const error = err as Error;
-        toast.error(error.message || 'فشل في إنشاء الصيدلية');
-        setError(error);
+        const errorMessage = getArabicErrorMessage(err);
+        console.error('❌ Error creating pharmacy:', err);
+        toast.error(errorMessage);
+        setError(err as Error);
         return null;
       } finally {
         setIsLoading(false);
@@ -252,6 +256,31 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
     []
   );
 
+  const deletePharmacy = useCallback(
+    async (id: string): Promise<{ success: boolean; deletedMedicinesCount: number; deletedPendingCount: number } | null> => {
+      if (!user) {
+        toast.error('يجب تسجيل الدخول أولاً');
+        return null;
+      }
+
+      try {
+        console.log('🗑️ Starting pharmacy deletion for ID:', id);
+        const result = await deletePharmacyPermanently(id);
+        console.log('✅ Deletion result:', result);
+        
+        const totalDeleted = result.deletedMedicinesCount + result.deletedPendingCount;
+        toast.success(`تم حذف الصيدلية نهائياً مع ${totalDeleted} دواء`);
+        return result;
+      } catch (err) {
+        const error = err as Error;
+        console.error('❌ Error deleting pharmacy:', error);
+        toast.error(error.message || 'فشل في حذف الصيدلية');
+        return null;
+      }
+    },
+    [user]
+  );
+
   const refreshPharmacies = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -279,6 +308,7 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
     changeMedicineLimit,
     updatePharmacyData,
     resetPharmacyPassword,
+    deletePharmacy,
     refreshPharmacies,
   };
 }

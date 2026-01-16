@@ -12,14 +12,15 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, getAuth } from 'firebase/auth';
+import { db, auth, getSecondaryApp } from '@/lib/firebase';
 import {
   PharmacyAccount,
   PharmacyStatus,
@@ -124,6 +125,8 @@ export async function createPharmacy(
   validatePharmacyInput(input);
   
   try {
+    console.log('🔍 Checking if email exists:', input.email);
+    
     // Check if email already exists
     const existingQuery = query(
       collection(db, PHARMACIES_COLLECTION),
@@ -135,20 +138,53 @@ export async function createPharmacy(
       throw new ValidationError('البريد الإلكتروني مستخدم مسبقاً', 'email', 'DUPLICATE');
     }
     
+    console.log('✅ Email is available');
+    console.log('🔐 Creating Firebase Auth user...');
+    
+    // استخدام secondary app لإنشاء المستخدم بدون التأثير على session الأدمن
+    const secondaryApp = getSecondaryApp();
+    const secondaryAuth = getAuth(secondaryApp);
+    
     // Create Firebase Auth user (password is automatically hashed by Firebase)
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      input.email,
-      input.password
-    );
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        input.email,
+        input.password
+      );
+      console.log('✅ Firebase Auth user created:', userCredential.user.uid);
+    } catch (authError: any) {
+      console.error('❌ Firebase Auth error:', authError.code, authError.message);
+      if (authError.code === 'auth/email-already-in-use') {
+        throw new ValidationError('البريد الإلكتروني مستخدم مسبقاً. جرب إيميل تاني أو احذف المستخدم من Firebase Console.', 'email', 'DUPLICATE');
+      }
+      if (authError.code === 'auth/weak-password') {
+        throw new ValidationError('كلمة المرور ضعيفة جداً', 'password', 'WEAK_PASSWORD');
+      }
+      if (authError.code === 'auth/invalid-email') {
+        throw new ValidationError('البريد الإلكتروني غير صالح', 'email', 'INVALID_EMAIL');
+      }
+      throw new DatabaseError('فشل في إنشاء حساب المستخدم: ' + authError.message, 'createPharmacy', authError);
+    }
     
     const userId = userCredential.user.uid;
     
     // Send email verification
-    await sendEmailVerification(userCredential.user);
+    try {
+      await sendEmailVerification(userCredential.user);
+      console.log('✅ Verification email sent');
+    } catch (e) {
+      console.warn('⚠️ Could not send verification email:', e);
+    }
+    
+    // تسجيل خروج المستخدم الجديد من secondary auth
+    await secondaryAuth.signOut();
+    console.log('✅ Signed out from secondary auth');
     
     // Generate pharmacy ID
     const pharmacyId = await generatePharmacyId();
+    console.log('✅ Generated pharmacy ID:', pharmacyId);
     
     // Create pharmacy document
     const pharmacyData = {
@@ -173,9 +209,12 @@ export async function createPharmacy(
       createdBy: adminId,
     };
     
+    console.log('💾 Saving pharmacy document...');
     // Save to pharmacies collection
     await setDoc(doc(db, PHARMACIES_COLLECTION, userId), pharmacyData);
+    console.log('✅ Pharmacy document saved');
     
+    console.log('💾 Saving user document...');
     // Also create user document with pharmacist role
     await setDoc(doc(db, USERS_COLLECTION, userId), {
       uid: userId,
@@ -191,18 +230,23 @@ export async function createPharmacy(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    console.log('✅ User document saved');
+    
+    console.log('🎉 تم إنشاء الصيدلية بنجاح:', pharmacyData.name);
     
     return mapFirestoreToPharmacy(userId, {
       ...pharmacyData,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof ValidationError) {
       throw error;
     }
-    console.error('Error creating pharmacy:', error);
-    throw new DatabaseError('فشل في إنشاء الصيدلية', 'createPharmacy', error as Error);
+    console.error('❌ Error creating pharmacy:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    throw new DatabaseError('فشل في إنشاء الصيدلية: ' + (error.message || 'خطأ غير معروف'), 'createPharmacy', error as Error);
   }
 }
 
@@ -502,5 +546,88 @@ export async function sendPharmacyPasswordReset(email: string): Promise<void> {
   } catch (error) {
     console.error('Error sending password reset email:', error);
     throw new DatabaseError('فشل في إرسال رابط إعادة تعيين كلمة المرور', 'sendPharmacyPasswordReset', error as Error);
+  }
+}
+
+
+/**
+ * حذف صيدلية نهائياً مع جميع أدويتها
+ * Delete pharmacy permanently with all its medicines
+ * ⚠️ هذه العملية لا يمكن التراجع عنها
+ */
+export async function deletePharmacyPermanently(id: string): Promise<{
+  success: boolean;
+  deletedMedicinesCount: number;
+  deletedPendingCount: number;
+}> {
+  try {
+    const docRef = doc(db, PHARMACIES_COLLECTION, id);
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) {
+      throw new NotFoundError('pharmacy', id);
+    }
+    
+    const pharmacyData = docSnap.data();
+    const pharmacyIdNum = pharmacyData.pharmacyId as number;
+    
+    console.log(`🗑️ بدء حذف الصيدلية: ${pharmacyData.name} (ID: ${pharmacyIdNum})`);
+    
+    // 1. حذف جميع الأدوية المعتمدة من medicines collection
+    const medicinesQuery = query(
+      collection(db, 'medicines'),
+      where('pharmacyId', '==', pharmacyIdNum)
+    );
+    const medicinesSnapshot = await getDocs(medicinesQuery);
+    
+    let deletedMedicinesCount = 0;
+    for (const medicineDoc of medicinesSnapshot.docs) {
+      await deleteDoc(doc(db, 'medicines', medicineDoc.id));
+      deletedMedicinesCount++;
+    }
+    console.log(`✅ تم حذف ${deletedMedicinesCount} دواء معتمد`);
+    
+    // 2. حذف جميع الأدوية المعلقة/المرفوضة من pending_medicines collection
+    const pendingQuery = query(
+      collection(db, 'pending_medicines'),
+      where('pharmacyId', '==', pharmacyIdNum)
+    );
+    const pendingSnapshot = await getDocs(pendingQuery);
+    
+    let deletedPendingCount = 0;
+    for (const pendingDoc of pendingSnapshot.docs) {
+      await deleteDoc(doc(db, 'pending_medicines', pendingDoc.id));
+      deletedPendingCount++;
+    }
+    console.log(`✅ تم حذف ${deletedPendingCount} دواء معلق/مرفوض`);
+    
+    // 3. حذف مستند المستخدم من users collection
+    const userRef = doc(db, USERS_COLLECTION, id);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      await deleteDoc(userRef);
+      console.log('✅ تم حذف مستند المستخدم');
+    }
+    
+    // 4. حذف مستند الصيدلية
+    await deleteDoc(docRef);
+    console.log('✅ تم حذف مستند الصيدلية');
+    
+    // ملاحظة: حذف المستخدم من Firebase Auth يتطلب Admin SDK
+    // يمكن للمستخدم إعادة التسجيل بنفس البريد الإلكتروني لاحقاً
+    
+    console.log(`🎉 تم حذف الصيدلية "${pharmacyData.name}" نهائياً`);
+    
+    return {
+      success: true,
+      deletedMedicinesCount,
+      deletedPendingCount,
+    };
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    console.error('Error deleting pharmacy permanently:', error);
+    throw new DatabaseError('فشل في حذف الصيدلية', 'deletePharmacyPermanently', error as Error);
   }
 }

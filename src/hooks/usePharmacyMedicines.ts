@@ -24,6 +24,14 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+interface LimitInfo {
+  canAdd: boolean;
+  currentCount: number;
+  limit: number;
+  remaining: number;
+  message?: string;
+}
+
 interface UsePharmacyMedicinesReturn {
   medicines: MedicineWithApproval[];
   groupedMedicines: GroupedMedicines;
@@ -35,12 +43,7 @@ interface UsePharmacyMedicinesReturn {
     approved: number;
     rejected: number;
   };
-  limitInfo: {
-    canAdd: boolean;
-    currentCount: number;
-    limit: number;
-    remaining: number;
-  };
+  limitInfo: LimitInfo;
   addMedicine: (data: CreateMedicineInput) => Promise<MedicineWithApproval | null>;
   editMedicine: (id: string, data: UpdateMedicineInput) => Promise<boolean>;
   deleteMedicine: (id: string) => Promise<boolean>;
@@ -53,11 +56,12 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   const [medicines, setMedicines] = useState<MedicineWithApproval[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [limitInfo, setLimitInfo] = useState({
+  const [limitInfo, setLimitInfo] = useState<LimitInfo>({
     canAdd: true,
     currentCount: 0,
     limit: 0, // Start with 0 to indicate not loaded yet
     remaining: 0,
+    message: undefined,
   });
 
   // Real-time listener for pharmacy medicines from both collections
@@ -186,6 +190,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         currentCount: 0,
         limit: 0,
         remaining: 0,
+        message: 'لم يتم تحديد الصيدلية',
       });
       return;
     }
@@ -193,9 +198,13 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     const updateLimitInfo = async () => {
       try {
         const info = await canPharmacyAddMedicine(effectivePharmacyId);
+        const remaining = Math.max(0, info.limit - info.currentCount);
         setLimitInfo({
-          ...info,
-          remaining: info.limit - info.currentCount,
+          canAdd: info.canAdd,
+          currentCount: info.currentCount,
+          limit: info.limit,
+          remaining,
+          message: info.message,
         });
       } catch (err) {
         console.error('Error fetching limit info:', err);
@@ -205,6 +214,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           currentCount: medicines.length,
           limit: 0,
           remaining: 0,
+          message: 'حدث خطأ في جلب معلومات الحد',
         });
       }
     };
@@ -237,7 +247,8 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
       }
 
       if (!limitInfo.canAdd) {
-        toast.error('تم الوصول للحد الأقصى من الأدوية المسموح بها');
+        const errorMsg = limitInfo.message || 'تم الوصول للحد الأقصى من الأدوية المسموح بها';
+        toast.error(errorMsg);
         return null;
       }
 
@@ -357,9 +368,13 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     
     try {
       const info = await canPharmacyAddMedicine(effectivePharmacyId);
+      const remaining = Math.max(0, info.limit - info.currentCount);
       setLimitInfo({
-        ...info,
-        remaining: info.limit - info.currentCount,
+        canAdd: info.canAdd,
+        currentCount: info.currentCount,
+        limit: info.limit,
+        remaining,
+        message: info.message,
       });
       return info.canAdd;
     } catch {

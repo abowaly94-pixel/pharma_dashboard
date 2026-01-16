@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
@@ -16,6 +16,21 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Secondary app for creating users without affecting current session
+let secondaryApp: ReturnType<typeof initializeApp> | null = null;
+export const getSecondaryApp = () => {
+  if (!secondaryApp) {
+    const apps = getApps();
+    const existingSecondary = apps.find(a => a.name === 'secondary');
+    if (existingSecondary) {
+      secondaryApp = existingSecondary;
+    } else {
+      secondaryApp = initializeApp(firebaseConfig, 'secondary');
+    }
+  }
+  return secondaryApp;
+};
 
 // Initialize Services (force long polling to avoid network/proxy issues)
 export const db = initializeFirestore(app, {

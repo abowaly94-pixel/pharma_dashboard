@@ -539,32 +539,119 @@ export async function filterMedicines(filters: MedicineFilters): Promise<Medicin
 
 /**
  * التحقق من إمكانية إضافة دواء
+ * يحسب العدد الفعلي من الأدوية (غير المحذوفة) من كلا الـ collections
  */
 export async function canPharmacyAddMedicine(pharmacyId: string): Promise<{
   canAdd: boolean;
   currentCount: number;
   limit: number;
+  message?: string;
 }> {
   try {
     // Convert string pharmacyId to number
     const pharmacyIdNum = parseInt(pharmacyId);
     if (isNaN(pharmacyIdNum)) {
-      return { canAdd: false, currentCount: 0, limit: 0 };
+      return { canAdd: false, currentCount: 0, limit: 0, message: 'معرف الصيدلية غير صحيح' };
     }
     
     const pharmacy = await getPharmacyByPharmacyId(pharmacyIdNum);
     if (!pharmacy) {
-      return { canAdd: false, currentCount: 0, limit: 0 };
+      return { canAdd: false, currentCount: 0, limit: 0, message: 'الصيدلية غير موجودة' };
     }
     
+    console.log('📊 Pharmacy limit info from DB:', {
+      pharmacyId: pharmacyIdNum,
+      name: pharmacy.name,
+      medicineLimit: pharmacy.medicineLimit,
+      currentMedicineCount: pharmacy.currentMedicineCount
+    });
+    
+    // حساب العدد الفعلي من الأدوية من كلا الـ collections
+    const actualCount = await getActualMedicineCount(pharmacyIdNum);
+    
+    console.log('📊 Actual medicine count:', actualCount);
+    
+    // تحديث العداد في الصيدلية إذا كان مختلف
+    if (actualCount !== pharmacy.currentMedicineCount) {
+      console.log(`🔄 Syncing medicine count for pharmacy ${pharmacyIdNum}: ${pharmacy.currentMedicineCount} -> ${actualCount}`);
+      await syncPharmacyMedicineCount(pharmacy.id, actualCount);
+    }
+    
+    const canAdd = actualCount < pharmacy.medicineLimit;
+    const remaining = pharmacy.medicineLimit - actualCount;
+    
+    let message: string | undefined;
+    if (!canAdd) {
+      message = `تم الوصول للحد الأقصى (${pharmacy.medicineLimit} دواء). تواصل مع الإدارة لزيادة الحد.`;
+    } else if (remaining <= 3) {
+      message = `تبقى ${remaining} أدوية فقط من الحد المسموح`;
+    }
+    
+    console.log('📊 Final limit info:', { canAdd, currentCount: actualCount, limit: pharmacy.medicineLimit, message });
+    
     return {
-      canAdd: pharmacy.currentMedicineCount < pharmacy.medicineLimit,
-      currentCount: pharmacy.currentMedicineCount,
+      canAdd,
+      currentCount: actualCount,
       limit: pharmacy.medicineLimit,
+      message,
     };
   } catch (error) {
     console.error('Error checking pharmacy medicine limit:', error);
-    return { canAdd: false, currentCount: 0, limit: 0 };
+    return { canAdd: false, currentCount: 0, limit: 0, message: 'حدث خطأ في التحقق من الحد' };
+  }
+}
+
+/**
+ * حساب العدد الفعلي للأدوية من كلا الـ collections
+ */
+async function getActualMedicineCount(pharmacyIdNum: number): Promise<number> {
+  try {
+    // عد الأدوية المعتمدة (غير المحذوفة) من medicines collection
+    const approvedQuery = query(
+      collection(db, MEDICINES_COLLECTION),
+      where('pharmacyId', '==', pharmacyIdNum),
+      where('deleted', '==', false)
+    );
+    
+    // عد الأدوية المعلقة والمرفوضة (غير المحذوفة) من pending_medicines collection
+    const pendingQuery = query(
+      collection(db, PENDING_MEDICINES_COLLECTION),
+      where('pharmacyId', '==', pharmacyIdNum),
+      where('deleted', '==', false)
+    );
+    
+    const [approvedSnapshot, pendingSnapshot] = await Promise.all([
+      getDocs(approvedQuery),
+      getDocs(pendingQuery)
+    ]);
+    
+    console.log(`📊 Medicine count breakdown for pharmacy ${pharmacyIdNum}:`, {
+      approved: approvedSnapshot.docs.length,
+      approvedIds: approvedSnapshot.docs.map(d => d.id),
+      pending: pendingSnapshot.docs.length,
+      pendingIds: pendingSnapshot.docs.map(d => d.id),
+      total: approvedSnapshot.docs.length + pendingSnapshot.docs.length
+    });
+    
+    return approvedSnapshot.docs.length + pendingSnapshot.docs.length;
+  } catch (error) {
+    console.error('Error counting medicines:', error);
+    return 0;
+  }
+}
+
+/**
+ * مزامنة عداد الأدوية في الصيدلية
+ */
+async function syncPharmacyMedicineCount(pharmacyDocId: string, actualCount: number): Promise<void> {
+  try {
+    const docRef = doc(db, 'pharmacies', pharmacyDocId);
+    await updateDoc(docRef, {
+      currentMedicineCount: actualCount,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error syncing medicine count:', error);
   }
 }
 

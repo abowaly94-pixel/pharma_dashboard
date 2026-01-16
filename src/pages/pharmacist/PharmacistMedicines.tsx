@@ -284,10 +284,11 @@ export default function PharmacistMedicines() {
           <Button 
             onClick={() => handleOpenAddEdit()} 
             className="gradient-primary text-primary-foreground font-cairo"
-            disabled={limitInfo && limitInfo.limit > 0 && medicines.length >= limitInfo.limit}
+            disabled={!limitInfo.canAdd}
+            title={!limitInfo.canAdd ? (limitInfo.message || 'تم الوصول للحد الأقصى') : 'إضافة دواء جديد'}
           >
             <Plus className="w-5 h-5 ml-2" />
-            إضافة دواء جديد
+            {!limitInfo.canAdd ? 'الحد الأقصى' : 'إضافة دواء جديد'}
           </Button>
         </motion.div>
 
@@ -346,28 +347,42 @@ export default function PharmacistMedicines() {
 
         {/* Limit Info */}
         {limitInfo && limitInfo.limit > 0 && (
-          <Card>
+          <Card className={`${!limitInfo.canAdd ? 'border-red-300 bg-red-50' : limitInfo.remaining <= 3 ? 'border-orange-300 bg-orange-50' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 font-cairo mb-1">حد الأدوية المسموح به</p>
-                  <p className="text-2xl font-bold">{medicines.length} / {limitInfo.limit}</p>
+                  <p className="text-2xl font-bold">{limitInfo.currentCount} / {limitInfo.limit}</p>
                 </div>
                 <div className="text-left">
                   <p className="text-sm text-gray-600 font-cairo mb-1">المتبقي</p>
-                  <p className={`text-2xl font-bold ${(limitInfo.limit - medicines.length) <= 10 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {limitInfo.limit - medicines.length}
+                  <p className={`text-2xl font-bold ${limitInfo.remaining <= 3 ? 'text-red-600' : limitInfo.remaining <= 10 ? 'text-orange-600' : 'text-green-600'}`}>
+                    {limitInfo.remaining}
                   </p>
                 </div>
               </div>
-              {medicines.length >= limitInfo.limit && (
-                <Alert className="mt-3 border-red-200 bg-red-50">
-                  <AlertCircle className="w-4 h-4 text-red-600" />
-                  <AlertDescription className="font-cairo text-red-700">
-                    تم الوصول للحد الأقصى من الأدوية. لا يمكن إضافة المزيد.
+              {/* رسالة تحذيرية عند اقتراب الحد */}
+              {limitInfo.message && (
+                <Alert className={`mt-3 ${!limitInfo.canAdd ? 'border-red-200 bg-red-50' : 'border-orange-200 bg-orange-50'}`}>
+                  <AlertCircle className={`w-4 h-4 ${!limitInfo.canAdd ? 'text-red-600' : 'text-orange-600'}`} />
+                  <AlertDescription className={`font-cairo ${!limitInfo.canAdd ? 'text-red-700' : 'text-orange-700'}`}>
+                    {limitInfo.message}
                   </AlertDescription>
                 </Alert>
               )}
+              {/* شريط التقدم */}
+              <div className="mt-3">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
+                      !limitInfo.canAdd ? 'bg-red-500' : 
+                      limitInfo.remaining <= 3 ? 'bg-orange-500' : 
+                      'bg-green-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (limitInfo.currentCount / limitInfo.limit) * 100)}%` }}
+                  ></div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

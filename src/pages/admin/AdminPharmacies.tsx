@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Plus, Search, Building2, Phone, Mail, MapPin, Edit, 
-  CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound
+  CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound, Trash2
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -57,7 +57,8 @@ export default function AdminPharmacies() {
     changePharmacyStatus,
     changeMedicineLimit,
     updatePharmacyData,
-    resetPharmacyPassword
+    resetPharmacyPassword,
+    deletePharmacy
   } = usePharmacyManagement();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function AdminPharmacies() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingPharmacy, setEditingPharmacy] = useState<PharmacyAccount | null>(null);
   const [selectedPharmacy, setSelectedPharmacy] = useState<PharmacyAccount | null>(null);
   const [pendingStatus, setPendingStatus] = useState<PharmacyStatus | null>(null);
@@ -100,6 +102,23 @@ export default function AdminPharmacies() {
   const handleOpenResetPasswordDialog = (pharmacy: PharmacyAccount) => {
     setSelectedPharmacy(pharmacy);
     setIsResetPasswordDialogOpen(true);
+  };
+
+  const handleOpenDeleteDialog = (pharmacy: PharmacyAccount) => {
+    setSelectedPharmacy(pharmacy);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (selectedPharmacy) {
+      console.log('🗑️ Confirming delete for pharmacy:', selectedPharmacy.id, selectedPharmacy.name);
+      const result = await deletePharmacy(selectedPharmacy.id);
+      console.log('📦 Delete result:', result);
+      if (result?.success) {
+        setIsDeleteDialogOpen(false);
+        setSelectedPharmacy(null);
+      }
+    }
   };
 
   const handleConfirmResetPassword = async () => {
@@ -398,6 +417,14 @@ export default function AdminPharmacies() {
                           <DropdownMenuItem onClick={() => handleOpenResetPasswordDialog(pharmacy)}>
                             <KeyRound className="w-4 h-4 ml-2" />
                             إعادة تعيين كلمة المرور
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenDeleteDialog(pharmacy)}
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4 ml-2" />
+                            حذف الصيدلية نهائياً
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {pharmacy.status !== 'active' && (
@@ -805,6 +832,56 @@ export default function AdminPharmacies() {
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
               <AlertDialogAction onClick={handleConfirmResetPassword}>
                 إرسال الرابط
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Pharmacy Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent className="border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo text-red-600 flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                حذف الصيدلية نهائياً
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-base space-y-3">
+                {selectedPharmacy && (
+                  <>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="font-bold text-red-700 mb-1">⚠️ تحذير: هذه العملية لا يمكن التراجع عنها!</p>
+                      <p className="text-red-600 text-sm">
+                        سيتم حذف الصيدلية وجميع بياناتها بشكل نهائي.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <p><strong>الصيدلية:</strong> {selectedPharmacy.name}</p>
+                      <p><strong>البريد:</strong> {selectedPharmacy.email}</p>
+                      <p><strong>عدد الأدوية:</strong> {selectedPharmacy.currentMedicineCount} دواء</p>
+                    </div>
+                    
+                    <p className="text-red-600 font-semibold">
+                      سيتم حذف:
+                    </p>
+                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                      <li>حساب الصيدلية</li>
+                      <li>جميع الأدوية المعتمدة</li>
+                      <li>جميع الأدوية المعلقة والمرفوضة</li>
+                      <li>بيانات المستخدم</li>
+                    </ul>
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="w-4 h-4 ml-2" />
+                حذف نهائياً
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
