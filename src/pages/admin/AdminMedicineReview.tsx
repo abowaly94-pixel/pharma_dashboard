@@ -8,8 +8,6 @@ import {
   Package,
   Building2,
   Calendar,
-  Filter,
-  Eye,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -34,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { useMedicineApproval } from '@/hooks/useMedicineApproval';
 import { MedicineWithApproval } from '@/types';
+import { toast } from 'sonner';
 
 export default function AdminMedicineReview() {
   const {
@@ -52,6 +51,8 @@ export default function AdminMedicineReview() {
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject'>('approve');
   const [rejectionNotes, setRejectionNotes] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [selectedMedicineIds, setSelectedMedicineIds] = useState<Set<string>>(new Set());
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
 
   const approvedMedicines = allMedicines.filter(m => m.status === 'approved');
   const rejectedMedicines = allMedicines.filter(m => m.status === 'rejected');
@@ -70,7 +71,7 @@ export default function AdminMedicineReview() {
       await approve(selectedMedicine.id);
     } else {
       if (!rejectionNotes.trim()) {
-        alert('يرجى إدخال ملاحظات الرفض');
+        toast.error('يرجى إدخال ملاحظات الرفض');
         return;
       }
       await reject(selectedMedicine.id, rejectionNotes);
@@ -94,6 +95,61 @@ export default function AdminMedicineReview() {
   };
 
   const medicines = getMedicinesByTab();
+
+  // Handle checkbox toggle
+  const handleToggleSelect = (medicineId: string) => {
+    const newSelected = new Set(selectedMedicineIds);
+    if (newSelected.has(medicineId)) {
+      newSelected.delete(medicineId);
+    } else {
+      newSelected.add(medicineId);
+    }
+    setSelectedMedicineIds(newSelected);
+  };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    if (activeTab !== 'pending') return;
+    
+    if (selectedMedicineIds.size === pendingMedicines.length) {
+      setSelectedMedicineIds(new Set());
+    } else {
+      setSelectedMedicineIds(new Set(pendingMedicines.map(m => m.id)));
+    }
+  };
+
+  // Handle bulk approve
+  const handleBulkApprove = async () => {
+    if (selectedMedicineIds.size === 0) return;
+    
+    setIsBulkApproving(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of selectedMedicineIds) {
+      const success = await approve(id);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    setIsBulkApproving(false);
+    setSelectedMedicineIds(new Set());
+
+    if (failCount === 0) {
+      toast.success(`تمت الموافقة على ${successCount} دواء بنجاح`);
+    } else {
+      toast.warning(`تمت الموافقة على ${successCount} دواء، فشل ${failCount}`);
+    }
+  };
+
+  // Clear selection when changing tabs
+  const handleTabChange = (tab: 'pending' | 'approved' | 'rejected') => {
+    setActiveTab(tab);
+    setSelectedMedicineIds(new Set());
+  };
 
   return (
     <DashboardLayout>
@@ -160,7 +216,7 @@ export default function AdminMedicineReview() {
           className="flex gap-2 border-b"
         >
           <button
-            onClick={() => setActiveTab('pending')}
+            onClick={() => handleTabChange('pending')}
             className={`px-4 py-2 font-cairo font-semibold transition-colors ${
               activeTab === 'pending'
                 ? 'border-b-2 border-orange-500 text-orange-600'
@@ -170,7 +226,7 @@ export default function AdminMedicineReview() {
             قيد المراجعة ({stats.pending})
           </button>
           <button
-            onClick={() => setActiveTab('approved')}
+            onClick={() => handleTabChange('approved')}
             className={`px-4 py-2 font-cairo font-semibold transition-colors ${
               activeTab === 'approved'
                 ? 'border-b-2 border-green-500 text-green-600'
@@ -180,7 +236,7 @@ export default function AdminMedicineReview() {
             موافق عليها ({stats.approved})
           </button>
           <button
-            onClick={() => setActiveTab('rejected')}
+            onClick={() => handleTabChange('rejected')}
             className={`px-4 py-2 font-cairo font-semibold transition-colors ${
               activeTab === 'rejected'
                 ? 'border-b-2 border-red-500 text-red-600'
@@ -191,33 +247,76 @@ export default function AdminMedicineReview() {
           </button>
         </motion.div>
 
-        {/* Filters */}
+        {/* Filters and Bulk Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-4"
+          className="space-y-4"
         >
-          <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="ابحث عن دواء..."
-              className="pr-10 font-cairo"
-            />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="ابحث عن دواء..."
+                className="pr-10 font-cairo"
+              />
+            </div>
+            <Select
+              value={filters.pharmacyId || 'all'}
+              onValueChange={(value) =>
+                setFilters({ ...filters, pharmacyId: value === 'all' ? undefined : value })
+              }
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="جميع الصيدليات" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الصيدليات</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select
-            value={filters.pharmacyId || 'all'}
-            onValueChange={(value) =>
-              setFilters({ ...filters, pharmacyId: value === 'all' ? undefined : value })
-            }
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="جميع الصيدليات" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الصيدليات</SelectItem>
-            </SelectContent>
-          </Select>
+
+          {/* Bulk Actions Bar */}
+          {activeTab === 'pending' && pendingMedicines.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+                className="font-cairo"
+              >
+                {selectedMedicineIds.size === pendingMedicines.length ? 'إلغاء التحديد' : 'تحديد الكل'}
+              </Button>
+              
+              {selectedMedicineIds.size > 0 && (
+                <>
+                  <Badge variant="secondary" className="font-cairo">
+                    {selectedMedicineIds.size} محدد
+                  </Badge>
+                  
+                  <Button
+                    size="sm"
+                    onClick={handleBulkApprove}
+                    disabled={isBulkApproving}
+                    className="bg-green-600 hover:bg-green-700 font-cairo"
+                  >
+                    {isBulkApproving ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full ml-2" />
+                        جاري الموافقة...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 ml-2" />
+                        الموافقة على المحدد ({selectedMedicineIds.size})
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </motion.div>
 
         {/* Medicines Grid */}
@@ -239,10 +338,22 @@ export default function AdminMedicineReview() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="stat-card hover:shadow-lg transition-shadow"
+                className={`stat-card hover:shadow-lg transition-all ${
+                  selectedMedicineIds.has(medicine.id) ? 'ring-2 ring-primary' : ''
+                }`}
               >
-                {/* Image */}
+                {/* Image with Checkbox */}
                 <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg overflow-hidden mb-4">
+                  {activeTab === 'pending' && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedMedicineIds.has(medicine.id)}
+                        onChange={() => handleToggleSelect(medicine.id)}
+                        className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      />
+                    </div>
+                  )}
                   {medicine.subabaseImageUrl ? (
                     <img
                       src={medicine.subabaseImageUrl}
