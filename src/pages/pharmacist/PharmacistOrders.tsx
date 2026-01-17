@@ -316,7 +316,11 @@ export default function PharmacistOrders() {
 
         {/* Order Details Dialog */}
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogContent 
+            className="max-w-3xl max-h-[90vh] overflow-y-auto" 
+            dir="rtl"
+            onPointerDownOutside={() => setSelectedOrder(null)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 تفاصيل الطلب #{selectedOrder?.orderId?.slice(-8) ?? ''}

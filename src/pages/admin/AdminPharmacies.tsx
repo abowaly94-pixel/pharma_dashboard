@@ -81,7 +81,7 @@ export default function AdminPharmacies() {
     phoneNumber: '',
     ownerName: '',
     licenseNumber: '',
-    medicineLimit: 100,
+    medicineLimit: 0,
   });
 
   const handleOpenStatusDialog = (pharmacy: PharmacyAccount, status: PharmacyStatus) => {
@@ -156,7 +156,7 @@ export default function AdminPharmacies() {
         phoneNumber: '',
         ownerName: '',
         licenseNumber: '',
-        medicineLimit: 100,
+        medicineLimit: 0,
       });
     }
     setIsDialogOpen(true);
@@ -182,7 +182,7 @@ export default function AdminPharmacies() {
     // Validate required fields
     if (!formData.name || !formData.email || !formData.address || 
         !formData.city || !formData.phoneNumber || !formData.ownerName || 
-        !formData.licenseNumber) {
+        !formData.licenseNumber || !formData.medicineLimit) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
@@ -190,6 +190,12 @@ export default function AdminPharmacies() {
     // Validate license number length
     if (formData.licenseNumber.trim().length < 5) {
       toast.error('رقم الترخيص يجب أن يكون 5 أحرف على الأقل');
+      return;
+    }
+    
+    // Validate medicine limit
+    if (formData.medicineLimit <= 0) {
+      toast.error('الحد الأقصى للأدوية يجب أن يكون أكبر من صفر');
       return;
     }
     
@@ -220,7 +226,7 @@ export default function AdminPharmacies() {
             phoneNumber: '',
             ownerName: '',
             licenseNumber: '',
-            medicineLimit: 100,
+            medicineLimit: 0,
           });
           setShowPassword(false);
         }
@@ -510,7 +516,10 @@ export default function AdminPharmacies() {
 
         {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent 
+            className="max-w-2xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={() => setIsDialogOpen(false)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 {editingPharmacy ? 'تعديل بيانات الصيدلية' : 'إضافة صيدلية جديدة'}
@@ -534,7 +543,7 @@ export default function AdminPharmacies() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
-                      placeholder="صيدلية النور"
+                      placeholder="أدخل اسم الصيدلية"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -545,7 +554,7 @@ export default function AdminPharmacies() {
                       onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                       required
                       minLength={5}
-                      placeholder="12345"
+                      placeholder="أدخل رقم الترخيص"
                     />
                   </div>
                 </div>
@@ -558,7 +567,7 @@ export default function AdminPharmacies() {
                       value={formData.ownerName}
                       onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
                       required
-                      placeholder="أحمد محمد"
+                      placeholder="أدخل اسم المالك"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -568,7 +577,7 @@ export default function AdminPharmacies() {
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       required
-                      placeholder="القاهرة"
+                      placeholder="أدخل اسم المدينة"
                     />
                   </div>
                 </div>
@@ -581,7 +590,7 @@ export default function AdminPharmacies() {
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
                     minLength={5}
-                    placeholder="شارع الجمهورية، المعادي"
+                    placeholder="أدخل العنوان بالتفصيل"
                   />
                 </div>
               </div>
@@ -600,7 +609,7 @@ export default function AdminPharmacies() {
                       required
                       minLength={10}
                       dir="ltr"
-                      placeholder="+20 123 456 7890"
+                      placeholder="أدخل رقم الهاتف"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -613,7 +622,7 @@ export default function AdminPharmacies() {
                       required
                       disabled={!!editingPharmacy}
                       dir="ltr"
-                      placeholder="pharmacy@example.com"
+                      placeholder="أدخل البريد الإلكتروني"
                     />
                   </div>
                 </div>
@@ -629,7 +638,7 @@ export default function AdminPharmacies() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required={!editingPharmacy}
                         minLength={8}
-                        placeholder="كلمة مرور قوية (8 أحرف على الأقل)"
+                        placeholder="أدخل كلمة مرور قوية (8 أحرف على الأقل)"
                         className="pl-10"
                         dir="ltr"
                       />
@@ -650,16 +659,18 @@ export default function AdminPharmacies() {
                 <h3 className="text-sm font-semibold text-gray-700 font-cairo">الإعدادات</h3>
                 
                 <div className="space-y-1.5">
-                  <Label htmlFor="medicineLimit" className="text-sm">الحد الأقصى للأدوية</Label>
+                  <Label htmlFor="medicineLimit" className="text-sm">الحد الأقصى للأدوية *</Label>
                   <Input
                     id="medicineLimit"
                     type="number"
                     min={1}
-                    value={formData.medicineLimit}
-                    onChange={(e) => setFormData({ ...formData, medicineLimit: parseInt(e.target.value) || 100 })}
+                    required
+                    value={formData.medicineLimit === 0 ? '' : formData.medicineLimit}
+                    onChange={(e) => setFormData({ ...formData, medicineLimit: parseInt(e.target.value) || 0 })}
+                    placeholder="أدخل الحد الأقصى للأدوية"
                   />
                   <p className="text-xs text-muted-foreground">
-                    عدد الأدوية التي يمكن للصيدلية إضافتها (الافتراضي: 100)
+                    عدد الأدوية التي يمكن للصيدلية إضافتها
                   </p>
                 </div>
               </div>
@@ -699,7 +710,10 @@ export default function AdminPharmacies() {
 
         {/* Medicine Limit Dialog */}
         <Dialog open={isLimitDialogOpen} onOpenChange={setIsLimitDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent 
+            className="max-w-md"
+            onPointerDownOutside={() => setIsLimitDialogOpen(false)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo">تعديل حد الأدوية</DialogTitle>
               <DialogDescription>
@@ -730,6 +744,7 @@ export default function AdminPharmacies() {
                   min={selectedPharmacy?.currentMedicineCount || 1}
                   value={newLimit}
                   onChange={(e) => setNewLimit(parseInt(e.target.value) || 100)}
+                  placeholder="أدخل الحد الجديد"
                 />
                 <p className="text-xs text-muted-foreground">
                   يجب أن يكون الحد الجديد أكبر من أو يساوي عدد الأدوية الحالية
@@ -749,7 +764,10 @@ export default function AdminPharmacies() {
 
         {/* Details Dialog */}
         <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent 
+            className="max-w-lg"
+            onPointerDownOutside={() => setIsDetailsDialogOpen(false)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo">تفاصيل الصيدلية</DialogTitle>
             </DialogHeader>

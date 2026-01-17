@@ -630,7 +630,10 @@ export default function PharmacistMedicines() {
 
         {/* Add/Edit Dialog - نفس القائمة التي يستخدمها الأدمن */}
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent 
+            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={() => setIsAddEditDialogOpen(false)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
@@ -695,10 +698,10 @@ export default function PharmacistMedicines() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={formData.price}
+                      value={formData.price === 0 ? '' : formData.price}
                       onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                       required
-                      placeholder="0.00"
+                      placeholder="أدخل السعر بالجنيه"
                       className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
@@ -708,10 +711,10 @@ export default function PharmacistMedicines() {
                       id="quantity"
                       type="number"
                       min="0"
-                      value={formData.quantity}
+                      value={formData.quantity === 0 ? '' : formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                       required
-                      placeholder="0"
+                      placeholder="أدخل الكمية المتاحة"
                       className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
@@ -792,12 +795,12 @@ export default function PharmacistMedicines() {
                           type="number"
                           min="0"
                           max="100"
-                          value={formData.discountRating}
+                          value={formData.discountRating === 0 ? '' : formData.discountRating}
                           onChange={(e) => setFormData({ 
                             ...formData, 
                             discountRating: parseInt(e.target.value) || 0 
                           })}
-                          placeholder="نسبة الخصم %"
+                          placeholder="أدخل نسبة الخصم (اختياري)"
                           className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
                         />
                       </div>

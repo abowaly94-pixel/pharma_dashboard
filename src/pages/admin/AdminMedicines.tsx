@@ -92,8 +92,9 @@ export default function AdminMedicines() {
       });
     } else {
       setEditingMedicine(null);
-      // Get first pharmacy as default
-      const defaultPharmacy = pharmacies[0];
+      // Get first pharmacy as default (excluding صيدلية النخيل)
+      const availablePharmacies = pharmacies.filter(p => p.name !== 'صيدلية النخيل');
+      const defaultPharmacy = availablePharmacies[0];
       setFormData({
         name: '',
         code: `MED-${Date.now()}`,
@@ -101,8 +102,8 @@ export default function AdminMedicines() {
         price: 0,
         quantity: 0,
         pharmacyId: defaultPharmacy?.pharmacyId || 1,
-        pharmacyName: defaultPharmacy?.name || 'صيدلية النخيل',
-        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : 'القاهرة',
+        pharmacyName: defaultPharmacy?.name || '',
+        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
         category: '',
         manufacturer: '',
         subabaseImageUrl: '',
@@ -461,7 +462,10 @@ export default function AdminMedicines() {
 
         {/* Add/Edit Dialog */}
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent 
+            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={() => setIsAddEditDialogOpen(false)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
@@ -519,10 +523,10 @@ export default function AdminMedicines() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={formData.price}
+                      value={formData.price === 0 ? '' : formData.price}
                       onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                       required
-                      placeholder="0.00"
+                      placeholder="أدخل السعر بالجنيه"
                       className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
@@ -532,10 +536,10 @@ export default function AdminMedicines() {
                       id="quantity"
                       type="number"
                       min="0"
-                      value={formData.quantity}
+                      value={formData.quantity === 0 ? '' : formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                       required
-                      placeholder="0"
+                      placeholder="أدخل الكمية المتاحة"
                       className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
@@ -590,11 +594,13 @@ export default function AdminMedicines() {
                         <SelectValue placeholder="اختر الصيدلية" />
                       </SelectTrigger>
                       <SelectContent>
-                        {pharmacies.map((pharmacy) => (
-                          <SelectItem key={pharmacy.id} value={pharmacy.pharmacyId.toString()}>
-                            <span className="font-cairo">{pharmacy.name}</span>
-                          </SelectItem>
-                        ))}
+                        {pharmacies
+                          .filter((pharmacy) => pharmacy.name !== 'صيدلية النخيل')
+                          .map((pharmacy) => (
+                            <SelectItem key={pharmacy.id} value={pharmacy.pharmacyId.toString()}>
+                              <span className="font-cairo">{pharmacy.name}</span>
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -604,7 +610,7 @@ export default function AdminMedicines() {
                       id="pharmacyName"
                       value={formData.pharmacyName}
                       onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                      placeholder="اسم الصيدلية"
+                      placeholder="اكتب اسم صيدليتك"
                       className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     />
                   </div>
@@ -679,12 +685,12 @@ export default function AdminMedicines() {
                           type="number"
                           min="0"
                           max="100"
-                          value={formData.discountRating}
+                          value={formData.discountRating === 0 ? '' : formData.discountRating}
                           onChange={(e) => setFormData({ 
                             ...formData, 
                             discountRating: parseInt(e.target.value) || 0 
                           })}
-                          placeholder="نسبة الخصم %"
+                          placeholder="أدخل نسبة الخصم (اختياري)"
                           className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
                         />
                       </div>
@@ -898,7 +904,11 @@ export default function AdminMedicines() {
 
         {/* View Details Dialog */}
         <Dialog open={!!selectedMedicine} onOpenChange={() => setSelectedMedicine(null)}>
-          <DialogContent className="max-w-3xl" dir="rtl">
+          <DialogContent 
+            className="max-w-3xl" 
+            dir="rtl"
+            onPointerDownOutside={() => setSelectedMedicine(null)}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">تفاصيل الدواء</DialogTitle>
             </DialogHeader>
