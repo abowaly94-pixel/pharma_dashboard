@@ -118,6 +118,11 @@ export default function AdminSettings() {
       return;
     }
 
+    if (!newApiKeyName.trim()) {
+      toast.error('يرجى إدخال اسم المفتاح');
+      return;
+    }
+
     // Check if key already exists
     if (apiKeysList.some(k => k.key === newApiKey.trim())) {
       toast.error('هذا المفتاح موجود بالفعل');
@@ -130,7 +135,7 @@ export default function AdminSettings() {
       const newKey: ApiKeyItem = {
         id: Date.now().toString(),
         key: newApiKey.trim(),
-        name: newApiKeyName.trim() || `مفتاح ${apiKeysList.length + 1}`,
+        name: newApiKeyName.trim(),
         isActive: apiKeysList.length === 0, // First key is active by default
         addedAt: new Date(),
       };
@@ -599,18 +604,23 @@ export default function AdminSettings() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-cairo">اسم المفتاح (اختياري)</Label>
+                    <Label className="font-cairo">
+                      اسم المفتاح <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       value={newApiKeyName}
                       onChange={(e) => setNewApiKeyName(e.target.value)}
                       placeholder="مثال: حساب شخصي، حساب العمل..."
                       className="font-cairo"
                       dir="rtl"
+                      required
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="font-cairo">مفتاح API</Label>
+                    <Label className="font-cairo">
+                      مفتاح API <span className="text-destructive">*</span>
+                    </Label>
                     <div className="relative">
                       <Input
                         type={showNewApiKey ? "text" : "password"}
@@ -619,6 +629,7 @@ export default function AdminSettings() {
                         placeholder="أدخل مفتاح Remove.bg API"
                         className="font-mono pl-12"
                         dir="ltr"
+                        required
                       />
                       <Button
                         type="button"
@@ -647,7 +658,7 @@ export default function AdminSettings() {
                   </p>
                   <Button
                     onClick={handleAddApiKey}
-                    disabled={isAddingKey || !newApiKey.trim()}
+                    disabled={isAddingKey || !newApiKey.trim() || !newApiKeyName.trim()}
                     className="font-cairo"
                   >
                     <Plus className="w-4 h-4 ml-2" />
