@@ -12,7 +12,6 @@ import {
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { SalesChart, OrderStatusChart } from '@/components/dashboard/Charts';
-import { ApiKeyAlert } from '@/components/dashboard/ApiKeyAlert';
 import { useMedicines } from '@/hooks/useMedicines';
 import { useOrders } from '@/hooks/useOrders';
 import { useUsers } from '@/hooks/useUsers';
@@ -77,9 +76,6 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        {/* API Key Alert */}
-        <ApiKeyAlert />
-
         {/* Stats Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

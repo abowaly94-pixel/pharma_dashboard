@@ -1,13 +1,14 @@
-import { motion } from 'framer-motion';
-import { Settings, Bell, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings, Bell, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff, Copy, Check, Trash2, Plus, RefreshCw } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,17 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+interface ApiKeyItem {
+  id: string;
+  key: string;
+  name: string;
+  isActive: boolean;
+  remainingCalls?: number;
+  addedAt: Date;
+  lastTested?: Date;
+  isValid?: boolean;
+}
+
 export default function AdminSettings() {
   const { user, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -35,18 +47,16 @@ export default function AdminSettings() {
   const [notifications, setNotifications] = useState(true);
   const [emailAlerts, setEmailAlerts] = useState(true);
   
-  // API Keys Settings
-  const [apiKeys, setApiKeys] = useState({
-    removeBgApiKey: '',
-  });
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [isLoadingApiKeys, setIsLoadingApiKeys] = useState(false);
-  const [apiKeyStatus, setApiKeyStatus] = useState<{
-    isValid: boolean;
-    remainingCalls?: number;
-    error?: string;
-  } | null>(null);
-  const [isTestingApiKey, setIsTestingApiKey] = useState(false);
+  // API Keys Management
+  const [apiKeysList, setApiKeysList] = useState<ApiKeyItem[]>([]);
+  const [newApiKey, setNewApiKey] = useState('');
+  const [newApiKeyName, setNewApiKeyName] = useState('');
+  const [showNewApiKey, setShowNewApiKey] = useState(false);
+  const [isAddingKey, setIsAddingKey] = useState(false);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set());
+  const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
   
   // Profile Data
   const [profileData, setProfileData] = useState({
@@ -75,91 +85,330 @@ export default function AdminSettings() {
       
       if (apiKeysDoc.exists()) {
         const data = apiKeysDoc.data();
-        const removeBgKey = data.removeBgApiKey || '';
-        setApiKeys({
-          removeBgApiKey: removeBgKey,
-        });
+        const keysList = data.keysList || [];
         
-        // Test API key if it exists
-        if (removeBgKey.trim()) {
-          setTimeout(() => {
-            testApiKey();
-          }, 500);
+        // Convert to ApiKeyItem format
+        const formattedKeys: ApiKeyItem[] = keysList.map((item: any) => ({
+          id: item.id,
+          key: item.key,
+          name: item.name,
+          isActive: item.isActive,
+          remainingCalls: item.remainingCalls,
+          addedAt: item.addedAt?.toDate() || new Date(),
+          lastTested: item.lastTested?.toDate(),
+          isValid: item.isValid,
+        }));
+        
+        setApiKeysList(formattedKeys);
+        
+        // Test active key if exists
+        const activeKey = formattedKeys.find(k => k.isActive);
+        if (activeKey) {
+          setTimeout(() => testApiKey(activeKey.id), 500);
         }
       }
     } catch (error) {
-      console.error('Error loading API keys:', error);
+      toast.error('فشل تحميل مفاتيح API');
     }
   };
 
-  const handleSaveApiKeys = async () => {
-    setIsLoadingApiKeys(true);
+  const handleAddApiKey = async () => {
+    if (!newApiKey.trim()) {
+      toast.error('يرجى إدخال مفتاح API');
+      return;
+    }
+
+    // Check if key already exists
+    if (apiKeysList.some(k => k.key === newApiKey.trim())) {
+      toast.error('هذا المفتاح موجود بالفعل');
+      return;
+    }
+
+    setIsAddingKey(true);
+    
     try {
+      const newKey: ApiKeyItem = {
+        id: Date.now().toString(),
+        key: newApiKey.trim(),
+        name: newApiKeyName.trim() || `مفتاح ${apiKeysList.length + 1}`,
+        isActive: apiKeysList.length === 0, // First key is active by default
+        addedAt: new Date(),
+      };
+
+      const updatedList = [...apiKeysList, newKey];
+      
+      // Save to database
       const apiKeysRef = doc(db, 'system_settings', 'api_keys');
       await setDoc(apiKeysRef, {
-        removeBgApiKey: apiKeys.removeBgApiKey,
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          remainingCalls: k.remainingCalls || null,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        // Keep the old format for backward compatibility
+        removeBgApiKey: updatedList.find(k => k.isActive)?.key || '',
         updatedAt: new Date(),
         updatedBy: user?.uid,
       }, { merge: true });
       
-      toast.success('تم حفظ مفاتيح API بنجاح');
+      setApiKeysList(updatedList);
+      setNewApiKey('');
+      setNewApiKeyName('');
       
-      // Test the API key after saving
-      if (apiKeys.removeBgApiKey.trim()) {
-        await testApiKey();
-      }
-    } catch (error) {
-      console.error('Error saving API keys:', error);
-      toast.error('فشل حفظ مفاتيح API');
+      toast.success('تم إضافة المفتاح بنجاح');
+      
+      // Test the new key
+      setTimeout(() => testApiKey(newKey.id), 500);
+    } catch (error: any) {
+      console.error('Error adding API key:', error);
+      toast.error(`فشل إضافة المفتاح: ${error.message || 'خطأ غير معروف'}`);
     } finally {
-      setIsLoadingApiKeys(false);
+      setIsAddingKey(false);
     }
   };
 
-  const testApiKey = async () => {
-    if (!apiKeys.removeBgApiKey.trim()) {
-      setApiKeyStatus({ isValid: false, error: 'مفتاح API فارغ' });
-      return;
+  const saveApiKeysList = async (list: ApiKeyItem[]) => {
+    try {
+      const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+      await setDoc(apiKeysRef, {
+        keysList: list.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          remainingCalls: k.remainingCalls || null,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        // Keep the old format for backward compatibility
+        removeBgApiKey: list.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+    } catch (error: any) {
+      console.error('Error saving API keys list:', error);
+      throw error;
     }
+  };
 
-    setIsTestingApiKey(true);
-    setApiKeyStatus(null);
+  const testApiKey = async (keyId: string) => {
+    const keyIndex = apiKeysList.findIndex(k => k.id === keyId);
+    if (keyIndex === -1) return;
+    
+    const key = apiKeysList[keyIndex];
+
+    setTestingKeys(prev => new Set(prev).add(keyId));
 
     try {
-      // Test API key by making a request to get account info
       const response = await fetch('https://api.remove.bg/v1.0/account', {
         method: 'GET',
         headers: {
-          'X-Api-Key': apiKeys.removeBgApiKey.trim(),
+          'X-Api-Key': key.key,
         },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setApiKeyStatus({
-          isValid: true,
-          remainingCalls: data.attributes?.api?.free_calls_remaining || 0,
-        });
-        toast.success('مفتاح API صحيح ويعمل بشكل طبيعي');
-      } else {
-        let errorMessage = 'مفتاح API غير صحيح';
+        const remainingCalls = data.attributes?.api?.free_calls_remaining || 0;
         
-        if (response.status === 403) {
-          errorMessage = 'مفتاح API غير صحيح أو منتهي الصلاحية';
-        } else if (response.status === 429) {
-          errorMessage = 'تم تجاوز الحد المسموح من الطلبات';
+        const updatedList = [...apiKeysList];
+        updatedList[keyIndex] = {
+          ...updatedList[keyIndex],
+          isValid: true,
+          remainingCalls,
+          lastTested: new Date(),
+        };
+        
+        setApiKeysList(updatedList);
+        
+        // Save to database
+        const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+        await setDoc(apiKeysRef, {
+          keysList: updatedList.map(k => ({
+            id: k.id,
+            key: k.key,
+            name: k.name,
+            isActive: k.isActive,
+            remainingCalls: k.remainingCalls || null,
+            addedAt: k.addedAt,
+            lastTested: k.lastTested || null,
+            isValid: k.isValid !== undefined ? k.isValid : null,
+          })),
+          removeBgApiKey: updatedList.find(k => k.isActive)?.key || '',
+          updatedAt: new Date(),
+          updatedBy: user?.uid,
+        }, { merge: true });
+        
+        toast.success(`المفتاح صحيح! متبقي ${remainingCalls} استدعاء`);
+      } else {
+        const updatedList = [...apiKeysList];
+        updatedList[keyIndex] = {
+          ...updatedList[keyIndex],
+          isValid: false,
+          lastTested: new Date(),
+        };
+        
+        setApiKeysList(updatedList);
+        
+        // Save to database
+        const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+        await setDoc(apiKeysRef, {
+          keysList: updatedList.map(k => ({
+            id: k.id,
+            key: k.key,
+            name: k.name,
+            isActive: k.isActive,
+            remainingCalls: k.remainingCalls || null,
+            addedAt: k.addedAt,
+            lastTested: k.lastTested || null,
+            isValid: k.isValid !== undefined ? k.isValid : null,
+          })),
+          removeBgApiKey: updatedList.find(k => k.isActive)?.key || '',
+          updatedAt: new Date(),
+          updatedBy: user?.uid,
+        }, { merge: true });
+        
+        toast.error('المفتاح غير صحيح أو منتهي الصلاحية');
+      }
+    } catch (error: any) {
+      console.error('Error testing API key:', error);
+      toast.error('فشل اختبار المفتاح');
+    } finally {
+      setTestingKeys(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(keyId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleSetActiveKey = async (keyId: string) => {
+    try {
+      const updatedList = apiKeysList.map(k => ({
+        ...k,
+        isActive: k.id === keyId,
+      }));
+      
+      setApiKeysList(updatedList);
+      
+      // Save to database
+      const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+      await setDoc(apiKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          remainingCalls: k.remainingCalls || null,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        removeBgApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+      
+      toast.success('تم تفعيل المفتاح');
+    } catch (error: any) {
+      console.error('Error setting active key:', error);
+      toast.error('فشل تفعيل المفتاح');
+    }
+  };
+
+  const handleDeleteKey = async (keyId: string) => {
+    try {
+      const updatedList = apiKeysList.filter(k => k.id !== keyId);
+      
+      // If deleted key was active, activate the first one
+      if (apiKeysList.find(k => k.id === keyId)?.isActive && updatedList.length > 0) {
+        updatedList[0].isActive = true;
+      }
+      
+      setApiKeysList(updatedList);
+      
+      // Save to database
+      const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+      await setDoc(apiKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          remainingCalls: k.remainingCalls || null,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        removeBgApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+      
+      toast.success('تم حذف المفتاح');
+      setKeyToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting key:', error);
+      toast.error('فشل حذف المفتاح');
+    }
+  };
+
+  const handleCopyKey = async (keyId: string, key: string) => {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(key);
+        setCopiedKeyId(keyId);
+        toast.success('تم نسخ المفتاح');
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = key;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            setCopiedKeyId(keyId);
+            toast.success('تم نسخ المفتاح');
+          } else {
+            toast.error('فشل نسخ المفتاح');
+          }
+        } catch (err) {
+          toast.error('فشل نسخ المفتاح');
         }
         
-        setApiKeyStatus({ isValid: false, error: errorMessage });
-        toast.error(errorMessage);
+        document.body.removeChild(textArea);
       }
+      
+      setTimeout(() => setCopiedKeyId(null), 2000);
     } catch (error) {
-      console.error('Error testing API key:', error);
-      setApiKeyStatus({ isValid: false, error: 'فشل في اختبار المفتاح' });
-      toast.error('فشل في اختبار مفتاح API');
-    } finally {
-      setIsTestingApiKey(false);
+      console.error('Copy error:', error);
+      toast.error('فشل نسخ المفتاح');
     }
+  };
+
+  const toggleKeyVisibility = (keyId: string) => {
+    setVisibleKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(keyId)) {
+        newSet.delete(keyId);
+      } else {
+        newSet.add(keyId);
+      }
+      return newSet;
+    });
   };
 
   const handleSaveProfile = async () => {
@@ -317,7 +566,7 @@ export default function AdminSettings() {
           </Card>
         </motion.div>
 
-        {/* API Keys Settings */}
+        {/* API Keys Management */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -325,108 +574,297 @@ export default function AdminSettings() {
         >
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3 font-cairo">
-                <Key className="w-5 h-5 text-primary" />
-                مفاتيح API
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-3 font-cairo">
+                    <Key className="w-5 h-5 text-primary" />
+                    إدارة مفاتيح API
+                  </CardTitle>
+                  <CardDescription className="font-cairo mt-1">
+                    قم بإضافة وإدارة مفاتيح Remove.bg API الخاصة بك
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="font-cairo">
+                  {apiKeysList.length} مفتاح
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="font-cairo flex items-center gap-2">
-                    <Key className="w-4 h-4" />
-                    مفتاح Remove.bg API
-                  </Label>
-                  <div className="relative">
+              {/* Add New Key Section */}
+              <div className="p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5 space-y-4">
+                <div className="flex items-center gap-2 text-primary">
+                  <Plus className="w-5 h-5" />
+                  <h3 className="font-cairo font-semibold">إضافة مفتاح جديد</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="font-cairo">اسم المفتاح (اختياري)</Label>
                     <Input
-                      type={showApiKey ? "text" : "password"}
-                      value={apiKeys.removeBgApiKey}
-                      onChange={(e) => setApiKeys({ ...apiKeys, removeBgApiKey: e.target.value })}
-                      placeholder="أدخل مفتاح Remove.bg API"
-                      className="font-mono pl-12 text-right"
+                      value={newApiKeyName}
+                      onChange={(e) => setNewApiKeyName(e.target.value)}
+                      placeholder="مثال: حساب شخصي، حساب العمل..."
+                      className="font-cairo"
                       dir="rtl"
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute left-2 top-0 bottom-0 my-auto h-8 w-8 p-0"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                    >
-                      {showApiKey ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </Button>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="font-cairo">مفتاح API</Label>
+                    <div className="relative">
+                      <Input
+                        type={showNewApiKey ? "text" : "password"}
+                        value={newApiKey}
+                        onChange={(e) => setNewApiKey(e.target.value)}
+                        placeholder="أدخل مفتاح Remove.bg API"
+                        className="font-mono pl-12"
+                        dir="ltr"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute left-2 top-0 bottom-0 my-auto h-8 w-8 p-0"
+                        onClick={() => setShowNewApiKey(!showNewApiKey)}
+                      >
+                        {showNewApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
                   <p className="text-xs text-muted-foreground">
-                    يستخدم لإزالة خلفية الصور. احصل على مفتاح مجاني من{' '}
+                    احصل على مفتاح مجاني من{' '}
                     <a 
                       href="https://www.remove.bg/api" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-primary hover:underline font-medium"
                     >
                       remove.bg
                     </a>
                   </p>
-                  
-                  {/* API Key Status */}
-                  {apiKeyStatus && (
-                    <div className={`p-3 rounded-lg border ${
-                      apiKeyStatus.isValid 
-                        ? 'bg-green-50 border-green-200 text-green-800' 
-                        : 'bg-red-50 border-red-200 text-red-800'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          apiKeyStatus.isValid ? 'bg-green-500' : 'bg-red-500'
-                        }`} />
-                        <span className="font-cairo text-sm font-medium">
-                          {apiKeyStatus.isValid ? 'المفتاح صحيح' : 'المفتاح غير صحيح'}
-                        </span>
-                      </div>
-                      {apiKeyStatus.error && (
-                        <p className="text-xs mt-1">{apiKeyStatus.error}</p>
-                      )}
-                    </div>
-                  )}
+                  <Button
+                    onClick={handleAddApiKey}
+                    disabled={isAddingKey || !newApiKey.trim()}
+                    className="font-cairo"
+                  >
+                    <Plus className="w-4 h-4 ml-2" />
+                    {isAddingKey ? 'جاري الإضافة...' : 'إضافة المفتاح'}
+                  </Button>
                 </div>
               </div>
 
-              <Separator />
+              {/* API Keys List */}
+              {apiKeysList.length > 0 && (
+                <>
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <h3 className="font-cairo font-semibold text-sm text-muted-foreground">
+                      المفاتيح المحفوظة ({apiKeysList.length})
+                    </h3>
+                    
+                    {/* Scrollable Container */}
+                    <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+                      <AnimatePresence mode="popLayout">
+                        {apiKeysList.map((keyItem) => (
+                          <motion.div
+                            key={keyItem.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                              keyItem.isActive 
+                                ? 'border-primary bg-primary/5 shadow-sm' 
+                                : 'border-border bg-card hover:border-primary/30'
+                            }`}
+                          >
+                            <div className="space-y-3">
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-cairo font-semibold truncate">
+                                      {keyItem.name}
+                                    </h4>
+                                    {keyItem.isActive && (
+                                      <Badge className="bg-primary text-white font-cairo text-xs">
+                                        نشط
+                                      </Badge>
+                                    )}
+                                    {keyItem.isValid !== undefined && (
+                                      <Badge 
+                                        variant={keyItem.isValid ? "default" : "destructive"}
+                                        className="font-cairo text-xs"
+                                      >
+                                        {keyItem.isValid ? '✓ صحيح' : '✗ غير صحيح'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Key Display */}
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
+                                      {visibleKeys.has(keyItem.id) 
+                                        ? keyItem.key 
+                                        : '•'.repeat(Math.min(keyItem.key.length, 32))
+                                      }
+                                    </code>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => toggleKeyVisibility(keyItem.id)}
+                                    >
+                                      {visibleKeys.has(keyItem.id) ? (
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <Eye className="w-3.5 h-3.5" />
+                                      )}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => handleCopyKey(keyItem.id, keyItem.key)}
+                                    >
+                                      {copiedKeyId === keyItem.id ? (
+                                        <Check className="w-3.5 h-3.5 text-success" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Info */}
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                    <span>
+                                      أضيف: {keyItem.addedAt.toLocaleDateString('ar-EG')}
+                                    </span>
+                                    {keyItem.remainingCalls !== undefined && (
+                                      <span className="flex items-center gap-1">
+                                        <span className={keyItem.remainingCalls <= 10 ? 'text-destructive font-medium' : ''}>
+                                          {keyItem.remainingCalls} استدعاء متبقي
+                                        </span>
+                                      </span>
+                                    )}
+                                    {keyItem.lastTested && (
+                                      <span>
+                                        آخر اختبار: {keyItem.lastTested.toLocaleTimeString('ar-EG', { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Actions */}
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => testApiKey(keyItem.id)}
+                                    disabled={testingKeys.has(keyItem.id)}
+                                    className="h-8 font-cairo"
+                                  >
+                                    <RefreshCw className={`w-3.5 h-3.5 ml-1 ${testingKeys.has(keyItem.id) ? 'animate-spin' : ''}`} />
+                                    {testingKeys.has(keyItem.id) ? 'جاري الاختبار...' : 'اختبار'}
+                                  </Button>
+                                  
+                                  {!keyItem.isActive && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleSetActiveKey(keyItem.id)}
+                                      className="h-8 font-cairo"
+                                    >
+                                      تفعيل
+                                    </Button>
+                                  )}
+                                  
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setKeyToDelete(keyItem.id)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-cairo">💡 نصائح:</p>
-                  <ul className="list-disc list-inside space-y-1 mt-1">
-                    <li>كل حساب مجاني يحصل على 50 صورة شهرياً</li>
-                    <li>يمكنك إنشاء حسابات متعددة للحصول على المزيد</li>
-                    <li>تأكد من صحة المفتاح قبل الحفظ</li>
-                  </ul>
+              {/* Tips */}
+              {apiKeysList.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Key className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p className="font-cairo">لا توجد مفاتيح محفوظة</p>
+                  <p className="text-sm mt-1">قم بإضافة مفتاح API للبدء</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={testApiKey}
-                    disabled={isTestingApiKey || !apiKeys.removeBgApiKey.trim()}
-                    className="font-cairo"
-                  >
-                    {isTestingApiKey ? 'جاري الاختبار...' : 'اختبار المفتاح'}
-                  </Button>
-                  <Button
-                    onClick={handleSaveApiKeys}
-                    disabled={isLoadingApiKeys || !apiKeys.removeBgApiKey.trim()}
-                    className="font-cairo"
-                  >
-                    {isLoadingApiKeys ? 'جاري الحفظ...' : 'حفظ المفاتيح'}
-                  </Button>
-                </div>
+              )}
+              
+              <Separator />
+              
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <p className="font-cairo font-medium text-sm mb-2 flex items-center gap-2">
+                  💡 نصائح مهمة:
+                </p>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>كل حساب مجاني يحصل على 50 صورة شهرياً</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>يمكنك إضافة عدة مفاتيح والتبديل بينها</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>المفتاح النشط هو المستخدم حالياً في النظام</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>اختبر المفاتيح بانتظام للتأكد من صلاحيتها</span>
+                  </li>
+                </ul>
               </div>
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Delete Key Confirmation Dialog */}
+        <AlertDialog open={!!keyToDelete} onOpenChange={() => setKeyToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo text-xl">تأكيد حذف المفتاح</AlertDialogTitle>
+              <AlertDialogDescription className="font-cairo text-base">
+                هل أنت متأكد من حذف هذا المفتاح؟
+                <br />
+                لن تتمكن من استرجاعه بعد الحذف.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="font-cairo">إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => keyToDelete && handleDeleteKey(keyToDelete)}
+                className="bg-destructive hover:bg-destructive/90 font-cairo"
+              >
+                <Trash2 className="w-4 h-4 ml-2" />
+                حذف المفتاح
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Notifications Settings */}
         <motion.div
