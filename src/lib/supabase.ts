@@ -96,10 +96,29 @@ export async function uploadImageToSupabase(file: File): Promise<{success: boole
  */
 export async function removeImageBackground(imageUrl: string | File): Promise<{success: boolean, blob?: Blob, error?: string}> {
   try {
-    const apiKey = import.meta.env.VITE_REMOVEBG_API_KEY;
+    // Try to get API key from database first, fallback to env variable
+    let apiKey = import.meta.env.VITE_REMOVEBG_API_KEY;
+    
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      
+      const apiKeysRef = doc(db, 'system_settings', 'api_keys');
+      const apiKeysDoc = await getDoc(apiKeysRef);
+      
+      if (apiKeysDoc.exists()) {
+        const data = apiKeysDoc.data();
+        if (data.removeBgApiKey && data.removeBgApiKey.trim()) {
+          apiKey = data.removeBgApiKey.trim();
+          console.log('🔑 Using API key from database');
+        }
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Could not load API key from database, using env variable:', dbError);
+    }
     
     if (!apiKey) {
-      return { success: false, error: 'مفتاح API غير موجود. يرجى إضافة VITE_REMOVEBG_API_KEY في ملف .env.local' };
+      return { success: false, error: 'مفتاح API غير موجود. يرجى إضافة مفتاح Remove.bg API في الإعدادات' };
     }
 
     console.log('🎨 Starting background removal...');
@@ -125,9 +144,20 @@ export async function removeImageBackground(imageUrl: string | File): Promise<{s
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('❌ Remove.bg API error:', errorData);
+      
+      let errorMessage = `خطأ في API: ${response.status}`;
+      
+      if (response.status === 402) {
+        errorMessage = 'انتهت الحصة المجانية لهذا الشهر. يرجى تحديث مفتاح API أو الانتظار للشهر القادم';
+      } else if (response.status === 403) {
+        errorMessage = 'مفتاح API غير صحيح. يرجى التحقق من المفتاح في الإعدادات';
+      } else if (errorData.errors?.[0]?.title) {
+        errorMessage = errorData.errors[0].title;
+      }
+      
       return { 
         success: false, 
-        error: errorData.errors?.[0]?.title || `خطأ في API: ${response.status}` 
+        error: errorMessage
       };
     }
 
