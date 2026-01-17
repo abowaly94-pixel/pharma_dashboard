@@ -119,6 +119,11 @@ export interface User {
   createdAt?: Date;
   updatedAt?: Date;
   isActive?: boolean;
+  // Detailed address fields for pharmacists
+  street?: string;
+  city?: string;
+  governorate?: string;
+  postalCode?: string;
 }
 
 export interface DashboardStats {
@@ -154,6 +159,10 @@ export interface PharmacyAccount {
   createdAt: Date;
   updatedAt: Date;
   createdBy: string; // Admin ID who created this pharmacy
+  // Detailed address fields
+  street?: string;
+  governorate?: string;
+  postalCode?: string;
 }
 
 /** بيانات إنشاء صيدلية جديدة */
@@ -177,6 +186,9 @@ export interface UpdatePharmacyInput {
   phoneNumber?: string;
   ownerName?: string;
   licenseNumber?: string;
+  street?: string;
+  governorate?: string;
+  postalCode?: string;
 }
 
 // ==================== Medicine with Approval Interfaces ====================

@@ -48,6 +48,14 @@ export default function PharmacistMedicines() {
     medicines: medicines.map(m => ({ id: m.id, name: m.name, status: m.status }))
   });
   
+  // Check if address is complete
+  const isAddressComplete = !!(
+    user?.street && user.street.trim().length >= 3 &&
+    user?.city && user.city.trim().length >= 2 &&
+    user?.governorate && user.governorate.trim().length >= 2 &&
+    user?.postalCode && user.postalCode.trim().length >= 5
+  );
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
@@ -82,6 +90,12 @@ export default function PharmacistMedicines() {
   });
 
   const handleOpenAddEdit = (medicine?: MedicineWithApproval) => {
+    // Check if address is complete before allowing add/edit
+    if (!isAddressComplete) {
+      toast.error('يجب إدخال عنوان الصيدلية بالكامل أولاً من صفحة الإعدادات');
+      return;
+    }
+    
     if (medicine) {
       setEditingMedicine(medicine);
       setFormData({
@@ -284,13 +298,44 @@ export default function PharmacistMedicines() {
           <Button 
             onClick={() => handleOpenAddEdit()} 
             className="gradient-primary text-primary-foreground font-cairo"
-            disabled={!limitInfo.canAdd}
-            title={!limitInfo.canAdd ? (limitInfo.message || 'تم الوصول للحد الأقصى') : 'إضافة دواء جديد'}
+            disabled={!limitInfo.canAdd || !isAddressComplete}
+            title={
+              !isAddressComplete 
+                ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات' 
+                : !limitInfo.canAdd 
+                  ? (limitInfo.message || 'تم الوصول للحد الأقصى') 
+                  : 'إضافة دواء جديد'
+            }
           >
             <Plus className="w-5 h-5 ml-2" />
-            {!limitInfo.canAdd ? 'الحد الأقصى' : 'إضافة دواء جديد'}
+            {!isAddressComplete ? 'أكمل العنوان أولاً' : !limitInfo.canAdd ? 'الحد الأقصى' : 'إضافة دواء جديد'}
           </Button>
         </motion.div>
+
+        {/* Address Warning Alert */}
+        {!isAddressComplete && (
+          <Alert className="border-red-300 bg-red-50">
+            <AlertCircle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="font-cairo text-red-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold mb-1">⚠️ يجب إدخال عنوان الصيدلية بالكامل</p>
+                  <p className="text-sm">
+                    لا يمكنك إضافة أو تعديل الأدوية حتى تقوم بإدخال العنوان التفصيلي (الشارع، المدينة، المحافظة، الرمز البريدي) من صفحة الإعدادات
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/pharmacist/settings'}
+                  className="bg-white hover:bg-red-100 border-red-300 text-red-700 font-cairo font-bold"
+                >
+                  اذهب للإعدادات
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -608,6 +653,8 @@ export default function PharmacistMedicines() {
                         size="sm"
                         className="flex-1 text-xs h-8 border-gray-200 hover:bg-green-50 hover:border-green-300"
                         onClick={() => handleOpenAddEdit(medicine)}
+                        disabled={!isAddressComplete}
+                        title={!isAddressComplete ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات' : 'تعديل الدواء'}
                       >
                         <Edit className="w-3 h-3 ml-1" />
                         تعديل

@@ -434,6 +434,9 @@ export async function updatePharmacy(
     if (input.phoneNumber) updateData.phoneNumber = input.phoneNumber;
     if (input.ownerName) updateData.ownerName = input.ownerName.trim();
     if (input.licenseNumber) updateData.licenseNumber = input.licenseNumber.trim();
+    if (input.street) updateData.street = input.street.trim();
+    if (input.governorate) updateData.governorate = input.governorate.trim();
+    if (input.postalCode) updateData.postalCode = input.postalCode.trim();
     
     await updateDoc(docRef, updateData);
     

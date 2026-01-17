@@ -47,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   email: firebaseUser.email || userData.email,
                   pharmacyId: pharmacyData.pharmacyId,
                   pharmacyName: pharmacyData.name,
+                  street: pharmacyData.street || userData.street || '',
+                  city: pharmacyData.city || userData.city || '',
+                  governorate: pharmacyData.governorate || userData.governorate || '',
+                  postalCode: pharmacyData.postalCode || userData.postalCode || '',
                 });
               } else {
                 setUser({
@@ -138,6 +142,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: firebaseUser.email || userData.email,
               pharmacyId: pharmacyData.pharmacyId,
               pharmacyName: pharmacyData.name,
+              street: pharmacyData.street || userData.street || '',
+              city: pharmacyData.city || userData.city || '',
+              governorate: pharmacyData.governorate || userData.governorate || '',
+              postalCode: pharmacyData.postalCode || userData.postalCode || '',
             };
             setUser(fullUser);
             setIsLoading(false);
@@ -210,6 +218,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 email: currentUser.email || userData.email,
                 pharmacyId: pharmacyData.pharmacyId,
                 pharmacyName: pharmacyData.name,
+                street: pharmacyData.street || userData.street || '',
+                city: pharmacyData.city || userData.city || '',
+                governorate: pharmacyData.governorate || userData.governorate || '',
+                postalCode: pharmacyData.postalCode || userData.postalCode || '',
               });
             } else {
               setUser({
