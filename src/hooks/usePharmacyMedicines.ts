@@ -84,6 +84,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
       user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
     });
     setIsLoading(true);
+    setError(null); // Clear any previous errors
 
     // Query for approved medicines from 'medicines' collection
     const approvedQuery = query(
@@ -130,6 +131,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         subabaseORImageUrl: data.subabaseORImageUrl || data.subabaseImageUrl || '',
         pharmacyId: data.pharmacyId,
         pharmacyName: data.pharmacyName,
+        pharmcyAddress: data.pharmcyAddress || '',
         status: data.status || 'pending',
         rejectionNotes: data.rejectionNotes || null,
         reviewedBy: data.reviewedBy || null,
@@ -197,8 +199,25 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
     const updateLimitInfo = async () => {
       try {
+        console.log('🔍 Checking limit for pharmacy:', effectivePharmacyId);
+        console.log('📊 Current medicines in state:', medicines.length);
+        console.log('📋 Medicines breakdown:', {
+          pending: medicines.filter(m => m.status === 'pending').length,
+          approved: medicines.filter(m => m.status === 'approved').length,
+          rejected: medicines.filter(m => m.status === 'rejected').length,
+        });
+        
         const info = await canPharmacyAddMedicine(effectivePharmacyId);
         const remaining = Math.max(0, info.limit - info.currentCount);
+        
+        console.log('✅ Limit info received:', {
+          canAdd: info.canAdd,
+          currentCount: info.currentCount,
+          limit: info.limit,
+          remaining,
+          message: info.message,
+        });
+        
         setLimitInfo({
           canAdd: info.canAdd,
           currentCount: info.currentCount,

@@ -58,6 +58,7 @@ function mapFirestoreToMedicine(id: string, data: Record<string, unknown>): Medi
     subabaseORImageUrl: data.subabaseORImageUrl as string || data.subabaseImageUrl as string || '',
     pharmacyId: data.pharmacyId as string,
     pharmacyName: data.pharmacyName as string,
+    pharmcyAddress: data.pharmcyAddress as string || 'غير محدد',
     status: (data.status as MedicineStatus) || 'pending',
     rejectionNotes: (data.rejectionNotes as string) || null,
     reviewedBy: (data.reviewedBy as string) || null,
@@ -123,6 +124,14 @@ export async function createMedicine(
       );
     }
     
+    // Build pharmacy address from detailed fields
+    const pharmcyAddress = [
+      pharmacy.street,
+      pharmacy.city,
+      pharmacy.governorate,
+      pharmacy.postalCode
+    ].filter(Boolean).join(', ') || pharmacy.address || 'غير محدد';
+    
     // Generate unique ID - يتم الحفظ في pending_medicines فقط
     const medicineId = doc(collection(db, PENDING_MEDICINES_COLLECTION)).id;
     
@@ -139,6 +148,7 @@ export async function createMedicine(
       subabaseORImageUrl: input.subabaseORImageUrl || input.subabaseImageUrl || '',
       pharmacyId: pharmacyIdNum, // Store as number
       pharmacyName,
+      pharmcyAddress, // Add pharmacy address
       status: 'pending' as MedicineStatus, // Always pending
       rejectionNotes: null,
       reviewedBy: null,
@@ -152,6 +162,7 @@ export async function createMedicine(
       medicineId,
       pharmacyId: pharmacyIdNum,
       pharmacyName,
+      pharmcyAddress,
       name: input.name
     });
     

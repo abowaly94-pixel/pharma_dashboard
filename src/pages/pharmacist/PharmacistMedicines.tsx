@@ -35,9 +35,11 @@ export default function PharmacistMedicines() {
     stats: medicineStats, 
     limitInfo,
     isLoading,
+    error,
     addMedicine: addMedicineFromHook,
     editMedicine,
     deleteMedicine: deleteMedicineFromHook,
+    checkCanAdd,
   } = usePharmacyMedicines(user?.pharmacyId?.toString());
   
   console.log('🏥 PharmacistMedicines Component:', {
@@ -45,6 +47,7 @@ export default function PharmacistMedicines() {
     pharmacyId: user?.pharmacyId,
     medicinesCount: medicines.length,
     isLoading,
+    error: error?.message,
     medicines: medicines.map(m => ({ id: m.id, name: m.name, status: m.status }))
   });
   
@@ -138,6 +141,12 @@ export default function PharmacistMedicines() {
     e.preventDefault();
     
     console.log('📝 Form submitted with data:', formData);
+    
+    // التحقق من اكتمال عنوان الصيدلية
+    if (!isAddressComplete) {
+      toast.error('⚠️ يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً');
+      return;
+    }
     
     // التحقق من وجود صورة
     if (!formData.subabaseImageUrl || formData.subabaseImageUrl.trim() === '') {
@@ -285,6 +294,25 @@ export default function PharmacistMedicines() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Error Display */}
+        {error && (
+          <Alert className="border-red-300 bg-red-50">
+            <AlertCircle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="font-cairo text-red-700">
+              <p className="font-bold mb-1">❌ حدث خطأ</p>
+              <p className="text-sm">{error.message}</p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="mt-2 bg-white hover:bg-red-100 border-red-300 text-red-700 font-cairo font-bold"
+              >
+                إعادة تحميل الصفحة
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -295,21 +323,31 @@ export default function PharmacistMedicines() {
             <h1 className="text-3xl font-bold font-cairo">أدويتي</h1>
             <p className="text-muted-foreground">إدارة أدوية الصيدلية ({medicines.length} دواء)</p>
           </div>
-          <Button 
-            onClick={() => handleOpenAddEdit()} 
-            className="gradient-primary text-primary-foreground font-cairo"
-            disabled={!limitInfo.canAdd || !isAddressComplete}
-            title={
-              !isAddressComplete 
-                ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات' 
-                : !limitInfo.canAdd 
-                  ? (limitInfo.message || 'تم الوصول للحد الأقصى') 
-                  : 'إضافة دواء جديد'
-            }
-          >
-            <Plus className="w-5 h-5 ml-2" />
-            {!isAddressComplete ? 'أكمل العنوان أولاً' : !limitInfo.canAdd ? 'الحد الأقصى' : 'إضافة دواء جديد'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={checkCanAdd}
+              variant="outline"
+              className="font-cairo"
+              title="تحديث معلومات الحد الأقصى"
+            >
+              🔄 تحديث
+            </Button>
+            <Button 
+              onClick={() => handleOpenAddEdit()} 
+              className="gradient-primary text-primary-foreground font-cairo"
+              disabled={!limitInfo.canAdd || !isAddressComplete}
+              title={
+                !isAddressComplete 
+                  ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات' 
+                  : !limitInfo.canAdd 
+                    ? (limitInfo.message || 'تم الوصول للحد الأقصى') 
+                    : 'إضافة دواء جديد'
+              }
+            >
+              <Plus className="w-5 h-5 ml-2" />
+              {!isAddressComplete ? 'أكمل العنوان أولاً' : !limitInfo.canAdd ? 'الحد الأقصى' : 'إضافة دواء جديد'}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Address Warning Alert */}
@@ -686,6 +724,17 @@ export default function PharmacistMedicines() {
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
               </DialogTitle>
             </DialogHeader>
+            
+            {/* Address Warning */}
+            {!isAddressComplete && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <AlertDescription className="font-cairo text-red-700 font-bold">
+                  ⚠️ يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات قبل إضافة أي دواء
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Section 1: Basic Info */}
               <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
@@ -1048,8 +1097,14 @@ export default function PharmacistMedicines() {
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={!formData.subabaseImageUrl}
-                  title={!formData.subabaseImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
+                  disabled={!formData.subabaseImageUrl || !isAddressComplete}
+                  title={
+                    !isAddressComplete 
+                      ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً'
+                      : !formData.subabaseImageUrl 
+                      ? 'يجب رفع صورة للدواء أولاً' 
+                      : ''
+                  }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}

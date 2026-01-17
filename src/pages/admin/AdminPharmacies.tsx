@@ -187,6 +187,12 @@ export default function AdminPharmacies() {
       return;
     }
     
+    // Validate address length
+    if (formData.address.trim().length < 5) {
+      toast.error('⚠️ عنوان الصيدلية يجب أن يكون 5 أحرف على الأقل');
+      return;
+    }
+    
     // Validate license number length
     if (formData.licenseNumber.trim().length < 5) {
       toast.error('رقم الترخيص يجب أن يكون 5 أحرف على الأقل');
@@ -583,15 +589,26 @@ export default function AdminPharmacies() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="address" className="text-sm">العنوان بالتفصيل *</Label>
+                  <Label htmlFor="address" className="text-sm font-bold text-red-600 flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    عنوان الصيدلية بالتفصيل *
+                    {(!formData.address || formData.address.trim().length < 5) && (
+                      <span className="text-xs text-red-500">(مطلوب - 5 أحرف على الأقل)</span>
+                    )}
+                  </Label>
                   <Input
                     id="address"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
                     minLength={5}
-                    placeholder="أدخل العنوان بالتفصيل"
+                    placeholder="مثال: شارع الجمهورية، بني سويف، المنيا"
+                    className={`font-cairo ${!formData.address || formData.address.trim().length < 5 ? 'border-red-500 focus:border-red-600' : 'border-green-500'}`}
+                    dir="rtl"
                   />
+                  <p className="text-xs text-red-600 font-bold">
+                    ⚠️ يجب إدخال العنوان بالكامل (الشارع، المدينة، المحافظة)
+                  </p>
                 </div>
               </div>
 
@@ -680,7 +697,25 @@ export default function AdminPharmacies() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   إلغاء
                 </Button>
-                <Button type="submit">
+                <Button 
+                  type="submit"
+                  disabled={
+                    !formData.name || 
+                    !formData.email || 
+                    !formData.address || formData.address.trim().length < 5 ||
+                    !formData.city || 
+                    !formData.phoneNumber || 
+                    !formData.ownerName || 
+                    !formData.licenseNumber || 
+                    !formData.medicineLimit ||
+                    (!editingPharmacy && (!formData.password || formData.password.length < 8))
+                  }
+                  title={
+                    !formData.address || formData.address.trim().length < 5
+                      ? 'يجب إدخال عنوان الصيدلية بالكامل (5 أحرف على الأقل)'
+                      : ''
+                  }
+                >
                   {editingPharmacy ? 'حفظ التعديلات' : 'إضافة الصيدلية'}
                 </Button>
               </DialogFooter>

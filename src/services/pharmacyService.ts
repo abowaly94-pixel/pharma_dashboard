@@ -63,6 +63,10 @@ function mapFirestoreToPharmacy(id: string, data: Record<string, unknown>): Phar
     createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
     updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toDate() : new Date(),
     createdBy: (data.createdBy as string) || '',
+    // Detailed address fields
+    street: (data.street as string) || '',
+    governorate: (data.governorate as string) || '',
+    postalCode: (data.postalCode as string) || '',
   };
 }
 

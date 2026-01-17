@@ -130,6 +130,12 @@ export default function AdminMedicines() {
       return;
     }
     
+    // التحقق من وجود عنوان الصيدلية
+    if (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5) {
+      toast.error('⚠️ يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)');
+      return;
+    }
+    
     try {
       // Check if image was deleted (empty string) and we're editing
       const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
@@ -617,9 +623,12 @@ export default function AdminMedicines() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="pharmcyAddress" className="font-cairo text-sm font-semibold text-gray-700 flex items-center gap-1">
-                    <MapPin className="w-4 h-4 text-purple-600" />
+                  <Label htmlFor="pharmcyAddress" className="font-cairo text-sm font-semibold text-red-600 flex items-center gap-1">
+                    <MapPin className="w-4 h-4 text-red-600" />
                     عنوان الصيدلية بالتفصيل *
+                    {(!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5) && (
+                      <span className="text-xs text-red-500">(مطلوب - 5 أحرف على الأقل)</span>
+                    )}
                   </Label>
                   <Textarea
                     id="pharmcyAddress"
@@ -627,8 +636,13 @@ export default function AdminMedicines() {
                     onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })}
                     placeholder="الشارع، المدينة، المحافظة، الرمز البريدي"
                     rows={2}
-                    className="text-sm resize-none bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    required
+                    className={`text-sm resize-none ${!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5 ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-green-500 bg-white'} focus:ring-purple-500`}
+                    dir="rtl"
                   />
+                  <p className="text-xs text-red-600 font-bold">
+                    ⚠️ يجب إدخال العنوان بالكامل (الشارع، المدينة، المحافظة)
+                  </p>
                 </div>
               </div>
 
@@ -891,8 +905,14 @@ export default function AdminMedicines() {
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={!formData.subabaseImageUrl}
-                  title={!formData.subabaseImageUrl ? 'يجب رفع صورة للدواء أولاً' : ''}
+                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5}
+                  title={
+                    !formData.subabaseImageUrl 
+                      ? 'يجب رفع صورة للدواء أولاً' 
+                      : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5)
+                      ? 'يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)'
+                      : ''
+                  }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}

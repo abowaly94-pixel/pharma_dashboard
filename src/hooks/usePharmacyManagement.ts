@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   PharmacyAccount,
@@ -77,32 +77,87 @@ export function usePharmacyManagement(): UsePharmacyManagementReturn {
 
     const unsubscribe = onSnapshot(
       q,
-      (snapshot) => {
-        const pharmacyList: PharmacyAccount[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            pharmacyId: data.pharmacyId,
-            name: data.name,
-            email: data.email,
-            address: data.address,
-            city: data.city,
-            phoneNumber: data.phoneNumber,
-            ownerName: data.ownerName,
-            licenseNumber: data.licenseNumber,
-            status: data.status || 'inactive',
-            medicineLimit: data.medicineLimit || 100,
-            currentMedicineCount: data.currentMedicineCount || 0,
-            emailVerified: data.emailVerified || false,
-            failedLoginAttempts: data.failedLoginAttempts || 0,
-            lockedUntil: data.lockedUntil?.toDate() || null,
-            rating: data.rating || 0,
-            totalOrders: data.totalOrders || 0,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-            createdBy: data.createdBy || '',
-          };
-        });
+      async (snapshot) => {
+        const pharmacyList: PharmacyAccount[] = await Promise.all(
+          snapshot.docs.map(async (doc) => {
+            const data = doc.data();
+            
+            // Calculate actual medicine count from both collections
+            const pharmacyIdNum = data.pharmacyId;
+            let actualCount = data.currentMedicineCount || 0;
+            
+            // Only recalculate if there's a mismatch indicator or for accuracy
+            try {
+              // Count from medicines collection (approved)
+              const approvedQuery = query(
+                collection(db, 'medicines'),
+                where('pharmacyId', '==', pharmacyIdNum),
+                where('deleted', '==', false)
+              );
+              
+              // Count from pending_medicines collection (pending/rejected)
+              const pendingQuery = query(
+                collection(db, 'pending_medicines'),
+                where('pharmacyId', '==', pharmacyIdNum),
+                where('deleted', '==', false)
+              );
+              
+              const [approvedSnapshot, pendingSnapshot] = await Promise.all([
+                getDocs(approvedQuery),
+                getDocs(pendingQuery)
+              ]);
+              
+              actualCount = approvedSnapshot.docs.length + pendingSnapshot.docs.length;
+              
+              // Log the actual count for debugging
+              console.log(`📊 Pharmacy: ${data.name} (ID: ${pharmacyIdNum})`, {
+                stored: data.currentMedicineCount || 0,
+                actual: actualCount,
+                approved: approvedSnapshot.docs.length,
+                pending: pendingSnapshot.docs.length,
+                approvedIds: approvedSnapshot.docs.map(d => ({ id: d.id, name: d.data().name })),
+                pendingIds: pendingSnapshot.docs.map(d => ({ id: d.id, name: d.data().name, status: d.data().status })),
+              });
+              
+              // Log if there's a mismatch
+              if (actualCount !== (data.currentMedicineCount || 0)) {
+                console.warn(`⚠️ Medicine count mismatch for ${data.name}:`, {
+                  stored: data.currentMedicineCount,
+                  actual: actualCount,
+                  difference: actualCount - (data.currentMedicineCount || 0),
+                });
+              }
+            } catch (error) {
+              console.error('Error calculating medicine count:', error);
+            }
+            
+            return {
+              id: doc.id,
+              pharmacyId: data.pharmacyId,
+              name: data.name,
+              email: data.email,
+              address: data.address,
+              city: data.city,
+              phoneNumber: data.phoneNumber,
+              ownerName: data.ownerName,
+              licenseNumber: data.licenseNumber,
+              status: data.status || 'inactive',
+              medicineLimit: data.medicineLimit || 100,
+              currentMedicineCount: actualCount, // Use actual count
+              emailVerified: data.emailVerified || false,
+              failedLoginAttempts: data.failedLoginAttempts || 0,
+              lockedUntil: data.lockedUntil?.toDate() || null,
+              rating: data.rating || 0,
+              totalOrders: data.totalOrders || 0,
+              createdAt: data.createdAt?.toDate() || new Date(),
+              updatedAt: data.updatedAt?.toDate() || new Date(),
+              createdBy: data.createdBy || '',
+              street: data.street || '',
+              governorate: data.governorate || '',
+              postalCode: data.postalCode || '',
+            };
+          })
+        );
 
         setPharmacies(pharmacyList);
         
