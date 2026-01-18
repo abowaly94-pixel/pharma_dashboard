@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Search, 
+import {
+  Search,
   Filter,
   Eye,
   CheckCircle,
@@ -16,6 +16,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrders } from "@/hooks/useOrders";
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { Order } from '@/types';
 import {
   Dialog,
@@ -49,6 +50,7 @@ const isImageFile = (url?: string) => {
 
 export default function AdminOrders() {
   const { orders, isLoading, error, updateOrderStatus } = useOrders();
+  const { notifyOrderStatusChange } = useAutoNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -59,18 +61,25 @@ export default function AdminOrders() {
   } | null>(null);
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
+    const matchesSearch =
       order.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.shippingAddressEntity.namee.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.shippingAddressEntity.phoneNumber.includes(searchQuery);
-    
+
     const matchesStatus = statusFilter === 'all' || order.orderStatus === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
   const handleStatusChange = async (orderId: string, newStatus: Order['orderStatus']) => {
     await updateOrderStatus(orderId, newStatus);
+
+    // Find the order to get pharmacy information
+    const order = orders.find(o => o.id === orderId);
+    if (order && order.pharmacyId) {
+      await notifyOrderStatusChange(order.orderId, newStatus, order.pharmacyId.toString());
+    }
+
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, orderStatus: newStatus } : null);
     }

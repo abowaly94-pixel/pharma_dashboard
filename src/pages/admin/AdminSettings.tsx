@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Bell, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff, Copy, Check, Trash2, Plus, RefreshCw } from 'lucide-react';
+import { Settings, Bell, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff, Copy, Check, Trash2, Plus, RefreshCw, Smartphone, Info, ExternalLink, AlertTriangle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,11 +42,11 @@ export default function AdminSettings() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  
+
   // User Settings
   const [notifications, setNotifications] = useState(true);
   const [emailAlerts, setEmailAlerts] = useState(true);
-  
+
   // API Keys Management
   const [apiKeysList, setApiKeysList] = useState<ApiKeyItem[]>([]);
   const [newApiKey, setNewApiKey] = useState('');
@@ -57,7 +57,13 @@ export default function AdminSettings() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set());
   const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
-  
+
+  // FCM Settings
+  const [fcmAccessToken, setFcmAccessToken] = useState('');
+  const [showFcmToken, setShowFcmToken] = useState(false);
+  const [isSavingFcm, setIsSavingFcm] = useState(false);
+  const [fcmTokenSaved, setFcmTokenSaved] = useState(false);
+
   // Profile Data
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
@@ -72,21 +78,87 @@ export default function AdminSettings() {
         email: user.email || '',
         phone: user.phoneNumber || '',
       });
-      
+
       // Load API keys
       loadApiKeys();
+
+      // Load FCM settings
+      loadFcmSettings();
     }
   }, [user]);
+
+  const loadFcmSettings = async () => {
+    try {
+      const settingsRef = doc(db, 'system_settings', 'fcm_config');
+      const settingsDoc = await getDoc(settingsRef);
+
+      if (settingsDoc.exists()) {
+        const data = settingsDoc.data();
+        if (data?.accessToken) {
+          setFcmAccessToken(data.accessToken);
+          setFcmTokenSaved(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading FCM settings:', error);
+    }
+  };
+
+  const handleSaveFcmToken = async () => {
+    if (!fcmAccessToken.trim()) {
+      toast.error('يرجى إدخال Access Token');
+      return;
+    }
+
+    setIsSavingFcm(true);
+    try {
+      const settingsRef = doc(db, 'system_settings', 'fcm_config');
+      await setDoc(settingsRef, {
+        accessToken: fcmAccessToken.trim(),
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      setFcmTokenSaved(true);
+      toast.success('تم حفظ Access Token بنجاح');
+    } catch (error: any) {
+      console.error('Error saving FCM token:', error);
+      toast.error('فشل حفظ Access Token: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setIsSavingFcm(false);
+    }
+  };
+
+  const handleDeleteFcmToken = async () => {
+    setIsSavingFcm(true);
+    try {
+      const settingsRef = doc(db, 'system_settings', 'fcm_config');
+      await setDoc(settingsRef, {
+        accessToken: null,
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      setFcmAccessToken('');
+      setFcmTokenSaved(false);
+      toast.success('تم حذف Access Token');
+    } catch (error: any) {
+      console.error('Error deleting FCM token:', error);
+      toast.error('فشل حذف Access Token');
+    } finally {
+      setIsSavingFcm(false);
+    }
+  };
 
   const loadApiKeys = async () => {
     try {
       const apiKeysRef = doc(db, 'system_settings', 'api_keys');
       const apiKeysDoc = await getDoc(apiKeysRef);
-      
+
       if (apiKeysDoc.exists()) {
         const data = apiKeysDoc.data();
         const keysList = data.keysList || [];
-        
+
         // Convert to ApiKeyItem format
         const formattedKeys: ApiKeyItem[] = keysList.map((item: any) => ({
           id: item.id,
@@ -98,9 +170,9 @@ export default function AdminSettings() {
           lastTested: item.lastTested?.toDate(),
           isValid: item.isValid,
         }));
-        
+
         setApiKeysList(formattedKeys);
-        
+
         // Test active key if exists
         const activeKey = formattedKeys.find(k => k.isActive);
         if (activeKey) {
@@ -130,7 +202,7 @@ export default function AdminSettings() {
     }
 
     setIsAddingKey(true);
-    
+
     try {
       const newKey: ApiKeyItem = {
         id: Date.now().toString(),
@@ -141,7 +213,7 @@ export default function AdminSettings() {
       };
 
       const updatedList = [...apiKeysList, newKey];
-      
+
       // Save to database
       const apiKeysRef = doc(db, 'system_settings', 'api_keys');
       await setDoc(apiKeysRef, {
@@ -160,13 +232,13 @@ export default function AdminSettings() {
         updatedAt: new Date(),
         updatedBy: user?.uid,
       }, { merge: true });
-      
+
       setApiKeysList(updatedList);
       setNewApiKey('');
       setNewApiKeyName('');
-      
+
       toast.success('تم إضافة المفتاح بنجاح');
-      
+
       // Test the new key
       setTimeout(() => testApiKey(newKey.id), 500);
     } catch (error: any) {
@@ -205,7 +277,7 @@ export default function AdminSettings() {
   const testApiKey = async (keyId: string) => {
     const keyIndex = apiKeysList.findIndex(k => k.id === keyId);
     if (keyIndex === -1) return;
-    
+
     const key = apiKeysList[keyIndex];
 
     setTestingKeys(prev => new Set(prev).add(keyId));
@@ -221,7 +293,7 @@ export default function AdminSettings() {
       if (response.ok) {
         const data = await response.json();
         const remainingCalls = data.attributes?.api?.free_calls_remaining || 0;
-        
+
         const updatedList = [...apiKeysList];
         updatedList[keyIndex] = {
           ...updatedList[keyIndex],
@@ -229,9 +301,9 @@ export default function AdminSettings() {
           remainingCalls,
           lastTested: new Date(),
         };
-        
+
         setApiKeysList(updatedList);
-        
+
         // Save to database
         const apiKeysRef = doc(db, 'system_settings', 'api_keys');
         await setDoc(apiKeysRef, {
@@ -249,7 +321,7 @@ export default function AdminSettings() {
           updatedAt: new Date(),
           updatedBy: user?.uid,
         }, { merge: true });
-        
+
         toast.success(`المفتاح صحيح! متبقي ${remainingCalls} استدعاء`);
       } else {
         const updatedList = [...apiKeysList];
@@ -258,9 +330,9 @@ export default function AdminSettings() {
           isValid: false,
           lastTested: new Date(),
         };
-        
+
         setApiKeysList(updatedList);
-        
+
         // Save to database
         const apiKeysRef = doc(db, 'system_settings', 'api_keys');
         await setDoc(apiKeysRef, {
@@ -278,7 +350,7 @@ export default function AdminSettings() {
           updatedAt: new Date(),
           updatedBy: user?.uid,
         }, { merge: true });
-        
+
         toast.error('المفتاح غير صحيح أو منتهي الصلاحية');
       }
     } catch (error: any) {
@@ -299,9 +371,9 @@ export default function AdminSettings() {
         ...k,
         isActive: k.id === keyId,
       }));
-      
+
       setApiKeysList(updatedList);
-      
+
       // Save to database
       const apiKeysRef = doc(db, 'system_settings', 'api_keys');
       await setDoc(apiKeysRef, {
@@ -319,7 +391,7 @@ export default function AdminSettings() {
         updatedAt: new Date(),
         updatedBy: user?.uid,
       }, { merge: true });
-      
+
       toast.success('تم تفعيل المفتاح');
     } catch (error: any) {
       console.error('Error setting active key:', error);
@@ -330,14 +402,14 @@ export default function AdminSettings() {
   const handleDeleteKey = async (keyId: string) => {
     try {
       const updatedList = apiKeysList.filter(k => k.id !== keyId);
-      
+
       // If deleted key was active, activate the first one
       if (apiKeysList.find(k => k.id === keyId)?.isActive && updatedList.length > 0) {
         updatedList[0].isActive = true;
       }
-      
+
       setApiKeysList(updatedList);
-      
+
       // Save to database
       const apiKeysRef = doc(db, 'system_settings', 'api_keys');
       await setDoc(apiKeysRef, {
@@ -355,7 +427,7 @@ export default function AdminSettings() {
         updatedAt: new Date(),
         updatedBy: user?.uid,
       }, { merge: true });
-      
+
       toast.success('تم حذف المفتاح');
       setKeyToDelete(null);
     } catch (error: any) {
@@ -381,7 +453,7 @@ export default function AdminSettings() {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         try {
           const successful = document.execCommand('copy');
           if (successful) {
@@ -393,10 +465,10 @@ export default function AdminSettings() {
         } catch (err) {
           toast.error('فشل نسخ المفتاح');
         }
-        
+
         document.body.removeChild(textArea);
       }
-      
+
       setTimeout(() => setCopiedKeyId(null), 2000);
     } catch (error) {
       console.error('Copy error:', error);
@@ -418,7 +490,7 @@ export default function AdminSettings() {
 
   const handleSaveProfile = async () => {
     if (!user?.uid) return;
-    
+
     setIsLoading(true);
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -426,10 +498,10 @@ export default function AdminSettings() {
         name: profileData.name,
         phoneNumber: profileData.phone,
       });
-      
+
       // Refresh user data
       await refreshUser();
-      
+
       toast.success('تم حفظ البيانات بنجاح');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -601,7 +673,7 @@ export default function AdminSettings() {
                   <Plus className="w-5 h-5" />
                   <h3 className="font-cairo font-semibold">إضافة مفتاح جديد</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="font-cairo">
@@ -616,7 +688,7 @@ export default function AdminSettings() {
                       required
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label className="font-cairo">
                       مفتاح API <span className="text-destructive">*</span>
@@ -643,13 +715,13 @@ export default function AdminSettings() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-muted-foreground">
                     احصل على مفتاح مجاني من{' '}
-                    <a 
-                      href="https://www.remove.bg/api" 
-                      target="_blank" 
+                    <a
+                      href="https://www.remove.bg/api"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline font-medium"
                     >
@@ -671,12 +743,12 @@ export default function AdminSettings() {
               {apiKeysList.length > 0 && (
                 <>
                   <Separator />
-                  
+
                   <div className="space-y-3">
                     <h3 className="font-cairo font-semibold text-sm text-muted-foreground">
                       المفاتيح المحفوظة ({apiKeysList.length})
                     </h3>
-                    
+
                     {/* Scrollable Container */}
                     <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
                       <AnimatePresence mode="popLayout">
@@ -686,11 +758,10 @@ export default function AdminSettings() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className={`p-4 rounded-lg border-2 transition-all ${
-                              keyItem.isActive 
-                                ? 'border-primary bg-primary/5 shadow-sm' 
-                                : 'border-border bg-card hover:border-primary/30'
-                            }`}
+                            className={`p-4 rounded-lg border-2 transition-all ${keyItem.isActive
+                              ? 'border-primary bg-primary/5 shadow-sm'
+                              : 'border-border bg-card hover:border-primary/30'
+                              }`}
                           >
                             <div className="space-y-3">
                               {/* Header */}
@@ -706,7 +777,7 @@ export default function AdminSettings() {
                                       </Badge>
                                     )}
                                     {keyItem.isValid !== undefined && (
-                                      <Badge 
+                                      <Badge
                                         variant={keyItem.isValid ? "default" : "destructive"}
                                         className="font-cairo text-xs"
                                       >
@@ -714,12 +785,12 @@ export default function AdminSettings() {
                                       </Badge>
                                     )}
                                   </div>
-                                  
+
                                   {/* Key Display */}
                                   <div className="flex items-center gap-2">
                                     <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
-                                      {visibleKeys.has(keyItem.id) 
-                                        ? keyItem.key 
+                                      {visibleKeys.has(keyItem.id)
+                                        ? keyItem.key
                                         : '•'.repeat(Math.min(keyItem.key.length, 32))
                                       }
                                     </code>
@@ -748,7 +819,7 @@ export default function AdminSettings() {
                                       )}
                                     </Button>
                                   </div>
-                                  
+
                                   {/* Info */}
                                   <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                     <span>
@@ -763,15 +834,15 @@ export default function AdminSettings() {
                                     )}
                                     {keyItem.lastTested && (
                                       <span>
-                                        آخر اختبار: {keyItem.lastTested.toLocaleTimeString('ar-EG', { 
-                                          hour: '2-digit', 
-                                          minute: '2-digit' 
+                                        آخر اختبار: {keyItem.lastTested.toLocaleTimeString('ar-EG', {
+                                          hour: '2-digit',
+                                          minute: '2-digit'
                                         })}
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                                
+
                                 {/* Actions */}
                                 <div className="flex items-center gap-1">
                                   <Button
@@ -784,7 +855,7 @@ export default function AdminSettings() {
                                     <RefreshCw className={`w-3.5 h-3.5 ml-1 ${testingKeys.has(keyItem.id) ? 'animate-spin' : ''}`} />
                                     {testingKeys.has(keyItem.id) ? 'جاري الاختبار...' : 'اختبار'}
                                   </Button>
-                                  
+
                                   {!keyItem.isActive && (
                                     <Button
                                       variant="outline"
@@ -795,7 +866,7 @@ export default function AdminSettings() {
                                       تفعيل
                                     </Button>
                                   )}
-                                  
+
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -823,9 +894,9 @@ export default function AdminSettings() {
                   <p className="text-sm mt-1">قم بإضافة مفتاح API للبدء</p>
                 </div>
               )}
-              
+
               <Separator />
-              
+
               <div className="bg-muted/50 p-4 rounded-lg">
                 <p className="font-cairo font-medium text-sm mb-2 flex items-center gap-2">
                   💡 نصائح مهمة:
@@ -876,6 +947,132 @@ export default function AdminSettings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* FCM / Push Notifications Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-3 font-cairo">
+                    <Smartphone className="w-5 h-5 text-primary" />
+                    إعدادات Push Notifications
+                  </CardTitle>
+                  <CardDescription className="font-cairo mt-1">
+                    تكوين FCM لإرسال إشعارات للموبايل
+                  </CardDescription>
+                </div>
+                {fcmTokenSaved && (
+                  <Badge className="bg-success text-white font-cairo">
+                    ✓ مُفعّل
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5 space-y-4">
+                <div className="flex items-center gap-2 text-primary">
+                  <Key className="w-5 h-5" />
+                  <h3 className="font-cairo font-semibold">FCM Access Token</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="font-cairo">
+                    Access Token <span className="text-muted-foreground text-xs">(مطلوب لإرسال Push Notifications)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showFcmToken ? "text" : "password"}
+                      value={fcmAccessToken}
+                      onChange={(e) => {
+                        setFcmAccessToken(e.target.value);
+                        setFcmTokenSaved(false);
+                      }}
+                      placeholder="أدخل FCM Access Token"
+                      className="font-mono pl-12"
+                      dir="ltr"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute left-2 top-0 bottom-0 my-auto h-8 w-8 p-0"
+                      onClick={() => setShowFcmToken(!showFcmToken)}
+                    >
+                      {showFcmToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <a
+                    href="https://developers.google.com/oauthplayground/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    احصل على Access Token من OAuth Playground
+                  </a>
+                  <div className="flex gap-2">
+                    {fcmTokenSaved && fcmAccessToken && (
+                      <Button
+                        variant="outline"
+                        onClick={handleDeleteFcmToken}
+                        disabled={isSavingFcm}
+                        className="font-cairo text-destructive border-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4 ml-2" />
+                        حذف
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSaveFcmToken}
+                      disabled={isSavingFcm || !fcmAccessToken.trim()}
+                      className="font-cairo"
+                    >
+                      <Check className="w-4 h-4 ml-2" />
+                      {isSavingFcm ? 'جاري الحفظ...' : 'حفظ Token'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-cairo font-bold text-amber-900 text-sm">💡 تنبيه بخصوص الخطأ 401:</p>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      هذا المفتاح (Access Token) مؤقت وتنتهي صلاحيته تلقائياً كل **60 دقيقة**. إذا ظهر لك خطأ "401" عند الإرسال، فهذا يعني أنك بحاجة لتوليد مفتاح جديد من الرابط أعلاه وحفظه هنا.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-cairo font-medium text-sm mb-2 flex items-center gap-2">
+                    <Info className="w-4 h-4 text-primary" />
+                    كيفية الحصول على Access Token:
+                  </p>
+                  <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                    <li>اذهب إلى <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OAuth 2.0 Playground</a></li>
+                    <li>اضغط على أيقونة الإعدادات (⚙️)</li>
+                    <li>فعّل "Use your own OAuth credentials"</li>
+                    <li>أدخل OAuth Client ID و Secret من Firebase Console</li>
+                    <li>في الخطوة 1، اختر "Firebase Cloud Messaging API v1"</li>
+                    <li>اضغط "Authorize APIs" ثم "Exchange authorization code"</li>
+                    <li>انسخ "Access token" والصقه هنا</li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Notifications Settings */}
         <motion.div

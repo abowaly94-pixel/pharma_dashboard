@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useMedicineApproval } from '@/hooks/useMedicineApproval';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MedicineWithApproval } from '@/types';
 import { toast } from 'sonner';
 
@@ -45,6 +46,8 @@ export default function AdminMedicineReview() {
     approve,
     reject,
   } = useMedicineApproval();
+
+  const { notifyMedicineApproved, notifyMedicineRejected } = useAutoNotifications();
 
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineWithApproval | null>(null);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -68,13 +71,19 @@ export default function AdminMedicineReview() {
     if (!selectedMedicine) return;
 
     if (reviewAction === 'approve') {
-      await approve(selectedMedicine.id);
+      const success = await approve(selectedMedicine.id);
+      if (success) {
+        await notifyMedicineApproved(selectedMedicine.name, selectedMedicine.pharmacyId);
+      }
     } else {
       if (!rejectionNotes.trim()) {
         toast.error('يرجى إدخال ملاحظات الرفض');
         return;
       }
-      await reject(selectedMedicine.id, rejectionNotes);
+      const success = await reject(selectedMedicine.id, rejectionNotes);
+      if (success) {
+        await notifyMedicineRejected(selectedMedicine.name, selectedMedicine.pharmacyId, rejectionNotes);
+      }
     }
 
     setIsReviewDialogOpen(false);
@@ -110,7 +119,7 @@ export default function AdminMedicineReview() {
   // Handle select all
   const handleSelectAll = () => {
     if (activeTab !== 'pending') return;
-    
+
     if (selectedMedicineIds.size === pendingMedicines.length) {
       setSelectedMedicineIds(new Set());
     } else {
@@ -121,7 +130,7 @@ export default function AdminMedicineReview() {
   // Handle bulk approve
   const handleBulkApprove = async () => {
     if (selectedMedicineIds.size === 0) return;
-    
+
     setIsBulkApproving(true);
     let successCount = 0;
     let failCount = 0;
@@ -130,6 +139,11 @@ export default function AdminMedicineReview() {
       const success = await approve(id);
       if (success) {
         successCount++;
+        // Find the medicine to get info for notification
+        const med = pendingMedicines.find(m => m.id === id);
+        if (med) {
+          await notifyMedicineApproved(med.name, med.pharmacyId);
+        }
       } else {
         failCount++;
       }
@@ -217,31 +231,28 @@ export default function AdminMedicineReview() {
         >
           <button
             onClick={() => handleTabChange('pending')}
-            className={`px-4 py-2 font-cairo font-semibold transition-colors ${
-              activeTab === 'pending'
+            className={`px-4 py-2 font-cairo font-semibold transition-colors ${activeTab === 'pending'
                 ? 'border-b-2 border-orange-500 text-orange-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             قيد المراجعة ({stats.pending})
           </button>
           <button
             onClick={() => handleTabChange('approved')}
-            className={`px-4 py-2 font-cairo font-semibold transition-colors ${
-              activeTab === 'approved'
+            className={`px-4 py-2 font-cairo font-semibold transition-colors ${activeTab === 'approved'
                 ? 'border-b-2 border-green-500 text-green-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             موافق عليها ({stats.approved})
           </button>
           <button
             onClick={() => handleTabChange('rejected')}
-            className={`px-4 py-2 font-cairo font-semibold transition-colors ${
-              activeTab === 'rejected'
+            className={`px-4 py-2 font-cairo font-semibold transition-colors ${activeTab === 'rejected'
                 ? 'border-b-2 border-red-500 text-red-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             مرفوضة ({stats.rejected})
           </button>
@@ -288,13 +299,13 @@ export default function AdminMedicineReview() {
               >
                 {selectedMedicineIds.size === pendingMedicines.length ? 'إلغاء التحديد' : 'تحديد الكل'}
               </Button>
-              
+
               {selectedMedicineIds.size > 0 && (
                 <>
                   <Badge variant="secondary" className="font-cairo">
                     {selectedMedicineIds.size} محدد
                   </Badge>
-                  
+
                   <Button
                     size="sm"
                     onClick={handleBulkApprove}
@@ -338,9 +349,8 @@ export default function AdminMedicineReview() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className={`stat-card hover:shadow-lg transition-all ${
-                  selectedMedicineIds.has(medicine.id) ? 'ring-2 ring-primary' : ''
-                }`}
+                className={`stat-card hover:shadow-lg transition-all ${selectedMedicineIds.has(medicine.id) ? 'ring-2 ring-primary' : ''
+                  }`}
               >
                 {/* Image with Checkbox */}
                 <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg overflow-hidden mb-4">

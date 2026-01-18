@@ -4,12 +4,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function NotificationPermissionPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const { requestPermission } = useNotifications();
+  const { user } = useAuth();
 
   useEffect(() => {
+    // Only show for logged-in users
+    if (!user) {
+      setShowPrompt(false);
+      return;
+    }
+
+    // Check if user dismissed the prompt before
+    const dismissed = localStorage.getItem('notification-prompt-dismissed');
+    if (dismissed === 'true') {
+      return;
+    }
+
     // Check if permission was already granted or denied
     if ('Notification' in window) {
       const permission = Notification.permission;
@@ -24,7 +38,7 @@ export function NotificationPermissionPrompt() {
         return () => clearTimeout(timer);
       }
     }
-  }, []);
+  }, [user]);
 
   const handleAllow = async () => {
     await requestPermission();

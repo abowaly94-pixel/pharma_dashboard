@@ -1,4 +1,4 @@
-import { Bell } from 'lucide-react';
+import { Bell, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -10,9 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { NotificationItem } from './NotificationItem';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead, requestPermission } = useNotifications();
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
 
   return (
     <Popover>
@@ -52,8 +60,37 @@ export function NotificationBell() {
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[400px]">
-          {notifications.length === 0 ? (
+        
+        {/* Enable Notifications Button */}
+        {notificationPermission !== 'granted' && (
+          <div className="p-4 border-b bg-muted/50">
+            <div className="flex items-center gap-3">
+              <BellRing className="h-5 w-5 text-primary" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold font-cairo mb-1">
+                  فعّل الإشعارات
+                </p>
+                <p className="text-xs text-muted-foreground font-cairo mb-2">
+                  احصل على تحديثات فورية
+                </p>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    await requestPermission();
+                    if ('Notification' in window) {
+                      setNotificationPermission(Notification.permission);
+                    }
+                  }}
+                  className="w-full"
+                >
+                  تفعيل الإشعارات
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <ScrollArea className="h-[400px]">{notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <Bell className="h-12 w-12 mb-2 opacity-20" />
               <p className="text-sm font-cairo">لا توجد إشعارات</p>

@@ -10,6 +10,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead
 } from '@/lib/notifications';
+import { onMessage, Messaging } from 'firebase/messaging';
 import { toast } from 'sonner';
 
 export interface Notification {
@@ -45,17 +46,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [messaging, setMessaging] = useState<Messaging | null>(null);
 
   // Initialize FCM and request permission
   const requestPermission = async () => {
     try {
-      await initializeMessaging();
+      // Initialize messaging first
+      const messagingInstance = await initializeMessaging();
+      if (!messagingInstance) {
+        toast.error('فشل في تهيئة نظام الإشعارات');
+        return;
+      }
+
+      // Set messaging instance in state
+      setMessaging(messagingInstance);
+
       const token = await requestNotificationPermission();
-      
+
       if (token && user) {
         setFcmToken(token);
         await saveFCMToken(user.uid, token);
         toast.success('تم تفعيل الإشعارات بنجاح');
+      } else if (!token) {
+        toast.error('لم يتم منح صلاحية الإشعارات');
       }
     } catch (error) {
       console.error('Error requesting notification permission:', error);
@@ -76,7 +89,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     const setupNotificationListener = async () => {
       try {
-        // Query notifications for this user or their role
+        // Query all notifications (we'll filter client-side for better performance)
         const q = query(
           collection(db, 'notifications'),
           orderBy('createdAt', 'desc')
@@ -84,22 +97,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
         unsubscribe = onSnapshot(q, (snapshot) => {
           const notificationsList: Notification[] = [];
-          
+
           snapshot.forEach((doc) => {
             const data = doc.data();
-            
-            // Filter notifications for this user
-            const isForUser = 
-              !data.targetUsers || 
-              data.targetUsers.length === 0 || 
-              data.targetUsers.includes(user.uid);
-            
-            const isForRole = 
-              !data.targetRoles || 
-              data.targetRoles.length === 0 || 
-              data.targetRoles.includes(user.role);
 
-            if (isForUser || isForRole) {
+            // Filter notifications for this user
+            const hasNoTargetUsers = !data.targetUsers || data.targetUsers.length === 0;
+            const isTargetUser = data.targetUsers?.includes(user.uid);
+
+            const hasNoTargetRoles = !data.targetRoles || data.targetRoles.length === 0;
+            const isTargetRole = data.targetRoles?.includes(user.role);
+
+            // Show notification if:
+            // 1. User is an admin (see everything)
+            // 2. No specific users AND no specific roles (broadcast to all)
+            // 3. User is in targetUsers
+            // 4. User's role is in targetRoles
+            const shouldShow =
+              user.role === 'admin' ||
+              (hasNoTargetUsers && hasNoTargetRoles) ||
+              isTargetUser ||
+              isTargetRole;
+
+            if (shouldShow) {
               notificationsList.push({
                 id: doc.id,
                 ...data
@@ -109,6 +129,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
           setNotifications(notificationsList);
           setUnreadCount(notificationsList.filter(n => !n.read).length);
+          setIsLoading(false);
+        }, (error) => {
+          console.error('Error in notification listener:', error);
           setIsLoading(false);
         });
       } catch (error) {
@@ -128,32 +151,41 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Listen for foreground FCM messages
   useEffect(() => {
-    const setupForegroundListener = async () => {
-      try {
-        const payload = await onMessageListener();
-        console.log('Foreground message received:', payload);
-        
-        // Show toast notification
-        if (payload && typeof payload === 'object' && 'notification' in payload) {
-          const notification = payload.notification as any;
-          toast.info(notification.title, {
-            description: notification.body
-          });
+    if (!fcmToken || !messaging) return;
+
+    // Set up continuous foreground message listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Foreground message received:', payload);
+
+      // Show toast notification
+      if (payload && typeof payload === 'object' && 'notification' in payload) {
+        const notification = payload.notification as any;
+        toast.info(notification.title, {
+          description: notification.body,
+          duration: 5000
+        });
+
+        // Play notification sound
+        try {
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(e => console.log('Could not play sound:', e));
+        } catch (e) {
+          console.log('Audio playback not supported:', e);
         }
-      } catch (error) {
-        console.error('Error in foreground listener:', error);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
       }
     };
-
-    if (fcmToken) {
-      setupForegroundListener();
-    }
-  }, [fcmToken]);
+  }, [fcmToken, messaging]);
 
   const markAsRead = async (notificationId: string) => {
     try {
       await markNotificationAsRead(notificationId);
-      
+
       // Update local state
       setNotifications(prev =>
         prev.map(n =>
@@ -171,7 +203,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     try {
       await markAllNotificationsAsRead(user.uid);
-      
+
       // Update local state
       setNotifications(prev =>
         prev.map(n => ({ ...n, read: true }))

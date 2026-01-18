@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { usePharmacyMedicines } from '@/hooks/usePharmacyMedicines';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MedicineWithApproval } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -30,9 +31,9 @@ import { toast } from 'sonner';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
-  const { 
+  const {
     medicines,
-    stats: medicineStats, 
+    stats: medicineStats,
     limitInfo,
     isLoading,
     error,
@@ -41,7 +42,9 @@ export default function PharmacistMedicines() {
     deleteMedicine: deleteMedicineFromHook,
     checkCanAdd,
   } = usePharmacyMedicines(user?.pharmacyId?.toString());
-  
+
+  const { notifyNewMedicine, notifyLowStock } = useAutoNotifications();
+
   console.log('🏥 PharmacistMedicines Component:', {
     userEmail: user?.email,
     pharmacyId: user?.pharmacyId,
@@ -50,7 +53,7 @@ export default function PharmacistMedicines() {
     error: error?.message,
     medicines: medicines.map(m => ({ id: m.id, name: m.name, status: m.status }))
   });
-  
+
   // Check if address is complete
   const isAddressComplete = !!(
     user?.street && user.street.trim().length >= 3 &&
@@ -58,7 +61,7 @@ export default function PharmacistMedicines() {
     user?.governorate && user.governorate.trim().length >= 2 &&
     user?.postalCode && user.postalCode.trim().length >= 5
   );
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
@@ -85,10 +88,10 @@ export default function PharmacistMedicines() {
     // Filter by search query
     const matchesSearch = medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (medicine.code && medicine.code.includes(searchQuery));
-    
+
     // Filter by status
     const matchesStatus = statusFilter === 'all' || medicine.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -98,7 +101,7 @@ export default function PharmacistMedicines() {
       toast.error('يجب إدخال عنوان الصيدلية بالكامل أولاً من صفحة الإعدادات');
       return;
     }
-    
+
     if (medicine) {
       setEditingMedicine(medicine);
       setFormData({
@@ -139,49 +142,49 @@ export default function PharmacistMedicines() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     console.log('📝 Form submitted with data:', formData);
-    
+
     // التحقق من اكتمال عنوان الصيدلية
     if (!isAddressComplete) {
       toast.error('⚠️ يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً');
       return;
     }
-    
+
     // التحقق من وجود صورة
     if (!formData.subabaseImageUrl || formData.subabaseImageUrl.trim() === '') {
       toast.error('يجب رفع صورة للدواء قبل الحفظ');
       return;
     }
-    
+
     // التحقق من البيانات المطلوبة
     if (!formData.name || formData.name.trim().length < 2) {
       toast.error('اسم الدواء مطلوب (حرفين على الأقل)');
       return;
     }
-    
+
     if (!formData.description || formData.description.trim().length < 10) {
       toast.error('وصف الدواء مطلوب (10 أحرف على الأقل)');
       return;
     }
-    
+
     if (!formData.category || formData.category.trim() === '') {
       toast.error('فئة الدواء مطلوبة');
       return;
     }
-    
+
     if (formData.price <= 0) {
       toast.error('السعر يجب أن يكون أكبر من صفر');
       return;
     }
-    
+
     if (formData.quantity < 0) {
       toast.error('الكمية يجب أن تكون صفر أو أكثر');
       return;
     }
-    
+
     console.log('✅ All validations passed');
-    
+
     try {
       const dataToSave = {
         name: formData.name.trim(),
@@ -195,21 +198,30 @@ export default function PharmacistMedicines() {
         subabaseORImageUrl: formData.subabaseImageUrl,
         expiryDate: new Date(),
       };
-      
+
       console.log('💾 Saving medicine:', dataToSave);
-      
+
       if (editingMedicine) {
         const success = await editMedicine(editingMedicine.id, dataToSave);
         if (success) {
           setIsAddEditDialogOpen(false);
+          // Check for low stock notification
+          if (dataToSave.quantity > 0 && dataToSave.quantity <= 5) {
+            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId?.toString() || "");
+          }
         }
       } else {
         const newMedicine = await addMedicineFromHook(dataToSave);
         console.log('🎉 Medicine creation result:', newMedicine);
         if (newMedicine) {
           setIsAddEditDialogOpen(false);
-          // الدواء الجديد سيظهر تلقائياً بفضل real-time listener
-          // وسيتم تحديث limitInfo تلقائياً
+          // Notify admin about new medicine
+          await notifyNewMedicine(dataToSave.name, user?.pharmacyName || "صيدلية");
+
+          // Check if initially added with low stock
+          if (dataToSave.quantity > 0 && dataToSave.quantity <= 5) {
+            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId?.toString() || "");
+          }
         }
       }
     } catch (error) {
@@ -263,20 +275,20 @@ export default function PharmacistMedicines() {
 
     try {
       const result = await removeImageBackground(formData.subabaseImageUrl);
-      
+
       if (!result.success || !result.blob) {
         toast.error(result.error || 'فشل إزالة الخلفية');
         return;
       }
 
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
-      
+
       if (formData.subabaseImageUrl.includes('supabase.co/storage')) {
         await deleteImageFromSupabase(formData.subabaseImageUrl);
       }
-      
+
       const uploadResult = await uploadImageToSupabase(file);
-      
+
       if (uploadResult.success && uploadResult.url) {
         setFormData({ ...formData, subabaseImageUrl: uploadResult.url });
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
@@ -301,8 +313,8 @@ export default function PharmacistMedicines() {
             <AlertDescription className="font-cairo text-red-700">
               <p className="font-bold mb-1">❌ حدث خطأ</p>
               <p className="text-sm">{error.message}</p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => window.location.reload()}
                 className="mt-2 bg-white hover:bg-red-100 border-red-300 text-red-700 font-cairo font-bold"
@@ -312,7 +324,7 @@ export default function PharmacistMedicines() {
             </AlertDescription>
           </Alert>
         )}
-        
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -324,7 +336,7 @@ export default function PharmacistMedicines() {
             <p className="text-muted-foreground">إدارة أدوية الصيدلية ({medicines.length} دواء)</p>
           </div>
           <div className="flex gap-2">
-            <Button 
+            <Button
               onClick={checkCanAdd}
               variant="outline"
               className="font-cairo"
@@ -332,15 +344,15 @@ export default function PharmacistMedicines() {
             >
               🔄 تحديث
             </Button>
-            <Button 
-              onClick={() => handleOpenAddEdit()} 
+            <Button
+              onClick={() => handleOpenAddEdit()}
               className="gradient-primary text-primary-foreground font-cairo"
               disabled={!limitInfo.canAdd || !isAddressComplete}
               title={
-                !isAddressComplete 
-                  ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات' 
-                  : !limitInfo.canAdd 
-                    ? (limitInfo.message || 'تم الوصول للحد الأقصى') 
+                !isAddressComplete
+                  ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات'
+                  : !limitInfo.canAdd
+                    ? (limitInfo.message || 'تم الوصول للحد الأقصى')
                     : 'إضافة دواء جديد'
               }
             >
@@ -362,8 +374,8 @@ export default function PharmacistMedicines() {
                     لا يمكنك إضافة أو تعديل الأدوية حتى تقوم بإدخال العنوان التفصيلي (الشارع، المدينة، المحافظة، الرمز البريدي) من صفحة الإعدادات
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => window.location.href = '/pharmacist/settings'}
                   className="bg-white hover:bg-red-100 border-red-300 text-red-700 font-cairo font-bold"
@@ -377,7 +389,7 @@ export default function PharmacistMedicines() {
 
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card 
+          <Card
             className={`cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'}`}
             onClick={() => setStatusFilter('all')}
           >
@@ -387,7 +399,7 @@ export default function PharmacistMedicines() {
               {statusFilter === 'all' && <p className="text-xs text-blue-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
             onClick={() => setStatusFilter('pending')}
           >
@@ -400,7 +412,7 @@ export default function PharmacistMedicines() {
               {statusFilter === 'pending' && <p className="text-xs text-orange-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-green-500 shadow-lg' : 'hover:shadow-md'}`}
             onClick={() => setStatusFilter('approved')}
           >
@@ -413,7 +425,7 @@ export default function PharmacistMedicines() {
               {statusFilter === 'approved' && <p className="text-xs text-green-600 font-cairo mt-1">✓ محدد</p>}
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`cursor-pointer transition-all ${statusFilter === 'rejected' ? 'ring-2 ring-red-500 shadow-lg' : 'hover:shadow-md'}`}
             onClick={() => setStatusFilter('rejected')}
           >
@@ -456,12 +468,11 @@ export default function PharmacistMedicines() {
               {/* شريط التقدم */}
               <div className="mt-3">
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div 
-                    className={`h-2.5 rounded-full transition-all duration-300 ${
-                      !limitInfo.canAdd ? 'bg-red-500' : 
-                      limitInfo.remaining <= 3 ? 'bg-orange-500' : 
-                      'bg-green-500'
-                    }`}
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-300 ${!limitInfo.canAdd ? 'bg-red-500' :
+                        limitInfo.remaining <= 3 ? 'bg-orange-500' :
+                          'bg-green-500'
+                      }`}
                     style={{ width: `${Math.min(100, (limitInfo.currentCount / limitInfo.limit) * 100)}%` }}
                   ></div>
                 </div>
@@ -486,7 +497,7 @@ export default function PharmacistMedicines() {
               className="pr-10 font-cairo"
             />
           </div>
-          
+
           {/* Status Filter Info */}
           {statusFilter !== 'all' && (
             <Alert className={`
@@ -509,9 +520,9 @@ export default function PharmacistMedicines() {
                   {statusFilter === 'approved' && '✅ عرض الأدوية الموافق عليها فقط'}
                   {statusFilter === 'rejected' && '❌ عرض الأدوية المرفوضة فقط'}
                 </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setStatusFilter('all')}
                   className="h-6 text-xs"
                 >
@@ -556,7 +567,7 @@ export default function PharmacistMedicines() {
             {filteredMedicines.map((medicine, index) => {
               const medicineStatus = medicine.status;
               const rejectionNotes = medicine.rejectionNotes;
-              
+
               return (
                 <motion.div
                   key={medicine.id}
@@ -593,7 +604,7 @@ export default function PharmacistMedicines() {
                         <Package className="w-12 h-12 text-gray-400" />
                       </div>
                     )}
-                    
+
                     {/* Status Badge - Always visible on top */}
                     <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
                       {medicineStatus === 'pending' && (
@@ -615,7 +626,7 @@ export default function PharmacistMedicines() {
                         </Badge>
                       )}
                     </div>
-                    
+
                     {/* Out of Stock */}
                     {medicine.quantity === 0 && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-xl">
@@ -686,8 +697,8 @@ export default function PharmacistMedicines() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         className="flex-1 text-xs h-8 border-gray-200 hover:bg-green-50 hover:border-green-300"
                         onClick={() => handleOpenAddEdit(medicine)}
@@ -697,9 +708,9 @@ export default function PharmacistMedicines() {
                         <Edit className="w-3 h-3 ml-1" />
                         تعديل
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="h-8 w-8 p-0 border-gray-200 hover:bg-red-50 hover:border-red-300 text-red-500 hover:text-red-600"
                         onClick={() => handleDelete(medicine.id)}
                       >
@@ -715,7 +726,7 @@ export default function PharmacistMedicines() {
 
         {/* Add/Edit Dialog - نفس القائمة التي يستخدمها الأدمن */}
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
-          <DialogContent 
+          <DialogContent
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={() => setIsAddEditDialogOpen(false)}
           >
@@ -724,7 +735,7 @@ export default function PharmacistMedicines() {
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
               </DialogTitle>
             </DialogHeader>
-            
+
             {/* Address Warning */}
             {!isAddressComplete && (
               <Alert className="border-red-200 bg-red-50">
@@ -734,7 +745,7 @@ export default function PharmacistMedicines() {
                 </AlertDescription>
               </Alert>
             )}
-            
+
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Section 1: Basic Info */}
               <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
@@ -742,7 +753,7 @@ export default function PharmacistMedicines() {
                   <Package className="w-5 h-5 text-blue-600" />
                   المعلومات الأساسية
                 </h3>
-                
+
                 <div className="grid grid-cols-[2fr,1fr] gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="font-cairo text-sm font-semibold text-gray-700">اسم الدواء *</Label>
@@ -844,7 +855,7 @@ export default function PharmacistMedicines() {
                   <Star className="w-5 h-5 text-green-600" />
                   خيارات إضافية
                 </h3>
-                
+
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="bg-white p-3 rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
                     <label className="flex items-center gap-3 cursor-pointer">
@@ -870,9 +881,9 @@ export default function PharmacistMedicines() {
                       <input
                         type="checkbox"
                         checked={formData.discountRating > 0}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          discountRating: e.target.checked ? 10 : 0 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          discountRating: e.target.checked ? 10 : 0
                         })}
                         className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                       />
@@ -892,9 +903,9 @@ export default function PharmacistMedicines() {
                           min="0"
                           max="100"
                           value={formData.discountRating === 0 ? '' : formData.discountRating}
-                          onChange={(e) => setFormData({ 
-                            ...formData, 
-                            discountRating: parseInt(e.target.value) || 0 
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            discountRating: parseInt(e.target.value) || 0
                           })}
                           placeholder="أدخل نسبة الخصم (اختياري)"
                           className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
@@ -912,18 +923,17 @@ export default function PharmacistMedicines() {
                   صورة الدواء *
                 </h3>
                 <p className="text-xs text-red-600 font-cairo font-bold">⚠️ يجب رفع صورة للدواء قبل الحفظ - هذا الحقل إلزامي</p>
-                
+
                 <div className="space-y-3">
                   {/* Upload Button */}
                   <div className="relative">
                     <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
-                        formData.subabaseImageUrl 
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${formData.subabaseImageUrl
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : isUploading
                             ? 'bg-amber-400 text-white cursor-wait'
                             : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
-                      }`}>
+                        }`}>
                         {isUploading ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -950,7 +960,7 @@ export default function PharmacistMedicines() {
                       />
                     </label>
                   </div>
-                  
+
                   {/* Divider */}
                   {!formData.subabaseImageUrl && (
                     <div className="flex items-center gap-3">
@@ -959,13 +969,13 @@ export default function PharmacistMedicines() {
                       <div className="flex-1 h-px bg-amber-300"></div>
                     </div>
                   )}
-                  
+
                   {/* URL Input */}
                   {!formData.subabaseImageUrl && (
                     <div className="space-y-2">
                       <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
                       <div className="flex gap-2">
-                        <Input 
+                        <Input
                           id="imageUrlInputPharmacist"
                           type="url"
                           placeholder="https://example.com/image.jpg"
@@ -1002,14 +1012,14 @@ export default function PharmacistMedicines() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Image Preview */}
                   {formData.subabaseImageUrl && (
                     <div className="space-y-3">
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
-                        <img 
-                          src={formData.subabaseImageUrl} 
-                          alt="Preview" 
+                        <img
+                          src={formData.subabaseImageUrl}
+                          alt="Preview"
                           className="w-full h-full object-contain p-3"
                           onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
@@ -1045,12 +1055,12 @@ export default function PharmacistMedicines() {
                             onClick={async () => {
                               const imageUrl = formData.subabaseImageUrl;
                               const isSupabaseImage = imageUrl.includes('supabase.co/storage');
-                              
+
                               if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
                                 if (isSupabaseImage) {
                                   toast.info('جاري حذف الصورة...');
                                   const result = await deleteImageFromSupabase(imageUrl);
-                                  
+
                                   if (result.success) {
                                     toast.success('تم حذف الصورة بنجاح');
                                     setFormData({ ...formData, subabaseImageUrl: '' });
@@ -1070,7 +1080,7 @@ export default function PharmacistMedicines() {
                           </button>
                         </div>
                       </div>
-                      
+
                       {/* URL Display */}
                       <div className="space-y-1">
                         <Label className="text-xs font-cairo text-gray-600">رابط الصورة</Label>
@@ -1087,23 +1097,23 @@ export default function PharmacistMedicines() {
 
               {/* Footer Buttons */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsAddEditDialogOpen(false)}
                   className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
                 >
                   إلغاء
                 </Button>
-                <Button 
+                <Button
                   type="submit"
                   disabled={!formData.subabaseImageUrl || !isAddressComplete}
                   title={
-                    !isAddressComplete 
+                    !isAddressComplete
                       ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً'
-                      : !formData.subabaseImageUrl 
-                      ? 'يجب رفع صورة للدواء أولاً' 
-                      : ''
+                      : !formData.subabaseImageUrl
+                        ? 'يجب رفع صورة للدواء أولاً'
+                        : ''
                   }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

@@ -22,21 +22,40 @@ export const initializeMessaging = async () => {
 export const requestNotificationPermission = async (): Promise<string | null> => {
   try {
     const permission = await Notification.requestPermission();
-    
+
     if (permission === 'granted') {
       console.log('Notification permission granted.');
-      
+
       if (!messaging) {
         await initializeMessaging();
       }
-      
+
       if (messaging) {
+        // Get VAPID key from environment variable
+        const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+
+        if (!vapidKey) {
+          console.error('VAPID key not found in environment variables');
+          return null;
+        }
+
         // Get FCM token
         const token = await getToken(messaging, {
-          vapidKey: 'YOUR_VAPID_KEY' // Replace with your VAPID key from Firebase Console
+          vapidKey: vapidKey
         });
-        
+
         console.log('FCM Token:', token);
+
+        // Subscribe to 'all' topic for broadcasting (simplified mock for web)
+        // In mobile apps, this is native. In Web, we'll track 'all' membership in Firestore
+        // or use the Topic subscription API if available.
+        try {
+          // You would typically call a backend function here to subscribe the token to '/topics/all'
+          // For now, we'll mark the token in Firestore as a subscriber
+        } catch (e) {
+          console.error('Topic subscription failed:', e);
+        }
+
         return token;
       }
     } else {
@@ -45,34 +64,75 @@ export const requestNotificationPermission = async (): Promise<string | null> =>
   } catch (error) {
     console.error('Error requesting notification permission:', error);
   }
-  
+
   return null;
 };
 
-// Save FCM token to Firestore
+// Save FCM token to Firestore (prevents duplicates)
 export const saveFCMToken = async (userId: string, token: string) => {
   try {
-    await addDoc(collection(db, 'fcmTokens'), {
+    // Check if token already exists for this user
+    const tokensRef = collection(db, 'fcmTokens');
+    const q = query(tokensRef, where('userId', '==', userId), where('token', '==', token));
+    const querySnapshot = await getDocs(q);
+
+    const tokenData = {
       userId,
       token,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+      platform: 'web', // Platform identifier for Web App
+      deviceId: navigator.userAgent, // Browser user agent as device ID
+      appVersion: '1.0.0', // App version
+      updatedAt: serverTimestamp(),
+      lastUsed: serverTimestamp()
+    };
+
+    if (querySnapshot.empty) {
+      // Token doesn't exist, add it
+      await addDoc(tokensRef, {
+        ...tokenData,
+        createdAt: serverTimestamp()
+      });
+      console.log('FCM token saved successfully');
+    } else {
+      // Token exists, update timestamp
+      const docRef = querySnapshot.docs[0].ref;
+      await updateDoc(docRef, tokenData);
+      console.log('FCM token updated successfully');
+    }
   } catch (error) {
     console.error('Error saving FCM token:', error);
   }
 };
 
-// Listen for foreground messages
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    if (messaging) {
-      onMessage(messaging, (payload) => {
-        console.log('Message received:', payload);
-        resolve(payload);
-      });
+// Listen for foreground messages (continuous listener)
+export const onMessageListener = () => {
+  return new Promise((resolve, reject) => {
+    if (!messaging) {
+      reject(new Error('Messaging not initialized'));
+      return;
     }
+
+    // Set up continuous listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Foreground message received:', payload);
+      resolve(payload);
+
+      // Show browser notification if permission granted
+      if (Notification.permission === 'granted' && payload.notification) {
+        new Notification(payload.notification.title || 'إشعار جديد', {
+          body: payload.notification.body || '',
+          icon: payload.notification.icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: 'fcm-notification',
+          requireInteraction: false
+        });
+      }
+    });
+
+    // Return unsubscribe function
+    return unsubscribe;
   });
+};
 
 // Notification types
 export interface NotificationData {
@@ -197,5 +257,77 @@ export const getUnreadNotificationCount = async (userId: string): Promise<number
   } catch (error) {
     console.error('Error getting unread count:', error);
     return 0;
+  }
+};
+
+// Delete a single notification
+export const deleteNotification = async (notificationId: string): Promise<void> => {
+  try {
+    const { deleteDoc } = await import('firebase/firestore');
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await deleteDoc(notificationRef);
+    console.log('Notification deleted:', notificationId);
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    throw error;
+  }
+};
+
+// Delete all notifications
+export const deleteAllNotifications = async (): Promise<number> => {
+  try {
+    const { deleteDoc } = await import('firebase/firestore');
+    const q = query(collection(db, 'notifications'));
+    const querySnapshot = await getDocs(q);
+
+    let deletedCount = 0;
+    const deletePromises = querySnapshot.docs.map(async (docSnapshot) => {
+      await deleteDoc(docSnapshot.ref);
+      deletedCount++;
+    });
+
+    await Promise.all(deletePromises);
+    console.log(`Deleted ${deletedCount} notifications`);
+    return deletedCount;
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
+    throw error;
+  }
+};
+
+// Get notification statistics
+export const getNotificationStats = async (): Promise<{
+  total: number;
+  unread: number;
+  read: number;
+  byType: Record<string, number>;
+}> => {
+  try {
+    const q = query(collection(db, 'notifications'));
+    const querySnapshot = await getDocs(q);
+
+    let total = 0;
+    let unread = 0;
+    let read = 0;
+    const byType: Record<string, number> = {};
+
+    querySnapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data();
+      total++;
+
+      if (data.read) {
+        read++;
+      } else {
+        unread++;
+      }
+
+      const type = data.type || 'general';
+      byType[type] = (byType[type] || 0) + 1;
+    });
+
+    return { total, unread, read, byType };
+  } catch (error) {
+    console.error('Error getting notification stats:', error);
+    return { total: 0, unread: 0, read: 0, byType: {} };
   }
 };

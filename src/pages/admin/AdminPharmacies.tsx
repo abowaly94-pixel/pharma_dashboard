@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Building2, Phone, Mail, MapPin, Edit, 
+import {
+  Plus, Search, Building2, Phone, Mail, MapPin, Edit,
   CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound, Trash2
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePharmacyManagement } from '@/hooks/usePharmacyManagement';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import {
   Dialog,
   DialogContent,
@@ -47,20 +48,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 
 export default function AdminPharmacies() {
-  const { 
-    filteredPharmacies, 
-    isLoading, 
+  const {
+    filteredPharmacies,
+    isLoading,
     stats,
     filters,
     setFilters,
-    createNewPharmacy, 
+    createNewPharmacy,
     changePharmacyStatus,
     changeMedicineLimit,
     updatePharmacyData,
     resetPharmacyPassword,
     deletePharmacy
   } = usePharmacyManagement();
-  
+
+  const { notifyPharmacyApproved, notifyPharmacyRejected } = useAutoNotifications();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -93,6 +96,14 @@ export default function AdminPharmacies() {
   const handleConfirmStatusChange = async () => {
     if (selectedPharmacy && pendingStatus) {
       await changePharmacyStatus(selectedPharmacy.id, pendingStatus);
+
+      // Send notification based on status
+      if (pendingStatus === 'active') {
+        await notifyPharmacyApproved(selectedPharmacy.name, selectedPharmacy.id);
+      } else if (pendingStatus === 'suspended') {
+        await notifyPharmacyRejected(selectedPharmacy.name, selectedPharmacy.id, "تم تعليق حسابك من قبل المسؤول");
+      }
+
       setIsStatusDialogOpen(false);
       setSelectedPharmacy(null);
       setPendingStatus(null);
@@ -175,47 +186,47 @@ export default function AdminPharmacies() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Log form data for debugging
     console.log('Form data being submitted:', formData);
-    
+
     // Validate required fields
-    if (!formData.name || !formData.email || !formData.address || 
-        !formData.city || !formData.phoneNumber || !formData.ownerName || 
-        !formData.licenseNumber || !formData.medicineLimit) {
+    if (!formData.name || !formData.email || !formData.address ||
+      !formData.city || !formData.phoneNumber || !formData.ownerName ||
+      !formData.licenseNumber || !formData.medicineLimit) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
-    
+
     // Validate address length
     if (formData.address.trim().length < 5) {
       toast.error('⚠️ عنوان الصيدلية يجب أن يكون 5 أحرف على الأقل');
       return;
     }
-    
+
     // Validate license number length
     if (formData.licenseNumber.trim().length < 5) {
       toast.error('رقم الترخيص يجب أن يكون 5 أحرف على الأقل');
       return;
     }
-    
+
     // Validate medicine limit
     if (formData.medicineLimit <= 0) {
       toast.error('الحد الأقصى للأدوية يجب أن يكون أكبر من صفر');
       return;
     }
-    
+
     // Validate phone number length
     if (formData.phoneNumber.length < 10) {
       toast.error('رقم الهاتف يجب أن يكون 10 أرقام على الأقل');
       return;
     }
-    
+
     if (!editingPharmacy && (!formData.password || formData.password.length < 8)) {
       toast.error('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
       return;
     }
-    
+
     try {
       if (editingPharmacy) {
         await updatePharmacyData(editingPharmacy.id, formData);
@@ -274,11 +285,11 @@ export default function AdminPharmacies() {
 
   const getStatusDescription = (status: PharmacyStatus, pharmacyName: string) => {
     switch (status) {
-      case 'active': 
+      case 'active':
         return `سيتم تفعيل صيدلية "${pharmacyName}" وستتمكن من تسجيل الدخول وإدارة الأدوية.`;
-      case 'inactive': 
+      case 'inactive':
         return `سيتم إلغاء تفعيل صيدلية "${pharmacyName}" ولن تتمكن من تسجيل الدخول.`;
-      case 'suspended': 
+      case 'suspended':
         return `سيتم تعليق صيدلية "${pharmacyName}" مؤقتاً. يمكنك إعادة تفعيلها لاحقاً.`;
     }
   };
@@ -431,7 +442,7 @@ export default function AdminPharmacies() {
                             إعادة تعيين كلمة المرور
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleOpenDeleteDialog(pharmacy)}
                             className="text-red-600 focus:text-red-600 focus:bg-red-50"
                           >
@@ -440,7 +451,7 @@ export default function AdminPharmacies() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {pharmacy.status !== 'active' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleOpenStatusDialog(pharmacy, 'active')}
                               className="text-green-600"
                             >
@@ -449,7 +460,7 @@ export default function AdminPharmacies() {
                             </DropdownMenuItem>
                           )}
                           {pharmacy.status === 'active' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleOpenStatusDialog(pharmacy, 'inactive')}
                               className="text-gray-600"
                             >
@@ -458,7 +469,7 @@ export default function AdminPharmacies() {
                             </DropdownMenuItem>
                           )}
                           {pharmacy.status !== 'suspended' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleOpenStatusDialog(pharmacy, 'suspended')}
                               className="text-red-600"
                             >
@@ -475,7 +486,7 @@ export default function AdminPharmacies() {
                       <span className="text-sm text-muted-foreground">الحالة</span>
                       {getStatusBadge(pharmacy.status)}
                     </div>
-                    
+
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Mail className="w-4 h-4 flex-shrink-0" />
@@ -499,16 +510,15 @@ export default function AdminPharmacies() {
                         </span>
                       </div>
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all ${
-                            pharmacy.currentMedicineCount >= pharmacy.medicineLimit 
-                              ? 'bg-red-500' 
+                        <div
+                          className={`h-2 rounded-full transition-all ${pharmacy.currentMedicineCount >= pharmacy.medicineLimit
+                              ? 'bg-red-500'
                               : pharmacy.currentMedicineCount >= pharmacy.medicineLimit * 0.8
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min((pharmacy.currentMedicineCount / pharmacy.medicineLimit) * 100, 100)}%` 
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                          style={{
+                            width: `${Math.min((pharmacy.currentMedicineCount / pharmacy.medicineLimit) * 100, 100)}%`
                           }}
                         />
                       </div>
@@ -522,7 +532,7 @@ export default function AdminPharmacies() {
 
         {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent 
+          <DialogContent
             className="max-w-2xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={() => setIsDialogOpen(false)}
           >
@@ -531,8 +541,8 @@ export default function AdminPharmacies() {
                 {editingPharmacy ? 'تعديل بيانات الصيدلية' : 'إضافة صيدلية جديدة'}
               </DialogTitle>
               <DialogDescription>
-                {editingPharmacy 
-                  ? 'قم بتعديل البيانات المطلوبة ثم احفظ التغييرات' 
+                {editingPharmacy
+                  ? 'قم بتعديل البيانات المطلوبة ثم احفظ التغييرات'
                   : 'املأ جميع البيانات المطلوبة لإنشاء حساب صيدلية جديد'}
               </DialogDescription>
             </DialogHeader>
@@ -540,7 +550,7 @@ export default function AdminPharmacies() {
               {/* Basic Info */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-700 font-cairo">المعلومات الأساسية</h3>
-                
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="name" className="text-sm">اسم الصيدلية *</Label>
@@ -615,7 +625,7 @@ export default function AdminPharmacies() {
               {/* Contact Info */}
               <div className="space-y-3 pt-3 border-t">
                 <h3 className="text-sm font-semibold text-gray-700 font-cairo">معلومات الاتصال</h3>
-                
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="phoneNumber" className="text-sm">رقم الهاتف *</Label>
@@ -674,7 +684,7 @@ export default function AdminPharmacies() {
               {/* Settings */}
               <div className="space-y-3 pt-3 border-t">
                 <h3 className="text-sm font-semibold text-gray-700 font-cairo">الإعدادات</h3>
-                
+
                 <div className="space-y-1.5">
                   <Label htmlFor="medicineLimit" className="text-sm">الحد الأقصى للأدوية *</Label>
                   <Input
@@ -697,16 +707,16 @@ export default function AdminPharmacies() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   إلغاء
                 </Button>
-                <Button 
+                <Button
                   type="submit"
                   disabled={
-                    !formData.name || 
-                    !formData.email || 
+                    !formData.name ||
+                    !formData.email ||
                     !formData.address || formData.address.trim().length < 5 ||
-                    !formData.city || 
-                    !formData.phoneNumber || 
-                    !formData.ownerName || 
-                    !formData.licenseNumber || 
+                    !formData.city ||
+                    !formData.phoneNumber ||
+                    !formData.ownerName ||
+                    !formData.licenseNumber ||
                     !formData.medicineLimit ||
                     (!editingPharmacy && (!formData.password || formData.password.length < 8))
                   }
@@ -745,7 +755,7 @@ export default function AdminPharmacies() {
 
         {/* Medicine Limit Dialog */}
         <Dialog open={isLimitDialogOpen} onOpenChange={setIsLimitDialogOpen}>
-          <DialogContent 
+          <DialogContent
             className="max-w-md"
             onPointerDownOutside={() => setIsLimitDialogOpen(false)}
           >
@@ -770,7 +780,7 @@ export default function AdminPharmacies() {
                   <span className="font-semibold">{selectedPharmacy?.currentMedicineCount} دواء</span>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="newLimit">الحد الجديد</Label>
                 <Input
@@ -799,7 +809,7 @@ export default function AdminPharmacies() {
 
         {/* Details Dialog */}
         <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-          <DialogContent 
+          <DialogContent
             className="max-w-lg"
             onPointerDownOutside={() => setIsDetailsDialogOpen(false)}
           >
@@ -818,7 +828,7 @@ export default function AdminPharmacies() {
                   </div>
                   {getStatusBadge(selectedPharmacy.status)}
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
                     <span className="text-muted-foreground">البريد الإلكتروني</span>
@@ -907,13 +917,13 @@ export default function AdminPharmacies() {
                         سيتم حذف الصيدلية وجميع بياناتها بشكل نهائي.
                       </p>
                     </div>
-                    
+
                     <div className="space-y-2 text-sm">
                       <p><strong>الصيدلية:</strong> {selectedPharmacy.name}</p>
                       <p><strong>البريد:</strong> {selectedPharmacy.email}</p>
                       <p><strong>عدد الأدوية:</strong> {selectedPharmacy.currentMedicineCount} دواء</p>
                     </div>
-                    
+
                     <p className="text-red-600 font-semibold">
                       سيتم حذف:
                     </p>
@@ -929,7 +939,7 @@ export default function AdminPharmacies() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={handleConfirmDelete}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
