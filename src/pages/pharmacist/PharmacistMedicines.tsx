@@ -186,6 +186,31 @@ export default function PharmacistMedicines() {
     console.log('✅ All validations passed');
 
     try {
+      // إذا كان تعديل وتم تغيير الصورة، احذف الصورة القديمة من Supabase
+      if (editingMedicine) {
+        const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
+        const newImageUrl = formData.subabaseImageUrl;
+        
+        // احذف الصورة القديمة إذا:
+        // 1. كانت موجودة
+        // 2. تم تغييرها (الصورة الجديدة مختلفة)
+        // 3. الصورة القديمة من Supabase (تحتوي على supabase.co)
+        if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes('supabase.co/storage')) {
+          console.log('🗑️ حذف الصورة القديمة من Supabase:', oldImageUrl);
+          toast.info('جاري حذف الصورة القديمة...');
+          
+          const deleteResult = await deleteImageFromSupabase(oldImageUrl);
+          
+          if (deleteResult.success) {
+            console.log('✅ تم حذف الصورة القديمة بنجاح');
+            toast.success('تم حذف الصورة القديمة من التخزين');
+          } else {
+            console.warn('⚠️ فشل حذف الصورة القديمة:', deleteResult.error);
+            // نكمل الحفظ حتى لو فشل حذف الصورة القديمة
+          }
+        }
+      }
+
       const dataToSave = {
         name: formData.name.trim(),
         code: formData.code,
@@ -205,6 +230,7 @@ export default function PharmacistMedicines() {
         const success = await editMedicine(editingMedicine.id, dataToSave);
         if (success) {
           setIsAddEditDialogOpen(false);
+          toast.success('تم تحديث الدواء بنجاح');
           // Check for low stock notification
           if (dataToSave.quantity > 0 && dataToSave.quantity <= 5) {
             await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId?.toString() || "");
@@ -215,6 +241,7 @@ export default function PharmacistMedicines() {
         console.log('🎉 Medicine creation result:', newMedicine);
         if (newMedicine) {
           setIsAddEditDialogOpen(false);
+          toast.success('تم إضافة الدواء بنجاح');
           // Notify admin about new medicine
           await notifyNewMedicine(dataToSave.name, user?.pharmacyName || "صيدلية");
 

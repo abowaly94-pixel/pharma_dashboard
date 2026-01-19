@@ -35,6 +35,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Autocomplete, AutocompleteOption } from '@/components/ui/autocomplete';
 import { deleteMedicinePermanently } from '@/services/medicineService';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -137,47 +139,44 @@ export default function AdminMedicines() {
     }
     
     try {
-      // Check if image was deleted (empty string) and we're editing
-      const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
-      console.log('Checking deletion conditions:');
-      console.log('  - editingMedicine exists?', !!editingMedicine);
-      console.log('  - formData.subabaseImageUrl is empty?', formData.subabaseImageUrl === '');
-      console.log('  - editingMedicine.subabaseORImageUrl?', editingMedicine?.subabaseORImageUrl);
-      console.log('  - editingMedicine.subabaseImageUrl?', (editingMedicine as any)?.subabaseImageUrl);
-      console.log('  - oldImageUrl (combined)?', oldImageUrl);
-      
-      if (editingMedicine && formData.subabaseImageUrl === '' && oldImageUrl) {
-        console.log('✅ All conditions met - proceeding with deletion');
-        // Delete the old image from Supabase Storage
-        const oldImageUrl = (editingMedicine as any).subabaseImageUrl || editingMedicine.subabaseORImageUrl;
-        console.log('🎯 Old image URL to delete:', oldImageUrl);
-        if (oldImageUrl) {
-          console.log('🔄 Attempting to delete image:', oldImageUrl);
-          toast.info('جاري حذف الصورة من التخزين...');
-          const result = await deleteImageFromSupabase(oldImageUrl);
-          console.log('📊 Deletion result:', result);
-          if (result.success) {
-            toast.success('تم حذف الصورة من التخزين بنجاح');
+      // إذا كان تعديل وتم تغيير الصورة، احذف الصورة القديمة من Supabase
+      if (editingMedicine) {
+        const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
+        const newImageUrl = formData.subabaseImageUrl;
+        
+        // احذف الصورة القديمة إذا:
+        // 1. كانت موجودة
+        // 2. تم تغييرها (الصورة الجديدة مختلفة)
+        // 3. الصورة القديمة من Supabase (تحتوي على supabase.co)
+        if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes('supabase.co/storage')) {
+          console.log('🗑️ حذف الصورة القديمة من Supabase:', oldImageUrl);
+          toast.info('جاري حذف الصورة القديمة...');
+          
+          const deleteResult = await deleteImageFromSupabase(oldImageUrl);
+          
+          if (deleteResult.success) {
+            console.log('✅ تم حذف الصورة القديمة بنجاح');
+            toast.success('تم حذف الصورة القديمة من التخزين');
           } else {
-            toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
-            console.error('❌ Deletion failed:', result.error);
+            console.warn('⚠️ فشل حذف الصورة القديمة:', deleteResult.error);
+            // نكمل الحفظ حتى لو فشل حذف الصورة القديمة
           }
         }
-      } else {
-        console.log('❌ Deletion conditions NOT met - skipping deletion');
       }
       
-      // Prepare data with subabaseImageUrl field
+      // حفظ البيانات
       const dataToSave = {
         ...formData,
-        // Keep subabaseImageUrl as the main field
       };
       
       if (editingMedicine) {
         await updateMedicine(editingMedicine.id, dataToSave);
+        toast.success('تم تحديث الدواء بنجاح');
       } else {
         await addMedicine(dataToSave);
+        toast.success('تم إضافة الدواء بنجاح');
       }
+      
       setIsAddEditDialogOpen(false);
     } catch (error) {
       console.error('Error saving medicine:', error);
@@ -579,47 +578,42 @@ export default function AdminMedicines() {
                   معلومات الصيدلية
                 </h3>
                 
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="pharmacy" className="font-cairo text-sm font-semibold text-gray-700">اختر الصيدلية *</Label>
-                    <Select
-                      value={formData.pharmacyId.toString()}
-                      onValueChange={(value) => {
-                        const selectedPharmacy = pharmacies.find(p => p.pharmacyId.toString() === value);
-                        if (selectedPharmacy) {
-                          setFormData({
-                            ...formData,
-                            pharmacyId: selectedPharmacy.pharmacyId,
-                            pharmacyName: selectedPharmacy.name,
-                            pharmcyAddress: `${selectedPharmacy.address}, ${selectedPharmacy.city}`
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500">
-                        <SelectValue placeholder="اختر الصيدلية" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {pharmacies
-                          .filter((pharmacy) => pharmacy.name !== 'صيدلية النخيل')
-                          .map((pharmacy) => (
-                            <SelectItem key={pharmacy.id} value={pharmacy.pharmacyId.toString()}>
-                              <span className="font-cairo">{pharmacy.name}</span>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pharmacyName" className="font-cairo text-sm font-semibold text-gray-700">أو اكتب يدوياً</Label>
-                    <Input
-                      id="pharmacyName"
-                      value={formData.pharmacyName}
-                      onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                      placeholder="اكتب اسم صيدليتك"
-                      className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pharmacyName" className="font-cairo text-sm font-semibold text-gray-700">
+                    اسم الصيدلية (اكتب أو اختر) *
+                  </Label>
+                  <Autocomplete
+                    options={pharmacies
+                      .filter((pharmacy) => pharmacy.name !== 'صيدلية النخيل')
+                      .map((pharmacy) => ({
+                        value: pharmacy.pharmacyId.toString(),
+                        label: pharmacy.name
+                      }))}
+                    value={formData.pharmacyName}
+                    onValueChange={(value) => {
+                      setFormData({
+                        ...formData,
+                        pharmacyName: value,
+                        pharmacyId: 0
+                      });
+                    }}
+                    onSelectOption={(option) => {
+                      const selectedPharmacy = pharmacies.find(p => p.pharmacyId.toString() === option.value);
+                      if (selectedPharmacy) {
+                        setFormData({
+                          ...formData,
+                          pharmacyId: selectedPharmacy.pharmacyId,
+                          pharmacyName: selectedPharmacy.name,
+                          pharmcyAddress: `${selectedPharmacy.address}, ${selectedPharmacy.city}`
+                        });
+                      }
+                    }}
+                    placeholder="اكتب اسم الصيدلية..."
+                    className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500">
+                    💡 اكتب لرؤية الاقتراحات أو أدخل اسم جديد
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
@@ -768,51 +762,23 @@ export default function AdminMedicines() {
                     </div>
                   )}
                   
-                  {/* URL Input */}
-                  {!formData.subabaseImageUrl && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
-                      <div className="flex gap-2">
-                        <Input 
-                          id="imageUrlInputAdmin"
-                          type="url"
-                          placeholder="https://example.com/image.jpg"
-                          className="flex-1 h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const input = e.currentTarget as HTMLInputElement;
-                              if (input.value.trim()) {
-                                setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
-                                input.value = '';
-                                toast.success('تم إضافة رابط الصورة');
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            const input = document.getElementById('imageUrlInputAdmin') as HTMLInputElement;
-                            if (input && input.value.trim()) {
-                              setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
-                              input.value = '';
-                              toast.success('تم إضافة رابط الصورة');
-                            } else {
-                              toast.error('الرجاء إدخال رابط صحيح');
-                            }
-                          }}
-                          className="h-10 px-5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo font-bold shadow-md"
-                        >
-                          إضافة
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  {/* URL Input - Always visible */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
+                    <Input 
+                      id="imageUrlInputAdmin"
+                      type="url"
+                      value={formData.subabaseImageUrl}
+                      onChange={(e) => {
+                        setFormData({ ...formData, subabaseImageUrl: e.target.value });
+                      }}
+                      placeholder="https://example.com/image.jpg"
+                      className="h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
                   
-                  {/* Image Preview */}
-                  {formData.subabaseImageUrl && (
+                  {/* Image Preview - Shows when URL is valid */}
+                  {formData.subabaseImageUrl && formData.subabaseImageUrl.trim() && (
                     <div className="space-y-3">
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         <img 
@@ -823,12 +789,28 @@ export default function AdminMedicines() {
                             const target = e.currentTarget as HTMLImageElement;
                             target.style.display = 'none';
                             const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo"><div class="text-center"><div class="text-4xl mb-2">⚠️</div><div class="font-bold">صورة غير صالحة</div><div class="text-xs mt-1">تأكد من صحة الرابط</div></div></div>';
+                            if (parent && !parent.querySelector('.error-message')) {
+                              const errorDiv = document.createElement('div');
+                              errorDiv.className = 'error-message w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo';
+                              errorDiv.innerHTML = '<div class="text-center"><div class="text-4xl mb-2">⚠️</div><div class="font-bold">صورة غير صالحة</div><div class="text-xs mt-1">تأكد من صحة الرابط</div></div>';
+                              parent.appendChild(errorDiv);
                             }
                           }}
                         />
                         <div className="absolute top-2 right-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('هل تريد حذف الصورة؟')) {
+                                setFormData({ ...formData, subabaseImageUrl: '' });
+                                toast.success('تم حذف الصورة');
+                              }
+                            }}
+                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all font-bold"
+                            title="حذف الصورة"
+                          >
+                            ×
+                          </button>
                           <button
                             type="button"
                             onClick={handleRemoveBackground}
@@ -848,45 +830,7 @@ export default function AdminMedicines() {
                               </>
                             )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const imageUrl = formData.subabaseImageUrl;
-                              const isSupabaseImage = imageUrl.includes('supabase.co/storage');
-                              
-                              if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
-                                if (isSupabaseImage) {
-                                  toast.info('جاري حذف الصورة...');
-                                  const result = await deleteImageFromSupabase(imageUrl);
-                                  
-                                  if (result.success) {
-                                    toast.success('تم حذف الصورة بنجاح');
-                                    setFormData({ ...formData, subabaseImageUrl: '' });
-                                  } else {
-                                    toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
-                                  }
-                                } else {
-                                  setFormData({ ...formData, subabaseImageUrl: '' });
-                                  toast.success('تم إزالة الصورة');
-                                }
-                              }
-                            }}
-                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
-                            title="حذف الصورة"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
-                      </div>
-                      
-                      {/* URL Display */}
-                      <div className="space-y-1">
-                        <Label className="text-xs font-cairo text-gray-600">رابط الصورة</Label>
-                        <Input
-                          value={formData.subabaseImageUrl}
-                          readOnly
-                          className="h-9 text-xs bg-gray-50 cursor-default border-gray-300"
-                        />
                       </div>
                     </div>
                   )}
