@@ -37,7 +37,9 @@ export default function PharmacistDashboard() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-3xl font-bold font-cairo mb-2">مرحباً، {user?.pharmacyName}</h1>
+          <h1 className="text-3xl font-bold font-cairo mb-2">
+            مرحباً، {user?.pharmacyName === 'صيدلية النخيل' ? 'الصيدلية' : user?.pharmacyName}
+          </h1>
           <p className="text-muted-foreground">إليك ملخص نشاط صيدليتك</p>
         </motion.div>
 

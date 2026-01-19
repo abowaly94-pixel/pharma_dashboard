@@ -53,34 +53,35 @@ self.addEventListener('notificationclick', (event) => {
   console.log('Service Worker: Notification clicked:', event);
   event.notification.close();
 
-  const urlToOpen = new URL(event.notification.data?.actionUrl || '/', self.location.origin).href;
-  console.log('Service Worker: Opening URL:', urlToOpen);
+  // Navigation disabled - notifications will only close
+  // const urlToOpen = new URL(event.notification.data?.actionUrl || '/', self.location.origin).href;
+  // console.log('Service Worker: Opening URL:', urlToOpen);
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open with this URL
-      for (const client of clientList) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          console.log('Service Worker: Focusing existing window');
-          return client.focus();
-        }
-      }
-      // Check if any window is open
-      if (clientList.length > 0) {
-        console.log('Service Worker: Navigating existing window');
-        return clientList[0].focus().then(client => {
-          if ('navigate' in client) {
-            return client.navigate(urlToOpen);
-          }
-        });
-      }
-      // Open new window if none exists
-      if (clients.openWindow) {
-        console.log('Service Worker: Opening new window');
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+  // event.waitUntil(
+  //   clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+  //     // Check if there's already a window open with this URL
+  //     for (const client of clientList) {
+  //       if (client.url === urlToOpen && 'focus' in client) {
+  //         console.log('Service Worker: Focusing existing window');
+  //         return client.focus();
+  //       }
+  //     }
+  //     // Check if any window is open
+  //     if (clientList.length > 0) {
+  //       console.log('Service Worker: Navigating existing window');
+  //       return clientList[0].focus().then(client => {
+  //         if ('navigate' in client) {
+  //           return client.navigate(urlToOpen);
+  //         }
+  //       });
+  //     }
+  //     // Open new window if none exists
+  //     if (clients.openWindow) {
+  //       console.log('Service Worker: Opening new window');
+  //       return clients.openWindow(urlToOpen);
+  //     }
+  //   })
+  // );
 });
 
 // Handle service worker activation

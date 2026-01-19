@@ -585,8 +585,8 @@ export default function PharmacistMedicines() {
             <h3 className="text-xl font-semibold mb-2">
               {searchQuery ? 'لم يتم العثور على نتائج' : 'لا توجد أدوية حتى الآن'}
             </h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery ? 'جرب البحث بكلمات مختلفة' : 'ابدأ بإضافة أدوية جديدة'}
+            <p className="text-muted-foreground">
+              {searchQuery ? 'جرب البحث بكلمات مختلفة' : 'لم يتم إضافة أي أدوية بعد'}
             </p>
           </div>
         ) : (
@@ -703,7 +703,16 @@ export default function PharmacistMedicines() {
 
                     <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                       <div className="flex flex-col">
-                        <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                        {medicine.discountRating > 0 ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm text-gray-400 line-through">{medicine.price} ج.م</span>
+                            <span className="text-lg font-bold text-blue-600">
+                              {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className={`text-sm font-medium ${medicine.quantity > 10 ? 'text-green-600' : medicine.quantity > 0 ? 'text-orange-500' : 'text-red-500'}`}>

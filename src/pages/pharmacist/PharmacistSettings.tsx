@@ -337,7 +337,9 @@ export default function PharmacistSettings() {
                   <Store className="w-5 h-5 text-primary" />
                   <div>
                     <p className="text-xs text-muted-foreground">اسم الصيدلية</p>
-                    <p className="font-cairo font-medium">{user?.pharmacyName || 'غير محدد'}</p>
+                    <p className="font-cairo font-medium">
+                      {user?.pharmacyName === 'صيدلية النخيل' ? 'الصيدلية' : (user?.pharmacyName || 'غير محدد')}
+                    </p>
                   </div>
                 </div>
 

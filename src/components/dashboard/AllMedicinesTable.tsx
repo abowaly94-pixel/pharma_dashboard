@@ -96,7 +96,16 @@ export function AllMedicinesTable({ medicines }: AllMedicinesTableProps) {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="text-sm font-bold text-green-600">{medicine.price} ج.م</span>
+                  {medicine.discountRating > 0 ? (
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-400 line-through">{medicine.price} ج.م</span>
+                      <span className="text-sm font-bold text-green-600">
+                        {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-bold text-green-600">{medicine.price} ج.م</span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <Badge 

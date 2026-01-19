@@ -392,7 +392,16 @@ export default function AdminMedicineReview() {
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <span className="text-muted-foreground">السعر: </span>
-                      <span className="font-bold text-primary">{medicine.price} ج.م</span>
+                      {medicine.discountRating > 0 ? (
+                        <span>
+                          <span className="text-sm text-gray-400 line-through">{medicine.price} ج.م</span>
+                          <span className="font-bold text-primary mr-2">
+                            {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="font-bold text-primary">{medicine.price} ج.م</span>
+                      )}
                     </div>
                     <div>
                       <span className="text-muted-foreground">الكمية: </span>
@@ -456,7 +465,16 @@ export default function AdminMedicineReview() {
                     الصيدلية: {selectedMedicine.pharmacyName}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    السعر: {selectedMedicine.price} ج.م
+                    السعر: {selectedMedicine.discountRating > 0 ? (
+                      <>
+                        <span className="line-through text-gray-400">{selectedMedicine.price} ج.م</span>
+                        <span className="font-bold text-primary mr-2">
+                          {(selectedMedicine.price * (1 - selectedMedicine.discountRating / 100)).toFixed(2)} ج.م
+                        </span>
+                      </>
+                    ) : (
+                      `${selectedMedicine.price} ج.م`
+                    )}
                   </p>
                 </div>
 

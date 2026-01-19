@@ -40,10 +40,10 @@ export function NotificationItem({ notification }: NotificationItemProps) {
       markAsRead(notification.id);
     }
     
-    // Navigate to action URL if provided
-    if (notification.actionUrl) {
-      window.location.href = notification.actionUrl;
-    }
+    // Navigation disabled - notifications will only mark as read
+    // if (notification.actionUrl) {
+    //   window.location.href = notification.actionUrl;
+    // }
   };
 
   const timeAgo = notification.createdAt?.toDate

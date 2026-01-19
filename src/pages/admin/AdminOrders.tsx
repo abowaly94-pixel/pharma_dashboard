@@ -416,7 +416,16 @@ export default function AdminOrders() {
                           <p className="text-sm text-muted-foreground">{item.medicineEntity.pharmacyName}</p>
                         </div>
                         <div className="text-left">
-                          <p className="font-medium">{item.medicineEntity.price} ج.م</p>
+                          {item.medicineEntity.discountRating > 0 ? (
+                            <div className="flex flex-col">
+                              <p className="text-xs text-gray-400 line-through">{item.medicineEntity.price} ج.م</p>
+                              <p className="font-medium">
+                                {(item.medicineEntity.price * (1 - item.medicineEntity.discountRating / 100)).toFixed(2)} ج.م
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="font-medium">{item.medicineEntity.price} ج.م</p>
+                          )}
                           <p className="text-sm text-muted-foreground">الكمية: {item.count}</p>
                         </div>
                       </div>

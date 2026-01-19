@@ -56,9 +56,9 @@ export default function AdminMedicines() {
     description: '',
     price: 0,
     quantity: 0,
-    pharmacyId: 1,
-    pharmacyName: 'صيدلية النخيل',
-    pharmcyAddress: 'القاهرة',
+    pharmacyId: 0,
+    pharmacyName: '',
+    pharmcyAddress: '',
     category: '',
     manufacturer: '',
     subabaseImageUrl: '',
@@ -94,16 +94,15 @@ export default function AdminMedicines() {
       });
     } else {
       setEditingMedicine(null);
-      // Get first pharmacy as default (excluding صيدلية النخيل)
-      const availablePharmacies = pharmacies.filter(p => p.name !== 'صيدلية النخيل');
-      const defaultPharmacy = availablePharmacies[0];
+      // Get first pharmacy as default
+      const defaultPharmacy = pharmacies[0];
       setFormData({
         name: '',
         code: `MED-${Date.now()}`,
         description: '',
         price: 0,
         quantity: 0,
-        pharmacyId: defaultPharmacy?.pharmacyId || 1,
+        pharmacyId: defaultPharmacy?.pharmacyId || 0,
         pharmacyName: defaultPharmacy?.name || '',
         pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
         category: '',
@@ -328,19 +327,7 @@ export default function AdminMedicines() {
           <div className="text-center py-12">
             <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">لا توجد أدوية</h3>
-            <p className="text-muted-foreground mb-4">لم يتم العثور على أي أدوية في قاعدة البيانات</p>
-            <div className="space-y-2">
-              <Button 
-                onClick={() => handleOpenAddEdit()} 
-                className="gradient-primary text-primary-foreground font-cairo"
-              >
-                <Plus className="w-4 h-4 ml-2" />
-                إضافة أول دواء
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                أو <a href="/seed" className="text-primary hover:underline">إضافة بيانات تجريبية</a>
-              </div>
-            </div>
+            <p className="text-muted-foreground">لم يتم العثور على أي أدوية في قاعدة البيانات</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -414,7 +401,16 @@ export default function AdminMedicines() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                     <div className="flex flex-col">
-                      <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                      {medicine.discountRating > 0 ? (
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-400 line-through">{medicine.price} ج.م</span>
+                          <span className="text-lg font-bold text-blue-600">
+                            {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                      )}
                       <div className="flex items-center gap-1 mt-1">
                         <Star className="w-3 h-3 text-yellow-400 fill-current" />
                         <span className="text-xs font-medium text-gray-700">{medicine.avgRating.toFixed(1)}</span>
@@ -584,7 +580,6 @@ export default function AdminMedicines() {
                   </Label>
                   <Autocomplete
                     options={pharmacies
-                      .filter((pharmacy) => pharmacy.name !== 'صيدلية النخيل')
                       .map((pharmacy) => ({
                         value: pharmacy.pharmacyId.toString(),
                         label: pharmacy.name
@@ -916,7 +911,16 @@ export default function AdminMedicines() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground font-cairo">السعر:</span>
-                        <p className="font-bold text-primary text-xl">{selectedMedicine.price} ج.م</p>
+                        {selectedMedicine.discountRating > 0 ? (
+                          <div className="flex flex-col">
+                            <p className="text-sm text-gray-400 line-through">{selectedMedicine.price} ج.م</p>
+                            <p className="font-bold text-primary text-xl">
+                              {(selectedMedicine.price * (1 - selectedMedicine.discountRating / 100)).toFixed(2)} ج.م
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="font-bold text-primary text-xl">{selectedMedicine.price} ج.م</p>
+                        )}
                       </div>
                       <div>
                         <span className="text-muted-foreground font-cairo">الكمية:</span>
