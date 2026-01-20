@@ -77,6 +77,7 @@ export default function PharmacistMedicines() {
     category: '',
     manufacturer: '',
     subabaseImageUrl: '',
+    subabaseORImageUrl: '', // الصورة الأصلية قبل إزالة الخلفية
     avgRating: 0,
     ratingCount: 0,
     discountRating: 0,
@@ -113,6 +114,7 @@ export default function PharmacistMedicines() {
         category: medicine.category || '',
         manufacturer: medicine.manufacturer || '',
         subabaseImageUrl: medicine.subabaseImageUrl || medicine.subabaseORImageUrl || '',
+        subabaseORImageUrl: medicine.subabaseORImageUrl || '',
         avgRating: medicine.avgRating || 0,
         ratingCount: medicine.ratingCount || 0,
         discountRating: medicine.discountRating || 0,
@@ -130,6 +132,7 @@ export default function PharmacistMedicines() {
         category: '',
         manufacturer: '',
         subabaseImageUrl: '',
+        subabaseORImageUrl: '',
         avgRating: 0,
         ratingCount: 0,
         discountRating: 0,
@@ -310,15 +313,20 @@ export default function PharmacistMedicines() {
 
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
 
-      if (formData.subabaseImageUrl.includes('supabase.co/storage')) {
-        await deleteImageFromSupabase(formData.subabaseImageUrl);
-      }
-
+      // رفع الصورة الجديدة بدون حذف القديمة
       const uploadResult = await uploadImageToSupabase(file);
 
       if (uploadResult.success && uploadResult.url) {
-        setFormData({ ...formData, subabaseImageUrl: uploadResult.url });
-        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
+        // حفظ الصورة الأصلية في subabaseORImageUrl إذا لم تكن محفوظة
+        const originalImageUrl = formData.subabaseORImageUrl || formData.subabaseImageUrl;
+        
+        setFormData({ 
+          ...formData, 
+          subabaseImageUrl: uploadResult.url,
+          subabaseORImageUrl: originalImageUrl
+        });
+        
+        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
         toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
       }
@@ -1052,6 +1060,15 @@ export default function PharmacistMedicines() {
                   {/* Image Preview */}
                   {formData.subabaseImageUrl && (
                     <div className="space-y-3">
+                      {/* Badge للصورة المعالجة */}
+                      {formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                          <span className="text-purple-600 text-sm font-cairo">
+                            ✨ صورة بدون خلفية - يمكنك حذفها والرجوع للأصلية
+                          </span>
+                        </div>
+                      )}
+                      
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         <img
                           src={formData.subabaseImageUrl}
@@ -1090,21 +1107,42 @@ export default function PharmacistMedicines() {
                             type="button"
                             onClick={async () => {
                               const imageUrl = formData.subabaseImageUrl;
+                              const originalImageUrl = formData.subabaseORImageUrl;
                               const isSupabaseImage = imageUrl.includes('supabase.co/storage');
+                              const hasOriginal = originalImageUrl && originalImageUrl !== imageUrl;
 
-                              if (window.confirm('هل تريد مسح الصورة؟' + (isSupabaseImage ? '\n\nسيتم حذف الصورة من التخزين فوراً.' : ''))) {
+                              let confirmMessage = 'هل تريد مسح الصورة؟';
+                              if (isSupabaseImage) {
+                                confirmMessage += '\n\nسيتم حذف الصورة من التخزين فوراً.';
+                              }
+                              if (hasOriginal) {
+                                confirmMessage += '\n\nسيتم الرجوع للصورة الأصلية.';
+                              }
+
+                              if (window.confirm(confirmMessage)) {
                                 if (isSupabaseImage) {
                                   toast.info('جاري حذف الصورة...');
                                   const result = await deleteImageFromSupabase(imageUrl);
 
                                   if (result.success) {
                                     toast.success('تم حذف الصورة بنجاح');
-                                    setFormData({ ...formData, subabaseImageUrl: '' });
+                                    
+                                    // إذا كان فيه صورة أصلية، نرجع لها
+                                    if (hasOriginal) {
+                                      setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                    } else {
+                                      setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                    }
                                   } else {
                                     toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
                                   }
                                 } else {
-                                  setFormData({ ...formData, subabaseImageUrl: '' });
+                                  // إذا كان فيه صورة أصلية، نرجع لها
+                                  if (hasOriginal) {
+                                    setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                  } else {
+                                    setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                  }
                                   toast.success('تم إزالة الصورة');
                                 }
                               }

@@ -62,6 +62,7 @@ export default function AdminMedicines() {
     category: '',
     manufacturer: '',
     subabaseImageUrl: '',
+    subabaseORImageUrl: '', // الصورة الأصلية قبل إزالة الخلفية
     avgRating: 0,
     ratingCount: 0,
     discountRating: 0,
@@ -85,6 +86,7 @@ export default function AdminMedicines() {
         category: medicine.category || '',
         manufacturer: medicine.manufacturer || '',
         subabaseImageUrl: (medicine as any).subabaseImageUrl || medicine.subabaseORImageUrl || '',
+        subabaseORImageUrl: medicine.subabaseORImageUrl || '',
         avgRating: medicine.avgRating,
         ratingCount: medicine.ratingCount,
         discountRating: medicine.discountRating,
@@ -108,6 +110,7 @@ export default function AdminMedicines() {
         category: '',
         manufacturer: '',
         subabaseImageUrl: '',
+        subabaseORImageUrl: '',
         avgRating: 0,
         ratingCount: 0,
         discountRating: 0,
@@ -246,17 +249,20 @@ export default function AdminMedicines() {
       // Convert blob to file
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
       
-      // Delete old image if it's from Supabase
-      if (formData.subabaseImageUrl.includes('supabase.co/storage')) {
-        await deleteImageFromSupabase(formData.subabaseImageUrl);
-      }
-      
-      // Upload new image without background
+      // رفع الصورة الجديدة بدون حذف القديمة
       const uploadResult = await uploadImageToSupabase(file);
       
       if (uploadResult.success && uploadResult.url) {
-        setFormData({ ...formData, subabaseImageUrl: uploadResult.url });
-        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
+        // حفظ الصورة الأصلية في subabaseORImageUrl إذا لم تكن محفوظة
+        const originalImageUrl = formData.subabaseORImageUrl || formData.subabaseImageUrl;
+        
+        setFormData({ 
+          ...formData, 
+          subabaseImageUrl: uploadResult.url,
+          subabaseORImageUrl: originalImageUrl
+        });
+        
+        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
         toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
       }
@@ -775,6 +781,15 @@ export default function AdminMedicines() {
                   {/* Image Preview - Shows when URL is valid */}
                   {formData.subabaseImageUrl && formData.subabaseImageUrl.trim() && (
                     <div className="space-y-3">
+                      {/* Badge للصورة المعالجة */}
+                      {formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                          <span className="text-purple-600 text-sm font-cairo">
+                            ✨ صورة بدون خلفية - يمكنك حذفها والرجوع للأصلية
+                          </span>
+                        </div>
+                      )}
+                      
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         <img 
                           src={formData.subabaseImageUrl} 
@@ -795,19 +810,6 @@ export default function AdminMedicines() {
                         <div className="absolute top-2 right-2 flex gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              if (window.confirm('هل تريد حذف الصورة؟')) {
-                                setFormData({ ...formData, subabaseImageUrl: '' });
-                                toast.success('تم حذف الصورة');
-                              }
-                            }}
-                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all font-bold"
-                            title="حذف الصورة"
-                          >
-                            ×
-                          </button>
-                          <button
-                            type="button"
                             onClick={handleRemoveBackground}
                             disabled={isRemovingBg}
                             className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
@@ -824,6 +826,55 @@ export default function AdminMedicines() {
                                 <span>حذف الخلفية</span>
                               </>
                             )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const imageUrl = formData.subabaseImageUrl;
+                              const originalImageUrl = formData.subabaseORImageUrl;
+                              const isSupabaseImage = imageUrl.includes('supabase.co/storage');
+                              const hasOriginal = originalImageUrl && originalImageUrl !== imageUrl;
+
+                              let confirmMessage = 'هل تريد مسح الصورة؟';
+                              if (isSupabaseImage) {
+                                confirmMessage += '\n\nسيتم حذف الصورة من التخزين فوراً.';
+                              }
+                              if (hasOriginal) {
+                                confirmMessage += '\n\nسيتم الرجوع للصورة الأصلية.';
+                              }
+
+                              if (window.confirm(confirmMessage)) {
+                                if (isSupabaseImage) {
+                                  toast.info('جاري حذف الصورة...');
+                                  const result = await deleteImageFromSupabase(imageUrl);
+
+                                  if (result.success) {
+                                    toast.success('تم حذف الصورة بنجاح');
+                                    
+                                    // إذا كان فيه صورة أصلية، نرجع لها
+                                    if (hasOriginal) {
+                                      setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                    } else {
+                                      setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                    }
+                                  } else {
+                                    toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
+                                  }
+                                } else {
+                                  // إذا كان فيه صورة أصلية، نرجع لها
+                                  if (hasOriginal) {
+                                    setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                  } else {
+                                    setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                  }
+                                  toast.success('تم إزالة الصورة');
+                                }
+                              }
+                            }}
+                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
+                            title="حذف الصورة"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
