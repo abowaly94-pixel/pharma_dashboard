@@ -534,7 +534,8 @@ export default function AdminPharmacies() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent
             className="max-w-2xl max-h-[90vh] overflow-y-auto"
-            onPointerDownOutside={() => setIsDialogOpen(false)}
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">

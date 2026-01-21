@@ -87,9 +87,7 @@ function validateMedicineInput(input: CreateMedicineInput): void {
   if (input.quantity < 0) {
     throw new ValidationError('الكمية يجب أن تكون صفر أو أكثر', 'quantity', 'OUT_OF_RANGE');
   }
-  if (!input.category) {
-    throw new ValidationError('فئة الدواء مطلوبة', 'category', 'REQUIRED');
-  }
+  // Category is optional - removed validation
 }
 
 /**

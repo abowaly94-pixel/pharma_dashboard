@@ -158,11 +158,6 @@ export default function PharmacistMedicines() {
       return;
     }
 
-    if (!formData.category || formData.category.trim() === '') {
-      toast.error('فئة الدواء مطلوبة');
-      return;
-    }
-
     if (formData.price <= 0) {
       toast.error('السعر يجب أن يكون أكبر من صفر');
       return;
@@ -671,22 +666,6 @@ export default function PharmacistMedicines() {
 
                   {/* Content */}
                   <CardContent className="p-4 space-y-3">
-                    {/* Status Bar - شريط الحالة الكبير */}
-                    <div className="mb-3">
-                      {medicineStatus === 'rejected' && (
-                        <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                          <XCircle className="w-4 h-4 text-red-600" />
-                          <span className="text-xs font-bold text-red-700 font-cairo">❌ تم الرفض من الأدمن</span>
-                        </div>
-                      )}
-                      {medicineStatus === 'approved' && (
-                        <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span className="text-xs font-bold text-green-700 font-cairo">✅ موافق عليه ومتاح</span>
-                        </div>
-                      )}
-                    </div>
-
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 mb-1">{medicine.name}</h3>
@@ -765,7 +744,8 @@ export default function PharmacistMedicines() {
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
           <DialogContent
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
-            onPointerDownOutside={() => setIsAddEditDialogOpen(false)}
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
@@ -863,13 +843,12 @@ export default function PharmacistMedicines() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category" className="font-cairo text-sm font-semibold text-gray-700">الفئة *</Label>
+                    <Label htmlFor="category" className="font-cairo text-sm font-semibold text-gray-700">الفئة</Label>
                     <Input
                       id="category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       placeholder="مسكنات، مضادات..."
-                      required
                       className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>

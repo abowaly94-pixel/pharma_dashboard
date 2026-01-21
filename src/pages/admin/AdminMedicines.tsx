@@ -522,7 +522,8 @@ export default function AdminMedicines() {
         <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
           <DialogContent 
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
-            onPointerDownOutside={() => setIsAddEditDialogOpen(false)}
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">

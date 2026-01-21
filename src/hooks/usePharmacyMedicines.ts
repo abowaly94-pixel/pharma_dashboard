@@ -298,8 +298,6 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           toast.error('اسم الدواء مطلوب (حرفين على الأقل)');
         } else if (error.message.includes('وصف الدواء')) {
           toast.error('وصف الدواء مطلوب (10 أحرف على الأقل)');
-        } else if (error.message.includes('فئة الدواء')) {
-          toast.error('فئة الدواء مطلوبة');
         } else if (error.message.includes('السعر')) {
           toast.error('السعر يجب أن يكون أكبر من صفر');
         } else if (error.message.includes('الكمية')) {
