@@ -8,6 +8,11 @@ import {
   Package,
   Building2,
   Calendar,
+  Edit,
+  Trash2,
+  Image as ImageIcon,
+  MapPin,
+  Star,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -34,6 +39,9 @@ import { useMedicineApproval } from '@/hooks/useMedicineApproval';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MedicineWithApproval } from '@/types';
 import { toast } from 'sonner';
+import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function AdminMedicineReview() {
   const {
@@ -56,6 +64,24 @@ export default function AdminMedicineReview() {
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [selectedMedicineIds, setSelectedMedicineIds] = useState<Set<string>>(new Set());
   const [isBulkApproving, setIsBulkApproving] = useState(false);
+  
+  // Edit dialog states
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMedicine, setEditingMedicine] = useState<MedicineWithApproval | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+    price: 0,
+    quantity: 0,
+    category: '',
+    manufacturer: '',
+    subabaseImageUrl: '',
+    subabaseORImageUrl: '',
+  });
 
   const approvedMedicines = allMedicines.filter(m => m.status === 'approved');
   const rejectedMedicines = allMedicines.filter(m => m.status === 'rejected');
@@ -65,6 +91,132 @@ export default function AdminMedicineReview() {
     setReviewAction(action);
     setRejectionNotes('');
     setIsReviewDialogOpen(true);
+  };
+
+  const handleOpenEdit = (medicine: MedicineWithApproval) => {
+    setImageLoadError(false);
+    setEditingMedicine(medicine);
+    setEditFormData({
+      name: medicine.name,
+      code: medicine.code,
+      description: medicine.description,
+      price: medicine.price,
+      quantity: medicine.quantity,
+      category: medicine.category || '',
+      manufacturer: medicine.manufacturer || '',
+      subabaseImageUrl: medicine.subabaseImageUrl || medicine.subabaseORImageUrl || '',
+      subabaseORImageUrl: medicine.subabaseORImageUrl || '',
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMedicine) return;
+
+    if (!editFormData.subabaseImageUrl || editFormData.subabaseImageUrl.trim() === '') {
+      toast.error('يجب وجود صورة للدواء');
+      return;
+    }
+
+    try {
+      // Update medicine in pending_medicines collection
+      const medicineRef = doc(db, 'pending_medicines', editingMedicine.id);
+      await updateDoc(medicineRef, {
+        name: editFormData.name.trim(),
+        description: editFormData.description.trim(),
+        price: editFormData.price,
+        quantity: editFormData.quantity,
+        category: editFormData.category,
+        manufacturer: editFormData.manufacturer || '',
+        subabaseImageUrl: editFormData.subabaseImageUrl,
+        subabaseORImageUrl: editFormData.subabaseORImageUrl || editFormData.subabaseImageUrl,
+        updatedAt: serverTimestamp(),
+      });
+
+      toast.success('تم تحديث الدواء بنجاح');
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating medicine:', error);
+      toast.error('حدث خطأ أثناء تحديث الدواء');
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    toast.info('جاري رفع الصورة...');
+
+    try {
+      const result = await uploadImageToSupabase(file);
+      
+      if (result.success && result.url) {
+        setEditFormData({ ...editFormData, subabaseImageUrl: result.url });
+        toast.success('تم رفع الصورة بنجاح!');
+      } else {
+        toast.error(result.error || 'فشل رفع الصورة');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!editFormData.subabaseImageUrl) {
+      toast.error('لا توجد صورة لإزالة الخلفية منها');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    toast.info('جاري إزالة الخلفية... قد يستغرق بضع ثوانٍ');
+
+    try {
+      const result = await removeImageBackground(editFormData.subabaseImageUrl);
+      
+      if (!result.success || !result.blob) {
+        toast.error(result.error || 'فشل إزالة الخلفية');
+        setIsRemovingBg(false);
+        return;
+      }
+
+      const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
+      
+      const currentImageUrl = editFormData.subabaseImageUrl;
+      
+      // Delete old image from Supabase if it exists
+      if (currentImageUrl.includes('supabase.co/storage')) {
+        await deleteImageFromSupabase(currentImageUrl);
+      }
+      
+      // Upload new processed image
+      const uploadResult = await uploadImageToSupabase(file);
+      
+      if (uploadResult.success && uploadResult.url) {
+        const savedOriginalUrl = editFormData.subabaseORImageUrl || 
+                                 (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
+        
+        setEditFormData({ 
+          ...editFormData, 
+          subabaseImageUrl: uploadResult.url,
+          subabaseORImageUrl: savedOriginalUrl
+        });
+        
+        toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
+      } else {
+        toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
+      }
+    } catch (error) {
+      console.error('Error removing background:', error);
+      toast.error('حدث خطأ أثناء إزالة الخلفية');
+    } finally {
+      setIsRemovingBg(false);
+    }
   };
 
   const handleSubmitReview = async () => {
@@ -426,6 +578,14 @@ export default function AdminMedicineReview() {
                     <div className="flex gap-2 pt-2">
                       <Button
                         size="sm"
+                        onClick={() => handleOpenEdit(medicine)}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Edit className="w-4 h-4 ml-1" />
+                        تعديل
+                      </Button>
+                      <Button
+                        size="sm"
                         onClick={() => handleOpenReview(medicine, 'approve')}
                         className="flex-1 bg-green-600 hover:bg-green-700"
                       >
@@ -514,6 +674,290 @@ export default function AdminMedicineReview() {
                 </DialogFooter>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-cairo text-xl">
+                تعديل الدواء قبل الموافقة
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmitEdit} className="space-y-5">
+              {/* Basic Info */}
+              <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  المعلومات الأساسية
+                </h3>
+                
+                <div className="grid grid-cols-[2fr,1fr] gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name" className="font-cairo text-sm font-semibold text-gray-700">اسم الدواء *</Label>
+                    <Input
+                      id="edit-name"
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      required
+                      placeholder="أدخل اسم الدواء"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-code" className="font-cairo text-sm font-semibold text-gray-700">الكود</Label>
+                    <Input
+                      id="edit-code"
+                      value={editFormData.code}
+                      readOnly
+                      disabled
+                      className="h-10 bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description" className="font-cairo text-sm font-semibold text-gray-700">الوصف</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    rows={3}
+                    placeholder="أضف وصف تفصيلي للدواء..."
+                    className="text-sm resize-none bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-price" className="font-cairo text-sm font-semibold text-gray-700">السعر (ج.م) *</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editFormData.price === 0 ? '' : editFormData.price}
+                      onChange={(e) => setEditFormData({ ...editFormData, price: parseFloat(e.target.value) || 0 })}
+                      required
+                      placeholder="أدخل السعر"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-quantity" className="font-cairo text-sm font-semibold text-gray-700">الكمية *</Label>
+                    <Input
+                      id="edit-quantity"
+                      type="number"
+                      min="0"
+                      value={editFormData.quantity === 0 ? '' : editFormData.quantity}
+                      onChange={(e) => setEditFormData({ ...editFormData, quantity: parseInt(e.target.value) || 0 })}
+                      required
+                      placeholder="أدخل الكمية"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-category" className="font-cairo text-sm font-semibold text-gray-700">الفئة</Label>
+                    <Input
+                      id="edit-category"
+                      value={editFormData.category}
+                      onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                      placeholder="مسكنات، مضادات..."
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-manufacturer" className="font-cairo text-sm font-semibold text-gray-700">الشركة المصنعة</Label>
+                    <Input
+                      id="edit-manufacturer"
+                      value={editFormData.manufacturer}
+                      onChange={(e) => setEditFormData({ ...editFormData, manufacturer: e.target.value })}
+                      placeholder="اسم الشركة"
+                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Medicine Image */}
+              <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
+                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-amber-600" />
+                  صورة الدواء *
+                </h3>
+                
+                <div className="space-y-3">
+                  {/* Upload Button */}
+                  <div className="relative">
+                    <label className={`block ${editFormData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
+                        editFormData.subabaseImageUrl 
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                          : isUploading
+                            ? 'bg-amber-400 text-white cursor-wait'
+                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
+                      }`}>
+                        {isUploading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>جاري الرفع...</span>
+                          </>
+                        ) : editFormData.subabaseImageUrl ? (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>يوجد صورة - احذفها للتغيير</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-4 h-4" />
+                            <span>📤 رفع صورة من الجهاز</span>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading || !!editFormData.subabaseImageUrl}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  
+                  {/* Divider */}
+                  {!editFormData.subabaseImageUrl && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-amber-300"></div>
+                      <span className="text-sm text-gray-600 font-cairo font-semibold">أو</span>
+                      <div className="flex-1 h-px bg-amber-300"></div>
+                    </div>
+                  )}
+                  
+                  {/* URL Input - Hidden if image is from Supabase */}
+                  {!editFormData.subabaseImageUrl.includes('supabase.co/storage') && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
+                      <Input 
+                        type="url"
+                        value={editFormData.subabaseImageUrl}
+                        onChange={(e) => {
+                          setEditFormData({ ...editFormData, subabaseImageUrl: e.target.value });
+                          setImageLoadError(false);
+                        }}
+                        placeholder="https://example.com/image.jpg"
+                        className="h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Image Preview */}
+                  {editFormData.subabaseImageUrl && editFormData.subabaseImageUrl.trim() && (
+                    <div className="space-y-3">
+                      {/* Badge for processed image */}
+                      {editFormData.subabaseORImageUrl && editFormData.subabaseORImageUrl !== editFormData.subabaseImageUrl && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                          <span className="text-purple-600 text-sm font-cairo">
+                            ✨ صورة بدون خلفية - يمكنك حذفها والرجوع للأصلية
+                          </span>
+                        </div>
+                      )}
+                      
+                      <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
+                        {!imageLoadError ? (
+                          <img 
+                            src={editFormData.subabaseImageUrl} 
+                            alt="Preview" 
+                            className="w-full h-full object-contain p-3"
+                            onError={() => setImageLoadError(true)}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">⚠️</div>
+                              <div className="font-bold">صورة غير صالحة</div>
+                              <div className="text-xs mt-1">تأكد من صحة الرابط</div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          {/* Remove background button */}
+                          {!imageLoadError && !(editFormData.subabaseORImageUrl && editFormData.subabaseORImageUrl !== editFormData.subabaseImageUrl) && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveBackground}
+                              disabled={isRemovingBg}
+                              className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
+                            >
+                              {isRemovingBg ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  <span>جاري...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>✨</span>
+                                  <span>حذف الخلفية</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const imageUrl = editFormData.subabaseImageUrl;
+                              const originalImageUrl = editFormData.subabaseORImageUrl;
+                              const isSupabaseImage = imageUrl.includes('supabase.co/storage');
+                              const hasOriginal = originalImageUrl && originalImageUrl !== imageUrl;
+
+                              if (window.confirm('هل تريد مسح الصورة؟')) {
+                                if (isSupabaseImage) {
+                                  await deleteImageFromSupabase(imageUrl);
+                                }
+                                
+                                if (hasOriginal && originalImageUrl.includes('supabase.co/storage')) {
+                                  await deleteImageFromSupabase(originalImageUrl);
+                                }
+                                
+                                if (hasOriginal && !originalImageUrl.includes('supabase.co/storage')) {
+                                  setEditFormData({ ...editFormData, subabaseImageUrl: originalImageUrl });
+                                } else {
+                                  setEditFormData({ ...editFormData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                }
+                                
+                                toast.success('تم حذف الصورة');
+                              }
+                            }}
+                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
+                >
+                  إلغاء
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={!editFormData.subabaseImageUrl}
+                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  💾 حفظ التعديلات
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

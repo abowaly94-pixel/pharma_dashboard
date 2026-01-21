@@ -63,6 +63,7 @@ export default function PharmacistMedicines() {
   const [editingMedicine, setEditingMedicine] = useState<MedicineWithApproval | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -92,6 +93,9 @@ export default function PharmacistMedicines() {
   });
 
   const handleOpenAddEdit = (medicine?: MedicineWithApproval) => {
+    // Reset image error state
+    setImageLoadError(false);
+    
     if (medicine) {
       setEditingMedicine(medicine);
       setFormData({
@@ -287,34 +291,81 @@ export default function PharmacistMedicines() {
     toast.info('جاري إزالة الخلفية... قد يستغرق بضع ثوانٍ');
 
     try {
+      console.log('🎨 بدء إزالة الخلفية للصورة:', formData.subabaseImageUrl);
+      
       const result = await removeImageBackground(formData.subabaseImageUrl);
 
       if (!result.success || !result.blob) {
+        console.error('❌ فشل إزالة الخلفية:', result.error);
         toast.error(result.error || 'فشل إزالة الخلفية');
+        setIsRemovingBg(false);
         return;
       }
 
+      console.log('✅ تمت إزالة الخلفية بنجاح');
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
 
-      // رفع الصورة الجديدة بدون حذف القديمة
+      // حذف الصورة القديمة من Supabase إذا كانت موجودة
+      const currentImageUrl = formData.subabaseImageUrl;
+      const originalImageUrl = formData.subabaseORImageUrl;
+      
+      console.log('📋 معلومات الصور:', {
+        currentImageUrl,
+        originalImageUrl,
+        isFromSupabase: currentImageUrl.includes('supabase.co/storage')
+      });
+      
+      // احذف الصورة الحالية إذا كانت من Supabase
+      // (سواء كانت معالجة سابقة أو صورة أصلية من Supabase)
+      if (currentImageUrl.includes('supabase.co/storage')) {
+        console.log('🗑️ حذف الصورة القديمة من Supabase:', currentImageUrl);
+        toast.info('جاري حذف الصورة القديمة...');
+        
+        const deleteResult = await deleteImageFromSupabase(currentImageUrl);
+        
+        if (deleteResult.success) {
+          console.log('✅ تم حذف الصورة القديمة بنجاح');
+          toast.success('تم حذف الصورة القديمة');
+        } else {
+          console.error('❌ فشل حذف الصورة القديمة:', deleteResult.error);
+          toast.warning('تحذير: فشل حذف الصورة القديمة، لكن سنكمل رفع الجديدة');
+        }
+      } else {
+        console.log('ℹ️ الصورة الحالية ليست من Supabase، لن يتم حذفها');
+      }
+
+      // رفع الصورة الجديدة
+      console.log('📤 رفع الصورة المعالجة الجديدة...');
+      toast.info('جاري رفع الصورة المعالجة...');
+      
       const uploadResult = await uploadImageToSupabase(file);
 
       if (uploadResult.success && uploadResult.url) {
+        console.log('✅ تم رفع الصورة المعالجة بنجاح:', uploadResult.url);
+        
         // حفظ الصورة الأصلية في subabaseORImageUrl إذا لم تكن محفوظة
-        const originalImageUrl = formData.subabaseORImageUrl || formData.subabaseImageUrl;
+        // إذا كانت الصورة الأصلية من الإنترنت (ليست من Supabase)، احتفظ بها
+        const savedOriginalUrl = originalImageUrl || 
+                                 (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
+        
+        console.log('💾 حفظ البيانات:', {
+          newImageUrl: uploadResult.url,
+          savedOriginalUrl
+        });
         
         setFormData({ 
           ...formData, 
           subabaseImageUrl: uploadResult.url,
-          subabaseORImageUrl: originalImageUrl
+          subabaseORImageUrl: savedOriginalUrl
         });
         
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
+        console.error('❌ فشل رفع الصورة المعالجة:', uploadResult.error);
         toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
       }
     } catch (error) {
-      console.error('Error removing background:', error);
+      console.error('❌ خطأ في إزالة الخلفية:', error);
       toast.error('حدث خطأ أثناء إزالة الخلفية');
     } finally {
       setIsRemovingBg(false);
@@ -354,14 +405,6 @@ export default function PharmacistMedicines() {
             <p className="text-muted-foreground">إدارة أدوية الصيدلية ({medicines.length} دواء)</p>
           </div>
           <div className="flex gap-2">
-            <Button
-              onClick={checkCanAdd}
-              variant="outline"
-              className="font-cairo"
-              title="تحديث معلومات الحد الأقصى"
-            >
-              🔄 تحديث
-            </Button>
             <Button
               onClick={() => handleOpenAddEdit()}
               className="gradient-primary text-primary-foreground font-cairo"
@@ -630,12 +673,6 @@ export default function PharmacistMedicines() {
                   <CardContent className="p-4 space-y-3">
                     {/* Status Bar - شريط الحالة الكبير */}
                     <div className="mb-3">
-                      {medicineStatus === 'pending' && (
-                        <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                          <Clock className="w-4 h-4 text-orange-600" />
-                          <span className="text-xs font-bold text-orange-700 font-cairo">⏳ في انتظار موافقة الأدمن</span>
-                        </div>
-                      )}
                       {medicineStatus === 'rejected' && (
                         <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
                           <XCircle className="w-4 h-4 text-red-600" />
@@ -970,46 +1007,21 @@ export default function PharmacistMedicines() {
                     </div>
                   )}
 
-                  {/* URL Input */}
-                  {!formData.subabaseImageUrl && (
+                  {/* URL Input - Hidden if image is from Supabase (processed) for security */}
+                  {!formData.subabaseImageUrl.includes('supabase.co/storage') && (
                     <div className="space-y-2">
                       <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="imageUrlInputPharmacist"
-                          type="url"
-                          placeholder="https://example.com/image.jpg"
-                          className="flex-1 h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const input = e.currentTarget as HTMLInputElement;
-                              if (input.value.trim()) {
-                                setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
-                                input.value = '';
-                                toast.success('تم إضافة رابط الصورة');
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            const input = document.getElementById('imageUrlInputPharmacist') as HTMLInputElement;
-                            if (input && input.value.trim()) {
-                              setFormData({ ...formData, subabaseImageUrl: input.value.trim() });
-                              input.value = '';
-                              toast.success('تم إضافة رابط الصورة');
-                            } else {
-                              toast.error('الرجاء إدخال رابط صحيح');
-                            }
-                          }}
-                          className="h-10 px-5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-cairo font-bold shadow-md"
-                        >
-                          إضافة
-                        </Button>
-                      </div>
+                      <Input
+                        id="imageUrlInputPharmacist"
+                        type="url"
+                        value={formData.subabaseImageUrl}
+                        onChange={(e) => {
+                          setFormData({ ...formData, subabaseImageUrl: e.target.value });
+                          setImageLoadError(false); // Reset error when URL changes
+                        }}
+                        placeholder="https://example.com/image.jpg"
+                        className="h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                      />
                     </div>
                   )}
 
@@ -1026,39 +1038,47 @@ export default function PharmacistMedicines() {
                       )}
                       
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
-                        <img
-                          src={formData.subabaseImageUrl}
-                          alt="Preview"
-                          className="w-full h-full object-contain p-3"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo"><div class="text-center"><div class="text-4xl mb-2">⚠️</div><div class="font-bold">صورة غير صالحة</div><div class="text-xs mt-1">تأكد من صحة الرابط</div></div></div>';
-                            }
-                          }}
-                        />
+                        {!imageLoadError ? (
+                          <img
+                            src={formData.subabaseImageUrl}
+                            alt="Preview"
+                            className="w-full h-full object-contain p-3"
+                            onError={() => {
+                              setImageLoadError(true);
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">⚠️</div>
+                              <div className="font-bold">صورة غير صالحة</div>
+                              <div className="text-xs mt-1">تأكد من صحة الرابط</div>
+                            </div>
+                          </div>
+                        )}
                         <div className="absolute top-2 right-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleRemoveBackground}
-                            disabled={isRemovingBg}
-                            className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
-                            title="إزالة خلفية الصورة"
-                          >
-                            {isRemovingBg ? (
-                              <>
-                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>جاري...</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>✨</span>
-                                <span>حذف الخلفية</span>
-                              </>
-                            )}
-                          </button>
+                          {/* زر حذف الخلفية - يُخفى إذا كانت الصورة معالجة بالفعل أو فاشلة */}
+                          {!imageLoadError && !(formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl) && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveBackground}
+                              disabled={isRemovingBg}
+                              className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
+                              title="إزالة خلفية الصورة"
+                            >
+                              {isRemovingBg ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  <span>جاري...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>✨</span>
+                                  <span>حذف الخلفية</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={async () => {
@@ -1076,29 +1096,43 @@ export default function PharmacistMedicines() {
                               }
 
                               if (window.confirm(confirmMessage)) {
+                                // حذف الصورة الحالية من Supabase
                                 if (isSupabaseImage) {
+                                  console.log('🗑️ حذف الصورة الحالية:', imageUrl);
                                   toast.info('جاري حذف الصورة...');
                                   const result = await deleteImageFromSupabase(imageUrl);
 
                                   if (result.success) {
+                                    console.log('✅ تم حذف الصورة الحالية بنجاح');
                                     toast.success('تم حذف الصورة بنجاح');
-                                    
-                                    // إذا كان فيه صورة أصلية، نرجع لها
-                                    if (hasOriginal) {
-                                      setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
-                                    } else {
-                                      setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
-                                    }
                                   } else {
+                                    console.error('❌ فشل حذف الصورة الحالية:', result.error);
                                     toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
                                   }
-                                } else {
-                                  // إذا كان فيه صورة أصلية، نرجع لها
-                                  if (hasOriginal) {
-                                    setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                }
+                                
+                                // حذف الصورة الأصلية من Supabase إذا كانت موجودة ومختلفة
+                                if (hasOriginal && originalImageUrl.includes('supabase.co/storage')) {
+                                  console.log('🗑️ حذف الصورة الأصلية:', originalImageUrl);
+                                  const originalResult = await deleteImageFromSupabase(originalImageUrl);
+                                  
+                                  if (originalResult.success) {
+                                    console.log('✅ تم حذف الصورة الأصلية بنجاح');
                                   } else {
-                                    setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                    console.error('❌ فشل حذف الصورة الأصلية:', originalResult.error);
                                   }
+                                }
+                                
+                                // تحديث الـ state
+                                if (hasOriginal && !originalImageUrl.includes('supabase.co/storage')) {
+                                  // إذا كانت الصورة الأصلية من الإنترنت، نرجع لها
+                                  setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
+                                } else {
+                                  // إذا لا، نفرغ الحقول
+                                  setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
+                                }
+                                
+                                if (!isSupabaseImage) {
                                   toast.success('تم إزالة الصورة');
                                 }
                               }
@@ -1109,16 +1143,6 @@ export default function PharmacistMedicines() {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                      </div>
-
-                      {/* URL Display */}
-                      <div className="space-y-1">
-                        <Label className="text-xs font-cairo text-gray-600">رابط الصورة</Label>
-                        <Input
-                          value={formData.subabaseImageUrl}
-                          readOnly
-                          className="h-9 text-xs bg-gray-50 cursor-default border-gray-300"
-                        />
                       </div>
                     </div>
                   )}
