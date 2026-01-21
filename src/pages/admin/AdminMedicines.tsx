@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -51,6 +51,7 @@ export default function AdminMedicines() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
+  const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -72,9 +73,50 @@ export default function AdminMedicines() {
     reviews: []
   });
 
+  // Restore dialog state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('admin_medicine_dialog_state');
+    if (savedState) {
+      try {
+        const { isOpen, formData: savedFormData, editingMedicineId } = JSON.parse(savedState);
+        if (isOpen) {
+          setIsAddEditDialogOpen(true);
+          setFormData(savedFormData);
+          
+          // If editing, find the medicine by ID
+          if (editingMedicineId) {
+            const medicine = medicines.find(m => m.id === editingMedicineId);
+            if (medicine) {
+              setEditingMedicine(medicine);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to restore dialog state:', error);
+        localStorage.removeItem('admin_medicine_dialog_state');
+      }
+    }
+  }, [medicines]);
+
+  // Save dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (isAddEditDialogOpen) {
+      const stateToSave = {
+        isOpen: true,
+        formData,
+        editingMedicineId: editingMedicine?.id || null,
+      };
+      localStorage.setItem('admin_medicine_dialog_state', JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem('admin_medicine_dialog_state');
+    }
+  }, [isAddEditDialogOpen, formData, editingMedicine]);
+
   const handleOpenAddEdit = (medicine?: Medicine) => {
     // Reset image error state
     setImageLoadError(false);
+    // Reset uploaded images tracker
+    setUploadedImagesInSession([]);
     
     if (medicine) {
       setEditingMedicine(medicine);
@@ -216,6 +258,8 @@ export default function AdminMedicines() {
       
       if (result.success && result.url) {
         setFormData({ ...formData, subabaseImageUrl: result.url });
+        // تتبع الصورة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, result.url]);
         toast.success('تم رفع الصورة بنجاح!');
         console.log('✅ Upload success:', result.url);
       } else {
@@ -312,6 +356,9 @@ export default function AdminMedicines() {
           subabaseORImageUrl: savedOriginalUrl
         });
         
+        // تتبع الصورة المعالجة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, uploadResult.url]);
+        
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
         console.error('❌ فشل رفع الصورة المعالجة:', uploadResult.error);
@@ -323,6 +370,30 @@ export default function AdminMedicines() {
     } finally {
       setIsRemovingBg(false);
     }
+  };
+
+  // حذف الصور المرفوعة في الجلسة الحالية عند الإلغاء
+  const handleCancelDialog = async () => {
+    if (uploadedImagesInSession.length > 0) {
+      console.log('🗑️ حذف الصور المرفوعة في الجلسة:', uploadedImagesInSession);
+      toast.info('جاري حذف الصور المرفوعة...');
+      
+      for (const imageUrl of uploadedImagesInSession) {
+        if (imageUrl.includes('supabase.co/storage')) {
+          const result = await deleteImageFromSupabase(imageUrl);
+          if (result.success) {
+            console.log('✅ تم حذف الصورة:', imageUrl);
+          } else {
+            console.error('❌ فشل حذف الصورة:', imageUrl, result.error);
+          }
+        }
+      }
+      
+      toast.success('تم حذف الصور المرفوعة');
+    }
+    
+    setUploadedImagesInSession([]);
+    setIsAddEditDialogOpen(false);
   };
 
   return (
@@ -519,7 +590,11 @@ export default function AdminMedicines() {
         )}
 
         {/* Add/Edit Dialog */}
-        <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+        <Dialog open={isAddEditDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            handleCancelDialog();
+          }
+        }}>
           <DialogContent 
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
@@ -962,7 +1037,7 @@ export default function AdminMedicines() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsAddEditDialogOpen(false)}
+                  onClick={handleCancelDialog}
                   className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
                 >
                   إلغاء

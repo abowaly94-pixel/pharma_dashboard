@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -71,6 +71,7 @@ export default function AdminMedicineReview() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
   const [editFormData, setEditFormData] = useState({
     name: '',
     code: '',
@@ -82,6 +83,45 @@ export default function AdminMedicineReview() {
     subabaseImageUrl: '',
     subabaseORImageUrl: '',
   });
+
+  // Restore edit dialog state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('admin_medicine_review_edit_dialog_state');
+    if (savedState) {
+      try {
+        const { isOpen, editFormData: savedFormData, editingMedicineId } = JSON.parse(savedState);
+        if (isOpen) {
+          setIsEditDialogOpen(true);
+          setEditFormData(savedFormData);
+          
+          // If editing, find the medicine by ID
+          if (editingMedicineId) {
+            const medicine = allMedicines.find(m => m.id === editingMedicineId);
+            if (medicine) {
+              setEditingMedicine(medicine);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to restore edit dialog state:', error);
+        localStorage.removeItem('admin_medicine_review_edit_dialog_state');
+      }
+    }
+  }, [allMedicines]);
+
+  // Save edit dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (isEditDialogOpen) {
+      const stateToSave = {
+        isOpen: true,
+        editFormData,
+        editingMedicineId: editingMedicine?.id || null,
+      };
+      localStorage.setItem('admin_medicine_review_edit_dialog_state', JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem('admin_medicine_review_edit_dialog_state');
+    }
+  }, [isEditDialogOpen, editFormData, editingMedicine]);
 
   const approvedMedicines = allMedicines.filter(m => m.status === 'approved');
   const rejectedMedicines = allMedicines.filter(m => m.status === 'rejected');
@@ -95,6 +135,8 @@ export default function AdminMedicineReview() {
 
   const handleOpenEdit = (medicine: MedicineWithApproval) => {
     setImageLoadError(false);
+    // Reset uploaded images tracker
+    setUploadedImagesInSession([]);
     setEditingMedicine(medicine);
     setEditFormData({
       name: medicine.name,
@@ -154,6 +196,8 @@ export default function AdminMedicineReview() {
       
       if (result.success && result.url) {
         setEditFormData({ ...editFormData, subabaseImageUrl: result.url });
+        // تتبع الصورة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, result.url]);
         toast.success('تم رفع الصورة بنجاح!');
       } else {
         toast.error(result.error || 'فشل رفع الصورة');
@@ -207,6 +251,9 @@ export default function AdminMedicineReview() {
           subabaseORImageUrl: savedOriginalUrl
         });
         
+        // تتبع الصورة المعالجة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, uploadResult.url]);
+        
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉');
       } else {
         toast.error(uploadResult.error || 'فشل رفع الصورة بعد إزالة الخلفية');
@@ -217,6 +264,30 @@ export default function AdminMedicineReview() {
     } finally {
       setIsRemovingBg(false);
     }
+  };
+
+  // حذف الصور المرفوعة في الجلسة الحالية عند الإلغاء
+  const handleCancelEditDialog = async () => {
+    if (uploadedImagesInSession.length > 0) {
+      console.log('🗑️ حذف الصور المرفوعة في الجلسة:', uploadedImagesInSession);
+      toast.info('جاري حذف الصور المرفوعة...');
+      
+      for (const imageUrl of uploadedImagesInSession) {
+        if (imageUrl.includes('supabase.co/storage')) {
+          const result = await deleteImageFromSupabase(imageUrl);
+          if (result.success) {
+            console.log('✅ تم حذف الصورة:', imageUrl);
+          } else {
+            console.error('❌ فشل حذف الصورة:', imageUrl, result.error);
+          }
+        }
+      }
+      
+      toast.success('تم حذف الصور المرفوعة');
+    }
+    
+    setUploadedImagesInSession([]);
+    setIsEditDialogOpen(false);
   };
 
   const handleSubmitReview = async () => {
@@ -611,7 +682,11 @@ export default function AdminMedicineReview() {
 
         {/* Review Dialog */}
         <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent 
+            className="max-w-md"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo">
                 {reviewAction === 'approve' ? 'الموافقة على الدواء' : 'رفض الدواء'}
@@ -678,8 +753,16 @@ export default function AdminMedicineReview() {
         </Dialog>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            handleCancelEditDialog();
+          }
+        }}>
+          <DialogContent 
+            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle className="font-cairo text-xl">
                 تعديل الدواء قبل الموافقة
@@ -944,7 +1027,7 @@ export default function AdminMedicineReview() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsEditDialogOpen(false)}
+                  onClick={handleCancelEditDialog}
                   className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
                 >
                   إلغاء

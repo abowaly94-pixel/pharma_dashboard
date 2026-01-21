@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, Building2, Phone, Mail, MapPin, Edit,
@@ -86,6 +86,45 @@ export default function AdminPharmacies() {
     licenseNumber: '',
     medicineLimit: 0,
   });
+
+  // Restore dialog state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('admin_pharmacy_dialog_state');
+    if (savedState) {
+      try {
+        const { isOpen, formData: savedFormData, editingPharmacyId } = JSON.parse(savedState);
+        if (isOpen) {
+          setIsDialogOpen(true);
+          setFormData(savedFormData);
+          
+          // If editing, find the pharmacy by ID
+          if (editingPharmacyId) {
+            const pharmacy = filteredPharmacies.find(p => p.id === editingPharmacyId);
+            if (pharmacy) {
+              setEditingPharmacy(pharmacy);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to restore dialog state:', error);
+        localStorage.removeItem('admin_pharmacy_dialog_state');
+      }
+    }
+  }, [filteredPharmacies]);
+
+  // Save dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (isDialogOpen) {
+      const stateToSave = {
+        isOpen: true,
+        formData,
+        editingPharmacyId: editingPharmacy?.id || null,
+      };
+      localStorage.setItem('admin_pharmacy_dialog_state', JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem('admin_pharmacy_dialog_state');
+    }
+  }, [isDialogOpen, formData, editingPharmacy]);
 
   const handleOpenStatusDialog = (pharmacy: PharmacyAccount, status: PharmacyStatus) => {
     setSelectedPharmacy(pharmacy);
@@ -531,7 +570,11 @@ export default function AdminPharmacies() {
         )}
 
         {/* Add/Edit Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setIsDialogOpen(false);
+          }
+        }}>
           <DialogContent
             className="max-w-2xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}

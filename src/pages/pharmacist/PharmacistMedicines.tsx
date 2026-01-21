@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -64,6 +64,7 @@ export default function PharmacistMedicines() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
+  const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -81,6 +82,45 @@ export default function PharmacistMedicines() {
     sellingCount: 0,
   });
 
+  // Restore dialog state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('pharmacist_medicine_dialog_state');
+    if (savedState) {
+      try {
+        const { isOpen, formData: savedFormData, editingMedicineId } = JSON.parse(savedState);
+        if (isOpen) {
+          setIsAddEditDialogOpen(true);
+          setFormData(savedFormData);
+          
+          // If editing, find the medicine by ID
+          if (editingMedicineId) {
+            const medicine = medicines.find(m => m.id === editingMedicineId);
+            if (medicine) {
+              setEditingMedicine(medicine);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to restore dialog state:', error);
+        localStorage.removeItem('pharmacist_medicine_dialog_state');
+      }
+    }
+  }, [medicines]);
+
+  // Save dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (isAddEditDialogOpen) {
+      const stateToSave = {
+        isOpen: true,
+        formData,
+        editingMedicineId: editingMedicine?.id || null,
+      };
+      localStorage.setItem('pharmacist_medicine_dialog_state', JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem('pharmacist_medicine_dialog_state');
+    }
+  }, [isAddEditDialogOpen, formData, editingMedicine]);
+
   const filteredMedicines = medicines.filter(medicine => {
     // Filter by search query
     const matchesSearch = medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -95,6 +135,8 @@ export default function PharmacistMedicines() {
   const handleOpenAddEdit = (medicine?: MedicineWithApproval) => {
     // Reset image error state
     setImageLoadError(false);
+    // Reset uploaded images tracker
+    setUploadedImagesInSession([]);
     
     if (medicine) {
       setEditingMedicine(medicine);
@@ -263,6 +305,8 @@ export default function PharmacistMedicines() {
       const result = await uploadImageToSupabase(file);
       if (result.success && result.url) {
         setFormData({ ...formData, subabaseImageUrl: result.url });
+        // تتبع الصورة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, result.url]);
         toast.success('تم رفع الصورة بنجاح!');
       } else {
         toast.error(result.error || 'فشل رفع الصورة');
@@ -274,6 +318,30 @@ export default function PharmacistMedicines() {
       setIsUploading(false);
       e.target.value = '';
     }
+  };
+
+  // حذف الصور المرفوعة في الجلسة الحالية عند الإلغاء
+  const handleCancelDialog = async () => {
+    if (uploadedImagesInSession.length > 0) {
+      console.log('🗑️ حذف الصور المرفوعة في الجلسة:', uploadedImagesInSession);
+      toast.info('جاري حذف الصور المرفوعة...');
+      
+      for (const imageUrl of uploadedImagesInSession) {
+        if (imageUrl.includes('supabase.co/storage')) {
+          const result = await deleteImageFromSupabase(imageUrl);
+          if (result.success) {
+            console.log('✅ تم حذف الصورة:', imageUrl);
+          } else {
+            console.error('❌ فشل حذف الصورة:', imageUrl, result.error);
+          }
+        }
+      }
+      
+      toast.success('تم حذف الصور المرفوعة');
+    }
+    
+    setUploadedImagesInSession([]);
+    setIsAddEditDialogOpen(false);
   };
 
   const handleRemoveBackground = async () => {
@@ -353,6 +421,9 @@ export default function PharmacistMedicines() {
           subabaseImageUrl: uploadResult.url,
           subabaseORImageUrl: savedOriginalUrl
         });
+        
+        // تتبع الصورة المعالجة المرفوعة حديثاً
+        setUploadedImagesInSession(prev => [...prev, uploadResult.url]);
         
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
@@ -741,7 +812,11 @@ export default function PharmacistMedicines() {
         )}
 
         {/* Add/Edit Dialog - نفس القائمة التي يستخدمها الأدمن */}
-        <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+        <Dialog open={isAddEditDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            handleCancelDialog();
+          }
+        }}>
           <DialogContent
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
@@ -1133,7 +1208,7 @@ export default function PharmacistMedicines() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsAddEditDialogOpen(false)}
+                  onClick={handleCancelDialog}
                   className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
                 >
                   إلغاء
