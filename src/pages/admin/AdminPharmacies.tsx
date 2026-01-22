@@ -87,44 +87,7 @@ export default function AdminPharmacies() {
     medicineLimit: 0,
   });
 
-  // Restore dialog state from localStorage on mount
-  useEffect(() => {
-    const savedState = localStorage.getItem('admin_pharmacy_dialog_state');
-    if (savedState) {
-      try {
-        const { isOpen, formData: savedFormData, editingPharmacyId } = JSON.parse(savedState);
-        if (isOpen) {
-          setIsDialogOpen(true);
-          setFormData(savedFormData);
-          
-          // If editing, find the pharmacy by ID
-          if (editingPharmacyId) {
-            const pharmacy = filteredPharmacies.find(p => p.id === editingPharmacyId);
-            if (pharmacy) {
-              setEditingPharmacy(pharmacy);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to restore dialog state:', error);
-        localStorage.removeItem('admin_pharmacy_dialog_state');
-      }
-    }
-  }, [filteredPharmacies]);
 
-  // Save dialog state to localStorage whenever it changes
-  useEffect(() => {
-    if (isDialogOpen) {
-      const stateToSave = {
-        isOpen: true,
-        formData,
-        editingPharmacyId: editingPharmacy?.id || null,
-      };
-      localStorage.setItem('admin_pharmacy_dialog_state', JSON.stringify(stateToSave));
-    } else {
-      localStorage.removeItem('admin_pharmacy_dialog_state');
-    }
-  }, [isDialogOpen, formData, editingPharmacy]);
 
   const handleOpenStatusDialog = (pharmacy: PharmacyAccount, status: PharmacyStatus) => {
     setSelectedPharmacy(pharmacy);
@@ -551,10 +514,10 @@ export default function AdminPharmacies() {
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all ${pharmacy.currentMedicineCount >= pharmacy.medicineLimit
-                              ? 'bg-red-500'
-                              : pharmacy.currentMedicineCount >= pharmacy.medicineLimit * 0.8
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
+                            ? 'bg-red-500'
+                            : pharmacy.currentMedicineCount >= pharmacy.medicineLimit * 0.8
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
                             }`}
                           style={{
                             width: `${Math.min((pharmacy.currentMedicineCount / pharmacy.medicineLimit) * 100, 100)}%`
@@ -573,6 +536,19 @@ export default function AdminPharmacies() {
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           if (!open) {
             setIsDialogOpen(false);
+            setEditingPharmacy(null);
+            setFormData({
+              name: '',
+              email: '',
+              password: '',
+              address: '',
+              city: '',
+              phoneNumber: '',
+              ownerName: '',
+              licenseNumber: '',
+              medicineLimit: 0,
+            });
+            setShowPassword(false);
           }
         }}>
           <DialogContent
@@ -748,7 +724,22 @@ export default function AdminPharmacies() {
 
               {/* Footer */}
               <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => {
+                  setIsDialogOpen(false);
+                  setEditingPharmacy(null);
+                  setFormData({
+                    name: '',
+                    email: '',
+                    password: '',
+                    address: '',
+                    city: '',
+                    phoneNumber: '',
+                    ownerName: '',
+                    licenseNumber: '',
+                    medicineLimit: 0,
+                  });
+                  setShowPassword(false);
+                }}>
                   إلغاء
                 </Button>
                 <Button
