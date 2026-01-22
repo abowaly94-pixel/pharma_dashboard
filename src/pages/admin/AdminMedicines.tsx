@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -39,6 +39,7 @@ import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Autocomplete, AutocompleteOption } from '@/components/ui/autocomplete';
 import { deleteMedicinePermanently } from '@/services/medicineService';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { toast } from 'sonner';
 
 export default function AdminMedicines() {
@@ -50,6 +51,8 @@ export default function AdminMedicines() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false); // حماية إضافية من race conditions
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
   const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
   const [formData, setFormData] = useState({
@@ -170,6 +173,7 @@ export default function AdminMedicines() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     console.log('🚀 handleSubmit called');
     console.log('📝 Form data:', formData);
     console.log('✏️ Editing medicine:', editingMedicine);
@@ -186,6 +190,15 @@ export default function AdminMedicines() {
       return;
     }
     
+    // منع الإرسال المتكرر (بعد التحقق من البيانات)
+    if (isSaving || savingRef.current) {
+      toast.warning('جاري الحفظ... الرجاء الانتظار');
+      return;
+    }
+
+    setIsSaving(true);
+    savingRef.current = true; // حماية فورية
+
     try {
       // إذا كان تعديل وتم تغيير الصورة، احذف الصورة القديمة من Supabase
       if (editingMedicine) {
@@ -229,6 +242,9 @@ export default function AdminMedicines() {
     } catch (error) {
       console.error('Error saving medicine:', error);
       toast.error('حدث خطأ أثناء الحفظ');
+    } finally {
+      setIsSaving(false);
+      savingRef.current = false; // إعادة تعيين الحماية
     }
   };
 
@@ -250,11 +266,34 @@ export default function AdminMedicines() {
     if (!file) return;
 
     setIsUploading(true);
-    toast.info('جاري رفع الصورة...');
+    const originalSize = formatFileSize(file.size);
+    toast.info(`جاري ضغط ورفع الصورة... (${originalSize})`);
     console.log('📤 Uploading file:', file.name);
 
     try {
-      const result = await uploadImageToSupabase(file);
+      // ضغط الصورة أولاً
+      const compressedFile = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.85,
+        maxSizeMB: 1,
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة بنجاح! (${originalSize} → ${compressedSize})`);
+      }
+
+      // رفع الصورة المضغوطة
+      const result = await uploadImageToSupabase(compressedFile);
       
       if (result.success && result.url) {
         setFormData({ ...formData, subabaseImageUrl: result.url });
@@ -333,9 +372,31 @@ export default function AdminMedicines() {
       
       // رفع الصورة الجديدة
       console.log('📤 رفع الصورة المعالجة الجديدة...');
-      toast.info('جاري رفع الصورة المعالجة...');
+      const originalSize = formatFileSize(file.size);
+      toast.info(`جاري ضغط ورفع الصورة المعالجة... (${originalSize})`);
       
-      const uploadResult = await uploadImageToSupabase(file);
+      // ضغط الصورة المعالجة قبل الرفع (مع الحفاظ على الشفافية)
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,       // أبعاد أصغر للضغط الأفضل
+        maxHeight: 800,
+        quality: 0.95,       // جودة عالية لـ PNG
+        maxSizeMB: 0.15,     // حد أقصى 150 KB
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Background removed image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة المعالجة! (${originalSize} → ${compressedSize})`);
+      }
+      
+      const uploadResult = await uploadImageToSupabase(compressedFile);
       
       if (uploadResult.success && uploadResult.url) {
         console.log('✅ تم رفع الصورة المعالجة بنجاح:', uploadResult.url);

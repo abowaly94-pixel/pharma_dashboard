@@ -40,6 +40,7 @@ import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MedicineWithApproval } from '@/types';
 import { toast } from 'sonner';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -189,10 +190,33 @@ export default function AdminMedicineReview() {
     if (!file) return;
 
     setIsUploading(true);
-    toast.info('جاري رفع الصورة...');
+    const originalSize = formatFileSize(file.size);
+    toast.info(`جاري ضغط ورفع الصورة... (${originalSize})`);
 
     try {
-      const result = await uploadImageToSupabase(file);
+      // ضغط الصورة أولاً
+      const compressedFile = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.85,
+        maxSizeMB: 1,
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة بنجاح! (${originalSize} → ${compressedSize})`);
+      }
+
+      // رفع الصورة المضغوطة
+      const result = await uploadImageToSupabase(compressedFile);
       
       if (result.success && result.url) {
         setEditFormData({ ...editFormData, subabaseImageUrl: result.url });
@@ -239,7 +263,31 @@ export default function AdminMedicineReview() {
       }
       
       // Upload new processed image
-      const uploadResult = await uploadImageToSupabase(file);
+      const originalSize = formatFileSize(file.size);
+      toast.info(`جاري ضغط ورفع الصورة المعالجة... (${originalSize})`);
+      
+      // ضغط الصورة المعالجة قبل الرفع (مع الحفاظ على الشفافية)
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,       // أبعاد أصغر للضغط الأفضل
+        maxHeight: 800,
+        quality: 0.95,       // جودة عالية لـ PNG
+        maxSizeMB: 0.15,     // حد أقصى 150 KB
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Background removed image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة المعالجة! (${originalSize} → ${compressedSize})`);
+      }
+      
+      const uploadResult = await uploadImageToSupabase(compressedFile);
       
       if (uploadResult.success && uploadResult.url) {
         const savedOriginalUrl = editFormData.subabaseORImageUrl || 

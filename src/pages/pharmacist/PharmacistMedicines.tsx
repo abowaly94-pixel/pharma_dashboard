@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -27,6 +27,7 @@ import { MedicineWithApproval } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { toast } from 'sonner';
 
 export default function PharmacistMedicines() {
@@ -63,6 +64,8 @@ export default function PharmacistMedicines() {
   const [editingMedicine, setEditingMedicine] = useState<MedicineWithApproval | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false); // حماية إضافية من race conditions
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
   const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
   const [formData, setFormData] = useState({
@@ -210,7 +213,16 @@ export default function PharmacistMedicines() {
       return;
     }
 
+    // منع الإرسال المتكرر (بعد التحقق من البيانات)
+    if (isSaving || savingRef.current) {
+      toast.warning('جاري الحفظ... الرجاء الانتظار');
+      return;
+    }
+
     console.log('✅ All validations passed');
+
+    setIsSaving(true);
+    savingRef.current = true; // حماية فورية
 
     try {
       // إذا كان تعديل وتم تغيير الصورة، احذف الصورة القديمة من Supabase
@@ -281,6 +293,9 @@ export default function PharmacistMedicines() {
     } catch (error) {
       console.error('❌ Error in handleSubmit:', error);
       toast.error('حدث خطأ أثناء الحفظ');
+    } finally {
+      setIsSaving(false);
+      savingRef.current = false; // إعادة تعيين الحماية
     }
   };
 
@@ -299,10 +314,33 @@ export default function PharmacistMedicines() {
     if (!file) return;
 
     setIsUploading(true);
-    toast.info('جاري رفع الصورة...');
+    const originalSize = formatFileSize(file.size);
+    toast.info(`جاري ضغط ورفع الصورة... (${originalSize})`);
 
     try {
-      const result = await uploadImageToSupabase(file);
+      // ضغط الصورة أولاً
+      const compressedFile = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.85,
+        maxSizeMB: 1,
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة بنجاح! (${originalSize} → ${compressedSize})`);
+      }
+
+      // رفع الصورة المضغوطة
+      const result = await uploadImageToSupabase(compressedFile);
       if (result.success && result.url) {
         setFormData({ ...formData, subabaseImageUrl: result.url });
         // تتبع الصورة المرفوعة حديثاً
@@ -399,9 +437,31 @@ export default function PharmacistMedicines() {
 
       // رفع الصورة الجديدة
       console.log('📤 رفع الصورة المعالجة الجديدة...');
-      toast.info('جاري رفع الصورة المعالجة...');
+      const originalSize = formatFileSize(file.size);
+      toast.info(`جاري ضغط ورفع الصورة المعالجة... (${originalSize})`);
       
-      const uploadResult = await uploadImageToSupabase(file);
+      // ضغط الصورة المعالجة قبل الرفع (مع الحفاظ على الشفافية)
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,       // أبعاد أصغر للضغط الأفضل
+        maxHeight: 800,
+        quality: 0.95,       // جودة عالية لـ PNG
+        maxSizeMB: 0.15,     // حد أقصى 150 KB
+      });
+
+      const compressedSize = formatFileSize(compressedFile.size);
+      const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+      
+      console.log('📸 Background removed image compression:', {
+        original: originalSize,
+        compressed: compressedSize,
+        savings: `${savings}%`
+      });
+
+      if (savings > 10) {
+        toast.success(`تم ضغط الصورة المعالجة! (${originalSize} → ${compressedSize})`);
+      }
+      
+      const uploadResult = await uploadImageToSupabase(compressedFile);
 
       if (uploadResult.success && uploadResult.url) {
         console.log('✅ تم رفع الصورة المعالجة بنجاح:', uploadResult.url);
@@ -1215,17 +1275,32 @@ export default function PharmacistMedicines() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.subabaseImageUrl || !isAddressComplete}
+                  disabled={!formData.subabaseImageUrl || !isAddressComplete || isSaving || isUploading || isRemovingBg}
                   title={
-                    !isAddressComplete
-                      ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً'
-                      : !formData.subabaseImageUrl
-                        ? 'يجب رفع صورة للدواء أولاً'
+                    isSaving
+                      ? 'جاري الحفظ...'
+                      : isUploading
+                        ? 'جاري رفع الصورة...'
+                        : isRemovingBg
+                          ? 'جاري إزالة الخلفية...'
+                          : !isAddressComplete
+                            ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً'
+                            : !formData.subabaseImageUrl
+                              ? 'يجب رفع صورة للدواء أولاً'
                         : ''
                   }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-2" />
+                      جاري الحفظ...
+                    </>
+                  ) : editingMedicine ? (
+                    '💾 حفظ التعديلات'
+                  ) : (
+                    '➕ إضافة الدواء'
+                  )}
                 </Button>
               </div>
             </form>
