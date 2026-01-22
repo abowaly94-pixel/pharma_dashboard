@@ -17,7 +17,7 @@ import { Medicine } from '@/types';
 import { toast } from 'sonner';
 import { deleteImageFromSupabase } from '@/lib/supabase';
 
-export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean }) {
+export function useMedicines(pharmacyId?: string, options?: { enabled?: boolean }) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +38,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
 
     // Create base query - remove orderBy temporarily to test
     let medicinesQuery;
-    
+
     try {
       if (pharmacyId !== undefined && pharmacyId !== null) {
         // For pharmacist - filter by pharmacy first, then try orderBy
@@ -55,7 +55,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
         (snapshot) => {
           const medicinesList = snapshot.docs.map(doc => {
             const data = doc.data();
-            
+
             return {
               id: doc.id,
               name: data.name || 'دواء غير معروف',
@@ -63,7 +63,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
               description: data.description || '',
               price: data.price || 0,
               quantity: data.quantity || 0,
-              pharmacyId: data.pharmacyId || 0,
+              pharmacyId: data.pharmacyId as string,
               pharmacyName: data.pharmacyName || '',
               pharmcyAddress: data.pharmcyAddress || '',
               avgRating: data.avgRating || 0,
@@ -100,9 +100,9 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
             message: err.message,
             pharmacyId: pharmacyId
           });
-          
+
           let errorMessage = 'فشل في تحميل الأدوية';
-          
+
           if (err.code === 'failed-precondition') {
             errorMessage = 'يحتاج إنشاء فهرس في Firebase Console';
           } else if (err.code === 'permission-denied') {
@@ -110,7 +110,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
           } else if (err.code === 'unavailable') {
             errorMessage = 'خدمة Firebase غير متاحة حالياً';
           }
-          
+
           setError(errorMessage);
           setIsLoading(false);
           toast.error(`حدث خطأ: ${errorMessage}`);
@@ -163,16 +163,16 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
   const updateMedicine = async (id: string, updates: Partial<Medicine>) => {
     try {
       const medicineRef = doc(db, 'medicines', id);
-      
+
       // Clean up the updates object - explicitly set empty strings for deleted images
       const cleanedUpdates: any = { ...updates };
-      
+
       // If image URL is empty, explicitly set both fields to empty string
       if ('subabaseImageUrl' in cleanedUpdates && cleanedUpdates.subabaseImageUrl === '') {
         cleanedUpdates.subabaseImageUrl = '';
         cleanedUpdates.subabaseORImageUrl = '';
       }
-      
+
       await updateDoc(medicineRef, {
         ...cleanedUpdates,
         updatedAt: serverTimestamp()
@@ -190,16 +190,16 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
       // Get medicine data first to retrieve image URL
       const medicineRef = doc(db, 'medicines', id);
       const medicineDoc = await getDoc(medicineRef);
-      
+
       if (medicineDoc.exists()) {
         const medicineData = medicineDoc.data();
         const imageUrl = medicineData.subabaseImageUrl || medicineData.subabaseORImageUrl;
-        
+
         // Delete image from Supabase Storage if exists
         if (imageUrl) {
           console.log('🗑️ حذف الصورة من Supabase Storage:', imageUrl);
           const deleteResult = await deleteImageFromSupabase(imageUrl);
-          
+
           if (deleteResult.success) {
             console.log('✅ تم حذف الصورة من Supabase بنجاح');
           } else {
@@ -208,7 +208,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
           }
         }
       }
-      
+
       // Delete medicine document from Firestore
       await deleteDoc(medicineRef);
       toast.success('تم حذف الدواء والصورة بنجاح');

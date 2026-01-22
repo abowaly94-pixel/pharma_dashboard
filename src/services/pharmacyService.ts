@@ -44,7 +44,7 @@ const USERS_COLLECTION = 'users';
 function mapFirestoreToPharmacy(id: string, data: Record<string, unknown>): PharmacyAccount {
   return {
     id,
-    pharmacyId: data.pharmacyId as number,
+    pharmacyId: data.pharmacyId as string,
     name: data.name as string,
     email: data.email as string,
     address: data.address as string,
@@ -77,32 +77,32 @@ function validatePharmacyInput(input: CreatePharmacyInput): void {
   if (!input.name || input.name.trim().length < 2) {
     throw new ValidationError('اسم الصيدلية مطلوب ويجب أن يكون أكثر من حرفين', 'name', 'REQUIRED');
   }
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!input.email || !emailRegex.test(input.email)) {
     throw new ValidationError('البريد الإلكتروني غير صالح', 'email', 'INVALID_EMAIL');
   }
-  
+
   if (!input.password || input.password.length < 8) {
     throw new ValidationError('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'password', 'WEAK_PASSWORD');
   }
-  
+
   if (!input.address || input.address.trim().length < 5) {
     throw new ValidationError('العنوان مطلوب', 'address', 'REQUIRED');
   }
-  
+
   if (!input.city || input.city.trim().length < 2) {
     throw new ValidationError('المدينة مطلوبة', 'city', 'REQUIRED');
   }
-  
+
   if (!input.phoneNumber || input.phoneNumber.length < 10) {
     throw new ValidationError('رقم الهاتف غير صالح', 'phoneNumber', 'INVALID_PHONE');
   }
-  
+
   if (!input.ownerName || input.ownerName.trim().length < 2) {
     throw new ValidationError('اسم المالك مطلوب', 'ownerName', 'REQUIRED');
   }
-  
+
   if (!input.licenseNumber || input.licenseNumber.trim().length < 5) {
     throw new ValidationError('رقم الترخيص مطلوب', 'licenseNumber', 'REQUIRED');
   }
@@ -111,11 +111,7 @@ function validatePharmacyInput(input: CreatePharmacyInput): void {
 /**
  * توليد رقم صيدلية فريد
  */
-async function generatePharmacyId(): Promise<number> {
-  const pharmaciesRef = collection(db, PHARMACIES_COLLECTION);
-  const snapshot = await getDocs(pharmaciesRef);
-  return snapshot.size + 1;
-}
+// function generatePharmacyId moved or deprecated
 
 /**
  * إنشاء صيدلية جديدة
@@ -127,28 +123,28 @@ export async function createPharmacy(
 ): Promise<PharmacyAccount> {
   // Validate input
   validatePharmacyInput(input);
-  
+
   try {
     console.log('🔍 Checking if email exists:', input.email);
-    
+
     // Check if email already exists
     const existingQuery = query(
       collection(db, PHARMACIES_COLLECTION),
       where('email', '==', input.email.toLowerCase())
     );
     const existingSnapshot = await getDocs(existingQuery);
-    
+
     if (!existingSnapshot.empty) {
       throw new ValidationError('البريد الإلكتروني مستخدم مسبقاً', 'email', 'DUPLICATE');
     }
-    
+
     console.log('✅ Email is available');
     console.log('🔐 Creating Firebase Auth user...');
-    
+
     // استخدام secondary app لإنشاء المستخدم بدون التأثير على session الأدمن
     const secondaryApp = getSecondaryApp();
     const secondaryAuth = getAuth(secondaryApp);
-    
+
     // Create Firebase Auth user (password is automatically hashed by Firebase)
     let userCredential;
     try {
@@ -171,9 +167,9 @@ export async function createPharmacy(
       }
       throw new DatabaseError('فشل في إنشاء حساب المستخدم: ' + authError.message, 'createPharmacy', authError);
     }
-    
+
     const userId = userCredential.user.uid;
-    
+
     // Send email verification
     try {
       await sendEmailVerification(userCredential.user);
@@ -181,15 +177,16 @@ export async function createPharmacy(
     } catch (e) {
       console.warn('⚠️ Could not send verification email:', e);
     }
-    
+
     // تسجيل خروج المستخدم الجديد من secondary auth
     await secondaryAuth.signOut();
     console.log('✅ Signed out from secondary auth');
-    
+
     // Generate pharmacy ID
-    const pharmacyId = await generatePharmacyId();
-    console.log('✅ Generated pharmacy ID:', pharmacyId);
-    
+    // Use userId as the pharmacyId (string) to ensure uniqueness and persistent association
+    const pharmacyId = userId;
+    console.log('✅ Using User ID as Pharmacy ID:', pharmacyId);
+
     // Create pharmacy document
     const pharmacyData = {
       pharmacyId,
@@ -212,12 +209,12 @@ export async function createPharmacy(
       updatedAt: serverTimestamp(),
       createdBy: adminId,
     };
-    
+
     console.log('💾 Saving pharmacy document...');
     // Save to pharmacies collection
     await setDoc(doc(db, PHARMACIES_COLLECTION, userId), pharmacyData);
     console.log('✅ Pharmacy document saved');
-    
+
     console.log('💾 Saving user document...');
     // Also create user document with pharmacist role
     await setDoc(doc(db, USERS_COLLECTION, userId), {
@@ -235,9 +232,9 @@ export async function createPharmacy(
       updatedAt: serverTimestamp(),
     });
     console.log('✅ User document saved');
-    
+
     console.log('🎉 تم إنشاء الصيدلية بنجاح:', pharmacyData.name);
-    
+
     return mapFirestoreToPharmacy(userId, {
       ...pharmacyData,
       createdAt: Timestamp.now(),
@@ -264,22 +261,22 @@ export async function getPharmacies(filters?: PharmacyFilters): Promise<Pharmacy
   try {
     const pharmaciesRef = collection(db, PHARMACIES_COLLECTION);
     let q = query(pharmaciesRef);
-    
+
     // Apply status filter
     if (filters?.status && filters.status !== 'all') {
       q = query(q, where('status', '==', filters.status));
     }
-    
+
     // Apply sorting
     const sortField = filters?.sortBy || 'createdAt';
     const sortDirection = filters?.sortOrder || 'desc';
     q = query(q, orderBy(sortField, sortDirection));
-    
+
     const snapshot = await getDocs(q);
-    let pharmacies = snapshot.docs.map(doc => 
+    let pharmacies = snapshot.docs.map(doc =>
       mapFirestoreToPharmacy(doc.id, doc.data())
     );
-    
+
     // Apply search filter (client-side for flexibility)
     if (filters?.searchQuery) {
       const searchLower = filters.searchQuery.toLowerCase();
@@ -290,7 +287,7 @@ export async function getPharmacies(filters?: PharmacyFilters): Promise<Pharmacy
         pharmacy.city.toLowerCase().includes(searchLower)
       );
     }
-    
+
     return pharmacies;
   } catch (error) {
     console.error('Error fetching pharmacies:', error);
@@ -305,11 +302,11 @@ export async function getPharmacyById(id: string): Promise<PharmacyAccount> {
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     return mapFirestoreToPharmacy(docSnap.id, docSnap.data());
   } catch (error) {
     if (error instanceof NotFoundError) {
@@ -323,18 +320,18 @@ export async function getPharmacyById(id: string): Promise<PharmacyAccount> {
 /**
  * جلب صيدلية بواسطة رقم الصيدلية
  */
-export async function getPharmacyByPharmacyId(pharmacyId: number): Promise<PharmacyAccount | null> {
+export async function getPharmacyByPharmacyId(pharmacyId: string): Promise<PharmacyAccount | null> {
   try {
     const q = query(
       collection(db, PHARMACIES_COLLECTION),
       where('pharmacyId', '==', pharmacyId)
     );
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
       return null;
     }
-    
+
     const doc = snapshot.docs[0];
     return mapFirestoreToPharmacy(doc.id, doc.data());
   } catch (error) {
@@ -354,17 +351,17 @@ export async function updatePharmacyStatus(
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     // Update pharmacy status
     await updateDoc(docRef, {
       status,
       updatedAt: serverTimestamp(),
     });
-    
+
     // Also update user document
     const userRef = doc(db, USERS_COLLECTION, id);
     await updateDoc(userRef, {
@@ -391,15 +388,15 @@ export async function updateMedicineLimit(
   if (limit < 0) {
     throw new ValidationError('الحد يجب أن يكون رقماً موجباً', 'medicineLimit', 'OUT_OF_RANGE');
   }
-  
+
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     await updateDoc(docRef, {
       medicineLimit: limit,
       updatedAt: serverTimestamp(),
@@ -423,15 +420,15 @@ export async function updatePharmacy(
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     const updateData: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
     };
-    
+
     if (input.name) updateData.name = input.name.trim();
     if (input.address) updateData.address = input.address.trim();
     if (input.city) updateData.city = input.city.trim();
@@ -441,9 +438,9 @@ export async function updatePharmacy(
     if (input.street) updateData.street = input.street.trim();
     if (input.governorate) updateData.governorate = input.governorate.trim();
     if (input.postalCode) updateData.postalCode = input.postalCode.trim();
-    
+
     await updateDoc(docRef, updateData);
-    
+
     // Update user document if name changed
     if (input.name) {
       const userRef = doc(db, USERS_COLLECTION, id);
@@ -486,14 +483,14 @@ export async function updateMedicineCount(
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     const currentCount = (docSnap.data().currentMedicineCount as number) || 0;
     const newCount = Math.max(0, currentCount + increment);
-    
+
     await updateDoc(docRef, {
       currentMedicineCount: newCount,
       updatedAt: serverTimestamp(),
@@ -530,7 +527,7 @@ export async function getPharmacyStats(): Promise<{
 }> {
   try {
     const pharmacies = await getPharmacies();
-    
+
     return {
       total: pharmacies.length,
       active: pharmacies.filter(p => p.status === 'active').length,
@@ -570,44 +567,45 @@ export async function deletePharmacyPermanently(id: string): Promise<{
   try {
     const docRef = doc(db, PHARMACIES_COLLECTION, id);
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new NotFoundError('pharmacy', id);
     }
-    
+
     const pharmacyData = docSnap.data();
-    const pharmacyIdNum = pharmacyData.pharmacyId as number;
-    
-    console.log(`🗑️ بدء حذف الصيدلية: ${pharmacyData.name} (ID: ${pharmacyIdNum})`);
-    
+
+    const pharmacyId = pharmacyData.pharmacyId as string;
+
+    console.log(`🗑️ بدء حذف الصيدلية: ${pharmacyData.name} (ID: ${pharmacyId})`);
+
     // 1. حذف جميع الأدوية المعتمدة من medicines collection
     const medicinesQuery = query(
       collection(db, 'medicines'),
-      where('pharmacyId', '==', pharmacyIdNum)
+      where('pharmacyId', '==', pharmacyId)
     );
     const medicinesSnapshot = await getDocs(medicinesQuery);
-    
+
     let deletedMedicinesCount = 0;
     for (const medicineDoc of medicinesSnapshot.docs) {
       await deleteDoc(doc(db, 'medicines', medicineDoc.id));
       deletedMedicinesCount++;
     }
     console.log(`✅ تم حذف ${deletedMedicinesCount} دواء معتمد`);
-    
+
     // 2. حذف جميع الأدوية المعلقة/المرفوضة من pending_medicines collection
     const pendingQuery = query(
       collection(db, 'pending_medicines'),
-      where('pharmacyId', '==', pharmacyIdNum)
+      where('pharmacyId', '==', pharmacyId)
     );
     const pendingSnapshot = await getDocs(pendingQuery);
-    
+
     let deletedPendingCount = 0;
     for (const pendingDoc of pendingSnapshot.docs) {
       await deleteDoc(doc(db, 'pending_medicines', pendingDoc.id));
       deletedPendingCount++;
     }
     console.log(`✅ تم حذف ${deletedPendingCount} دواء معلق/مرفوض`);
-    
+
     // 3. حذف مستند المستخدم من users collection
     const userRef = doc(db, USERS_COLLECTION, id);
     const userSnap = await getDoc(userRef);
@@ -615,16 +613,16 @@ export async function deletePharmacyPermanently(id: string): Promise<{
       await deleteDoc(userRef);
       console.log('✅ تم حذف مستند المستخدم');
     }
-    
+
     // 4. حذف مستند الصيدلية
     await deleteDoc(docRef);
     console.log('✅ تم حذف مستند الصيدلية');
-    
+
     // ملاحظة: حذف المستخدم من Firebase Auth يتطلب Admin SDK
     // يمكن للمستخدم إعادة التسجيل بنفس البريد الإلكتروني لاحقاً
-    
+
     console.log(`🎉 تم حذف الصيدلية "${pharmacyData.name}" نهائياً`);
-    
+
     return {
       success: true,
       deletedMedicinesCount,

@@ -101,27 +101,26 @@ export async function createMedicine(
   pharmacyName: string
 ): Promise<MedicineWithApproval> {
   validateMedicineInput(input);
-  
+
   try {
-    // Convert pharmacyId to number for lookup
-    const pharmacyIdNum = parseInt(pharmacyId);
-    if (isNaN(pharmacyIdNum)) {
+    // Validating pharmacyId format (should be UUID string now)
+    if (!pharmacyId || pharmacyId.length < 5) {
       throw new ValidationError('معرف الصيدلية غير صحيح', 'pharmacyId', 'INVALID_FORMAT');
     }
-    
-    // Check if pharmacy can add more medicines using pharmacyId (number)
-    const pharmacy = await getPharmacyByPharmacyId(pharmacyIdNum);
+
+    // Check if pharmacy can add more medicines using pharmacyId (string reference)
+    const pharmacy = await getPharmacyById(pharmacyId);
     if (!pharmacy) {
       throw new NotFoundError('pharmacy', pharmacyId);
     }
-    
+
     if (pharmacy.currentMedicineCount >= pharmacy.medicineLimit) {
       throw new AuthorizationError(
         'تم الوصول للحد الأقصى من الأدوية المسموح بها',
         'MEDICINE_LIMIT_REACHED'
       );
     }
-    
+
     // Build pharmacy address from detailed fields
     const pharmcyAddress = [
       pharmacy.street,
@@ -129,10 +128,10 @@ export async function createMedicine(
       pharmacy.governorate,
       pharmacy.postalCode
     ].filter(Boolean).join(', ') || pharmacy.address || 'غير محدد';
-    
+
     // Generate unique ID - يتم الحفظ في pending_medicines فقط
     const medicineId = doc(collection(db, PENDING_MEDICINES_COLLECTION)).id;
-    
+
     const medicineData = {
       name: input.name.trim(),
       code: input.code.trim(),
@@ -144,7 +143,9 @@ export async function createMedicine(
       expiryDate: Timestamp.fromDate(input.expiryDate),
       subabaseImageUrl: input.subabaseImageUrl || '',
       subabaseORImageUrl: input.subabaseORImageUrl || input.subabaseImageUrl || '',
-      pharmacyId: pharmacyIdNum, // Store as number
+      isNewProduct: input.isNewProduct || false,
+      discountRating: input.discountRating || 0,
+      pharmacyId: pharmacyId, // Store as string (UID)
       pharmacyName,
       pharmcyAddress, // Add pharmacy address
       status: 'pending' as MedicineStatus, // Always pending
@@ -155,25 +156,25 @@ export async function createMedicine(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    
+
     console.log('💾 Saving medicine to pending_medicines collection:', {
       medicineId,
-      pharmacyId: pharmacyIdNum,
+      pharmacyId: pharmacyId,
       pharmacyName,
       pharmcyAddress,
       name: input.name
     });
-    
+
     // الحفظ في pending_medicines فقط - لن يظهر في medicines حتى الموافقة
     await setDoc(doc(db, PENDING_MEDICINES_COLLECTION, medicineId), medicineData);
-    
+
     console.log('✅ Medicine saved to pending_medicines successfully');
-    
+
     // Update pharmacy medicine count using the pharmacy document ID
     await updateMedicineCount(pharmacy.id, 1);
-    
+
     console.log('✅ Medicine count updated');
-    
+
     return mapFirestoreToMedicine(medicineId, {
       ...medicineData,
       createdAt: Timestamp.now(),
@@ -195,34 +196,32 @@ export async function createMedicine(
  */
 export async function getMedicinesByPharmacy(pharmacyId: string): Promise<MedicineWithApproval[]> {
   try {
-    const pharmacyIdNum = parseInt(pharmacyId);
-    
     // جلب الأدوية المعتمدة من medicines collection
     const approvedQuery = query(
       collection(db, MEDICINES_COLLECTION),
-      where('pharmacyId', '==', isNaN(pharmacyIdNum) ? pharmacyId : pharmacyIdNum),
+      where('pharmacyId', '==', pharmacyId),
       where('deleted', '==', false)
     );
-    
+
     // جلب الأدوية المعلقة والمرفوضة من pending_medicines collection
     const pendingQuery = query(
       collection(db, PENDING_MEDICINES_COLLECTION),
-      where('pharmacyId', '==', isNaN(pharmacyIdNum) ? pharmacyId : pharmacyIdNum),
+      where('pharmacyId', '==', pharmacyId),
       where('deleted', '==', false)
     );
-    
+
     const [approvedSnapshot, pendingSnapshot] = await Promise.all([
       getDocs(approvedQuery),
       getDocs(pendingQuery)
     ]);
-    
+
     const approvedMedicines = approvedSnapshot.docs.map(doc => mapFirestoreToMedicine(doc.id, doc.data()));
     const pendingMedicines = pendingSnapshot.docs.map(doc => mapFirestoreToMedicine(doc.id, doc.data()));
-    
+
     // دمج النتائج وترتيبها حسب تاريخ الإنشاء
     const allMedicines = [...approvedMedicines, ...pendingMedicines];
     allMedicines.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    
+
     return allMedicines;
   } catch (error) {
     console.error('Error fetching medicines:', error);
@@ -235,7 +234,7 @@ export async function getMedicinesByPharmacy(pharmacyId: string): Promise<Medici
  */
 export async function getMedicinesGroupedByStatus(pharmacyId: string): Promise<GroupedMedicines> {
   const medicines = await getMedicinesByPharmacy(pharmacyId);
-  
+
   return {
     pending: medicines.filter(m => m.status === 'pending'),
     approved: medicines.filter(m => m.status === 'approved'),
@@ -256,7 +255,7 @@ export async function getPendingMedicines(): Promise<MedicineWithApproval[]> {
       where('deleted', '==', false),
       orderBy('createdAt', 'desc')
     );
-    
+
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => mapFirestoreToMedicine(doc.id, doc.data()));
   } catch (error) {
@@ -274,19 +273,19 @@ export async function getMedicineById(id: string): Promise<MedicineWithApproval>
     // أولاً نبحث في medicines collection
     const medicinesDocRef = doc(db, MEDICINES_COLLECTION, id);
     const medicinesDocSnap = await getDoc(medicinesDocRef);
-    
+
     if (medicinesDocSnap.exists()) {
       return mapFirestoreToMedicine(medicinesDocSnap.id, medicinesDocSnap.data());
     }
-    
+
     // إذا لم نجده، نبحث في pending_medicines collection
     const pendingDocRef = doc(db, PENDING_MEDICINES_COLLECTION, id);
     const pendingDocSnap = await getDoc(pendingDocRef);
-    
+
     if (pendingDocSnap.exists()) {
       return mapFirestoreToMedicine(pendingDocSnap.id, pendingDocSnap.data());
     }
-    
+
     throw new NotFoundError('medicine', id);
   } catch (error) {
     if (error instanceof NotFoundError) throw error;
@@ -301,18 +300,18 @@ export async function getMedicineById(id: string): Promise<MedicineWithApproval>
 async function getMedicineCollection(id: string): Promise<string> {
   const medicinesDocRef = doc(db, MEDICINES_COLLECTION, id);
   const medicinesDocSnap = await getDoc(medicinesDocRef);
-  
+
   if (medicinesDocSnap.exists()) {
     return MEDICINES_COLLECTION;
   }
-  
+
   const pendingDocRef = doc(db, PENDING_MEDICINES_COLLECTION, id);
   const pendingDocSnap = await getDoc(pendingDocRef);
-  
+
   if (pendingDocSnap.exists()) {
     return PENDING_MEDICINES_COLLECTION;
   }
-  
+
   throw new NotFoundError('medicine', id);
 }
 
@@ -330,14 +329,14 @@ export async function updateMedicine(
   try {
     const medicine = await getMedicineById(id);
     const collectionName = await getMedicineCollection(id);
-    
+
     // Check ownership - compare as strings to handle both types
     const medicinePharmacyId = String(medicine.pharmacyId);
     const inputPharmacyId = String(pharmacyId);
     if (medicinePharmacyId !== inputPharmacyId) {
       throw new AuthorizationError('لا يمكنك تعديل هذا الدواء', 'RESOURCE_NOT_OWNED');
     }
-    
+
     // Check if editing is allowed based on status
     if (medicine.status === 'approved') {
       throw new AuthorizationError(
@@ -345,11 +344,11 @@ export async function updateMedicine(
         'EDIT_NOT_ALLOWED'
       );
     }
-    
+
     const updateData: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
     };
-    
+
     if (input.name) updateData.name = input.name.trim();
     if (input.code) updateData.code = input.code.trim();
     if (input.description) updateData.description = input.description.trim();
@@ -362,7 +361,9 @@ export async function updateMedicine(
       updateData.subabaseImageUrl = input.subabaseImageUrl;
       updateData.subabaseORImageUrl = input.subabaseORImageUrl || input.subabaseImageUrl;
     }
-    
+    if (input.isNewProduct !== undefined) updateData.isNewProduct = input.isNewProduct;
+    if (input.discountRating !== undefined) updateData.discountRating = input.discountRating;
+
     // If editing a rejected medicine, reset to pending
     if (medicine.status === 'rejected') {
       updateData.status = 'pending';
@@ -370,7 +371,7 @@ export async function updateMedicine(
       updateData.reviewedBy = null;
       updateData.reviewedAt = null;
     }
-    
+
     await updateDoc(doc(db, collectionName, id), updateData);
   } catch (error) {
     if (error instanceof NotFoundError || error instanceof AuthorizationError) {
@@ -391,17 +392,17 @@ export async function approveMedicine(id: string, adminId: string): Promise<void
     // جلب الدواء من pending_medicines
     const pendingDocRef = doc(db, PENDING_MEDICINES_COLLECTION, id);
     const pendingDocSnap = await getDoc(pendingDocRef);
-    
+
     if (!pendingDocSnap.exists()) {
       throw new NotFoundError('medicine', id);
     }
-    
+
     const medicineData = pendingDocSnap.data();
-    
+
     if (medicineData.status !== 'pending') {
       throw new AuthorizationError('يمكن الموافقة فقط على الأدوية المعلقة', 'ACTION_NOT_ALLOWED');
     }
-    
+
     // تحديث البيانات للموافقة
     const approvedData = {
       ...medicineData,
@@ -411,15 +412,15 @@ export async function approveMedicine(id: string, adminId: string): Promise<void
       rejectionNotes: null,
       updatedAt: serverTimestamp(),
     };
-    
+
     console.log('✅ Moving medicine from pending_medicines to medicines:', id);
-    
+
     // إنشاء الدواء في medicines collection
     await setDoc(doc(db, MEDICINES_COLLECTION, id), approvedData);
-    
+
     // حذف الدواء من pending_medicines collection
     await deleteDoc(pendingDocRef);
-    
+
     console.log('✅ Medicine approved and moved to medicines collection');
   } catch (error) {
     if (error instanceof NotFoundError || error instanceof AuthorizationError) {
@@ -443,22 +444,22 @@ export async function rejectMedicine(
   if (!notes || notes.trim().length < 5) {
     throw new ValidationError('يجب إضافة ملاحظات للرفض (5 أحرف على الأقل)', 'rejectionNotes', 'REQUIRED');
   }
-  
+
   try {
     // جلب الدواء من pending_medicines
     const pendingDocRef = doc(db, PENDING_MEDICINES_COLLECTION, id);
     const pendingDocSnap = await getDoc(pendingDocRef);
-    
+
     if (!pendingDocSnap.exists()) {
       throw new NotFoundError('medicine', id);
     }
-    
+
     const medicineData = pendingDocSnap.data();
-    
+
     if (medicineData.status !== 'pending' && medicineData.status !== 'rejected') {
       throw new AuthorizationError('يمكن رفض الأدوية المعلقة أو المرفوضة فقط', 'ACTION_NOT_ALLOWED');
     }
-    
+
     // تحديث الحالة في pending_medicines (يبقى هناك)
     await updateDoc(pendingDocRef, {
       status: 'rejected',
@@ -467,7 +468,7 @@ export async function rejectMedicine(
       rejectionNotes: notes.trim(),
       updatedAt: serverTimestamp(),
     });
-    
+
     console.log('❌ Medicine rejected in pending_medicines:', id);
   } catch (error) {
     if (error instanceof NotFoundError || error instanceof AuthorizationError || error instanceof ValidationError) {
@@ -486,43 +487,41 @@ export async function rejectMedicine(
 export async function filterMedicines(filters: MedicineFilters): Promise<MedicineWithApproval[]> {
   try {
     let allMedicines: MedicineWithApproval[] = [];
-    
+
     // تحديد أي collections نبحث فيها بناءً على فلتر الحالة
     const searchApproved = !filters.status || filters.status === 'all' || filters.status === 'approved';
     const searchPending = !filters.status || filters.status === 'all' || filters.status === 'pending' || filters.status === 'rejected';
-    
+
     if (searchApproved) {
       // البحث في medicines collection (الأدوية المعتمدة)
       let approvedQuery = query(collection(db, MEDICINES_COLLECTION), where('deleted', '==', false));
-      
+
       if (filters.pharmacyId) {
-        const pharmacyIdNum = parseInt(filters.pharmacyId);
-        approvedQuery = query(approvedQuery, where('pharmacyId', '==', isNaN(pharmacyIdNum) ? filters.pharmacyId : pharmacyIdNum));
+        approvedQuery = query(approvedQuery, where('pharmacyId', '==', filters.pharmacyId));
       }
-      
+
       const approvedSnapshot = await getDocs(approvedQuery);
       const approvedMedicines = approvedSnapshot.docs.map(doc => mapFirestoreToMedicine(doc.id, doc.data()));
       allMedicines = [...allMedicines, ...approvedMedicines];
     }
-    
+
     if (searchPending) {
       // البحث في pending_medicines collection
       let pendingQuery = query(collection(db, PENDING_MEDICINES_COLLECTION), where('deleted', '==', false));
-      
+
       if (filters.status && filters.status !== 'all' && filters.status !== 'approved') {
         pendingQuery = query(pendingQuery, where('status', '==', filters.status));
       }
-      
+
       if (filters.pharmacyId) {
-        const pharmacyIdNum = parseInt(filters.pharmacyId);
-        pendingQuery = query(pendingQuery, where('pharmacyId', '==', isNaN(pharmacyIdNum) ? filters.pharmacyId : pharmacyIdNum));
+        pendingQuery = query(pendingQuery, where('pharmacyId', '==', filters.pharmacyId));
       }
-      
+
       const pendingSnapshot = await getDocs(pendingQuery);
       const pendingMedicines = pendingSnapshot.docs.map(doc => mapFirestoreToMedicine(doc.id, doc.data()));
       allMedicines = [...allMedicines, ...pendingMedicines];
     }
-    
+
     // Apply date range filter (client-side)
     if (filters.dateRange) {
       allMedicines = allMedicines.filter(m => {
@@ -530,15 +529,15 @@ export async function filterMedicines(filters: MedicineFilters): Promise<Medicin
         return createdAt >= filters.dateRange!.start && createdAt <= filters.dateRange!.end;
       });
     }
-    
+
     // Apply category filter (client-side)
     if (filters.category) {
       allMedicines = allMedicines.filter(m => m.category === filters.category);
     }
-    
+
     // ترتيب حسب تاريخ الإنشاء
     allMedicines.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    
+
     return allMedicines;
   } catch (error) {
     console.error('Error filtering medicines:', error);
@@ -557,47 +556,42 @@ export async function canPharmacyAddMedicine(pharmacyId: string): Promise<{
   message?: string;
 }> {
   try {
-    // Convert string pharmacyId to number
-    const pharmacyIdNum = parseInt(pharmacyId);
-    if (isNaN(pharmacyIdNum)) {
-      return { canAdd: false, currentCount: 0, limit: 0, message: 'معرف الصيدلية غير صحيح' };
-    }
-    
-    const pharmacy = await getPharmacyByPharmacyId(pharmacyIdNum);
+    // Direct string usage
+    const pharmacy = await getPharmacyById(pharmacyId);
     if (!pharmacy) {
       return { canAdd: false, currentCount: 0, limit: 0, message: 'الصيدلية غير موجودة' };
     }
-    
+
     console.log('📊 Pharmacy limit info from DB:', {
-      pharmacyId: pharmacyIdNum,
+      pharmacyId: pharmacyId,
       name: pharmacy.name,
       medicineLimit: pharmacy.medicineLimit,
       currentMedicineCount: pharmacy.currentMedicineCount
     });
-    
+
     // حساب العدد الفعلي من الأدوية من كلا الـ collections
-    const actualCount = await getActualMedicineCount(pharmacyIdNum);
-    
+    const actualCount = await getActualMedicineCount(pharmacyId);
+
     console.log('📊 Actual medicine count:', actualCount);
-    
+
     // تحديث العداد في الصيدلية إذا كان مختلف
     if (actualCount !== pharmacy.currentMedicineCount) {
-      console.log(`🔄 Syncing medicine count for pharmacy ${pharmacyIdNum}: ${pharmacy.currentMedicineCount} -> ${actualCount}`);
+      console.log(`🔄 Syncing medicine count for pharmacy ${pharmacyId}: ${pharmacy.currentMedicineCount} -> ${actualCount}`);
       await syncPharmacyMedicineCount(pharmacy.id, actualCount);
     }
-    
+
     const canAdd = actualCount < pharmacy.medicineLimit;
     const remaining = pharmacy.medicineLimit - actualCount;
-    
+
     let message: string | undefined;
     if (!canAdd) {
       message = `تم الوصول للحد الأقصى (${pharmacy.medicineLimit} دواء). تواصل مع الإدارة لزيادة الحد.`;
     } else if (remaining <= 3) {
       message = `تبقى ${remaining} أدوية فقط من الحد المسموح`;
     }
-    
+
     console.log('📊 Final limit info:', { canAdd, currentCount: actualCount, limit: pharmacy.medicineLimit, message });
-    
+
     return {
       canAdd,
       currentCount: actualCount,
@@ -613,35 +607,35 @@ export async function canPharmacyAddMedicine(pharmacyId: string): Promise<{
 /**
  * حساب العدد الفعلي للأدوية من كلا الـ collections
  */
-async function getActualMedicineCount(pharmacyIdNum: number): Promise<number> {
+async function getActualMedicineCount(pharmacyId: string): Promise<number> {
   try {
     // عد الأدوية المعتمدة (غير المحذوفة) من medicines collection
     const approvedQuery = query(
       collection(db, MEDICINES_COLLECTION),
-      where('pharmacyId', '==', pharmacyIdNum),
+      where('pharmacyId', '==', pharmacyId),
       where('deleted', '==', false)
     );
-    
+
     // عد الأدوية المعلقة والمرفوضة (غير المحذوفة) من pending_medicines collection
     const pendingQuery = query(
       collection(db, PENDING_MEDICINES_COLLECTION),
-      where('pharmacyId', '==', pharmacyIdNum),
+      where('pharmacyId', '==', pharmacyId),
       where('deleted', '==', false)
     );
-    
+
     const [approvedSnapshot, pendingSnapshot] = await Promise.all([
       getDocs(approvedQuery),
       getDocs(pendingQuery)
     ]);
-    
-    console.log(`📊 Medicine count breakdown for pharmacy ${pharmacyIdNum}:`, {
+
+    console.log(`📊 Medicine count breakdown for pharmacy ${pharmacyId}:`, {
       approved: approvedSnapshot.docs.length,
       approvedIds: approvedSnapshot.docs.map(d => d.id),
       pending: pendingSnapshot.docs.length,
       pendingIds: pendingSnapshot.docs.map(d => d.id),
       total: approvedSnapshot.docs.length + pendingSnapshot.docs.length
     });
-    
+
     return approvedSnapshot.docs.length + pendingSnapshot.docs.length;
   } catch (error) {
     console.error('Error counting medicines:', error);
@@ -675,14 +669,14 @@ export async function deleteMedicine(
   try {
     const medicine = await getMedicineById(id);
     const collectionName = await getMedicineCollection(id);
-    
+
     // Check ownership - compare as strings to handle both types
     const medicinePharmacyId = String(medicine.pharmacyId);
     const inputPharmacyId = String(pharmacyId);
     if (medicinePharmacyId !== inputPharmacyId) {
       throw new AuthorizationError('لا يمكنك حذف هذا الدواء', 'RESOURCE_NOT_OWNED');
     }
-    
+
     // Check if deleting is allowed based on status
     if (medicine.status === 'approved') {
       throw new AuthorizationError(
@@ -690,12 +684,12 @@ export async function deleteMedicine(
         'ACTION_NOT_ALLOWED'
       );
     }
-    
+
     // Delete image from Supabase Storage if exists
     if (medicine.subabaseImageUrl) {
       console.log('🗑️ حذف الصورة من Supabase Storage:', medicine.subabaseImageUrl);
       const deleteResult = await deleteImageFromSupabase(medicine.subabaseImageUrl);
-      
+
       if (deleteResult.success) {
         console.log('✅ تم حذف الصورة من Supabase بنجاح');
       } else {
@@ -703,17 +697,17 @@ export async function deleteMedicine(
         // Continue with medicine deletion even if image deletion fails
       }
     }
-    
+
     // Delete the medicine (soft delete)
     await updateDoc(doc(db, collectionName, id), {
       deleted: true,
       deletedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    
+
     // Update pharmacy medicine count
     await updateMedicineCount(pharmacyId, -1);
-    
+
     console.log('✅ تم حذف الدواء والصورة بنجاح');
   } catch (error) {
     if (error instanceof NotFoundError || error instanceof AuthorizationError) {
@@ -732,12 +726,12 @@ export async function deleteMedicinePermanently(id: string): Promise<void> {
   try {
     const medicine = await getMedicineById(id);
     const collectionName = await getMedicineCollection(id);
-    
+
     // Delete image from Supabase Storage if exists
     if (medicine.subabaseImageUrl) {
       console.log('🗑️ حذف الصورة من Supabase Storage:', medicine.subabaseImageUrl);
       const deleteResult = await deleteImageFromSupabase(medicine.subabaseImageUrl);
-      
+
       if (deleteResult.success) {
         console.log('✅ تم حذف الصورة من Supabase بنجاح');
       } else {
@@ -745,10 +739,10 @@ export async function deleteMedicinePermanently(id: string): Promise<void> {
         // Continue with medicine deletion even if image deletion fails
       }
     }
-    
+
     // Delete the medicine document permanently (HARD DELETE)
     await deleteDoc(doc(db, collectionName, id));
-    
+
     console.log('✅ تم حذف الدواء والصورة نهائياً من Firebase');
   } catch (error) {
     if (error instanceof NotFoundError) {
@@ -775,16 +769,16 @@ export async function getMedicineStats(): Promise<{
       query(collection(db, MEDICINES_COLLECTION), where('deleted', '==', false))
     );
     const approvedCount = medicinesSnapshot.docs.length;
-    
+
     // جلب من pending_medicines collection
     const pendingSnapshot = await getDocs(
       query(collection(db, PENDING_MEDICINES_COLLECTION), where('deleted', '==', false))
     );
     const pendingMedicines = pendingSnapshot.docs.map(doc => doc.data());
-    
+
     const pendingCount = pendingMedicines.filter(m => m.status === 'pending').length;
     const rejectedCount = pendingMedicines.filter(m => m.status === 'rejected').length;
-    
+
     return {
       total: approvedCount + pendingMedicines.length,
       pending: pendingCount,

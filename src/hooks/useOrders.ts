@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { Order, CartItem } from '@/types';
 import { toast } from 'sonner';
 
-export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) {
+export function useOrders(pharmacyId?: string, options?: { enabled?: boolean }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +46,8 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
               orderId: data.orderId || doc.id,
               userId: data.userId || '',
               cartItem: Array.isArray(data.cartItem) ? data.cartItem : [],
-              orderStatus: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(data.orderStatus) 
-                ? data.orderStatus 
+              orderStatus: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(data.orderStatus)
+                ? data.orderStatus
                 : 'pending',
               paymentMethodName: data.paymentMethodName || 'Unknown',
               payWithCash: typeof data.payWithCash === 'boolean' ? data.payWithCash : true,
@@ -67,11 +67,11 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
               paymentProofUrl: data.paymentProofUrl || null,
               prescriptionUrl: data.prescriptionUrl || '',
               pharmacyId: data.pharmacyId,
-              createdAt: data.createdAt instanceof Timestamp 
-                ? data.createdAt.toDate() 
+              createdAt: data.createdAt instanceof Timestamp
+                ? data.createdAt.toDate()
                 : (data.createdAt ? new Date(data.createdAt) : new Date()),
-              updatedAt: data.updatedAt instanceof Timestamp 
-                ? data.updatedAt.toDate() 
+              updatedAt: data.updatedAt instanceof Timestamp
+                ? data.updatedAt.toDate()
                 : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
               reviews: Array.isArray(data.reviews) ? data.reviews : []
             } as Order;
@@ -99,12 +99,12 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
             const filteredCartItems = order.cartItem.filter(
               (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
             );
-            
+
             // Recalculate totals for this pharmacy's items only
             const pharmacySubtotal = filteredCartItems.reduce(
               (sum, item) => sum + (item.medicineEntity.price * item.count), 0
             );
-            
+
             return {
               ...order,
               cartItem: filteredCartItems,

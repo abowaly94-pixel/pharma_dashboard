@@ -15,7 +15,7 @@ export interface Medicine {
   description: string;
   price: number;
   quantity: number;
-  pharmacyId: number;
+  pharmacyId: string;
   pharmacyName: string;
   pharmcyAddress: string; // تم الاحتفاظ بالاسم الحالي للتوافق
   avgRating: number;
@@ -46,7 +46,7 @@ export interface PendingMedicine extends Medicine {
 
 export interface Pharmacy {
   id: string;
-  pharmacyId: number;
+  pharmacyId: string;
   name: string;
   address: string;
   city: string;
@@ -101,7 +101,7 @@ export interface Order {
   prescriptionUrl: string;
   createdAt: Date;
   updatedAt: Date;
-  pharmacyId?: number;
+  pharmacyId?: string;
   reviews?: Review[];
 }
 
@@ -114,7 +114,7 @@ export interface User {
   cart: CartItem[];
   favorites: string[];
   role?: 'admin' | 'pharmacist' | 'user';
-  pharmacyId?: number;
+  pharmacyId?: string;
   pharmacyName?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -140,7 +140,7 @@ export interface DashboardStats {
 /** حساب الصيدلية الموسع مع إدارة الحدود والحالة */
 export interface PharmacyAccount {
   id: string;
-  pharmacyId: number;
+  pharmacyId: string;
   name: string;
   email: string;
   address: string;
@@ -236,6 +236,8 @@ export interface CreateMedicineInput {
   expiryDate: Date;
   subabaseImageUrl: string;
   subabaseORImageUrl?: string;
+  isNewProduct?: boolean;
+  discountRating?: number;
 }
 
 /** بيانات تحديث الدواء */
@@ -250,6 +252,8 @@ export interface UpdateMedicineInput {
   expiryDate?: Date;
   subabaseImageUrl?: string;
   subabaseORImageUrl?: string;
+  isNewProduct?: boolean;
+  discountRating?: number;
 }
 
 // ==================== Filter Interfaces ====================

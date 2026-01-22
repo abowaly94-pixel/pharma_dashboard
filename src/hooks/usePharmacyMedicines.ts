@@ -66,13 +66,13 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   // Real-time listener for pharmacy medicines from both collections
   useEffect(() => {
-    const effectivePharmacyIdNumber = pharmacyId ? parseInt(pharmacyId) : user?.pharmacyId;
-    
-    if (!effectivePharmacyIdNumber) {
-      console.log('⚠️ No pharmacy ID found', { 
-        pharmacyId, 
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+
+    if (!effectivePharmacyId) {
+      console.log('⚠️ No pharmacy ID found', {
+        pharmacyId,
         userPharmacyId: user?.pharmacyId,
-        effectivePharmacyIdNumber,
+        effectivePharmacyId,
         user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
       });
       setMedicines([]);
@@ -80,7 +80,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
       return;
     }
 
-    console.log('🔍 Setting up real-time listeners for pharmacyId:', effectivePharmacyIdNumber, {
+    console.log('🔍 Setting up real-time listeners for pharmacyId:', effectivePharmacyId, {
       user: user ? { uid: user.uid, role: user.role, pharmacyId: user.pharmacyId } : null
     });
     setIsLoading(true);
@@ -89,14 +89,14 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
     // Query for approved medicines from 'medicines' collection
     const approvedQuery = query(
       collection(db, 'medicines'),
-      where('pharmacyId', '==', effectivePharmacyIdNumber),
+      where('pharmacyId', '==', effectivePharmacyId),
       where('deleted', '==', false)
     );
 
     // Query for pending/rejected medicines from 'pending_medicines' collection
     const pendingQuery = query(
       collection(db, 'pending_medicines'),
-      where('pharmacyId', '==', effectivePharmacyIdNumber),
+      where('pharmacyId', '==', effectivePharmacyId),
       where('deleted', '==', false)
     );
 
@@ -129,6 +129,8 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         expiryDate: data.expiryDate?.toDate() || new Date(),
         subabaseImageUrl: data.subabaseImageUrl || data.subabaseORImageUrl || '',
         subabaseORImageUrl: data.subabaseORImageUrl || data.subabaseImageUrl || '',
+        isNewProduct: data.isNewProduct || false,
+        discountRating: data.discountRating || 0,
         pharmacyId: data.pharmacyId,
         pharmacyName: data.pharmacyName,
         pharmcyAddress: data.pharmcyAddress || '',
@@ -185,7 +187,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   // Update limit info when pharmacy changes or medicines count changes
   useEffect(() => {
     const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-    
+
     if (!effectivePharmacyId) {
       setLimitInfo({
         canAdd: false,
@@ -206,10 +208,10 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           approved: medicines.filter(m => m.status === 'approved').length,
           rejected: medicines.filter(m => m.status === 'rejected').length,
         });
-        
+
         const info = await canPharmacyAddMedicine(effectivePharmacyId);
         const remaining = Math.max(0, info.limit - info.currentCount);
-        
+
         console.log('✅ Limit info received:', {
           canAdd: info.canAdd,
           currentCount: info.currentCount,
@@ -217,7 +219,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           remaining,
           message: info.message,
         });
-        
+
         setLimitInfo({
           canAdd: info.canAdd,
           currentCount: info.currentCount,
@@ -259,7 +261,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   const addMedicine = useCallback(
     async (data: CreateMedicineInput): Promise<MedicineWithApproval | null> => {
       const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-      
+
       if (!effectivePharmacyId || !user) {
         toast.error('يجب تسجيل الدخول أولاً');
         return null;
@@ -277,10 +279,10 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           pharmacyName: user.pharmacyName,
           data
         });
-        
+
         const pharmacyName = user.pharmacyName || 'صيدلية';
         const medicine = await createMedicine(data, effectivePharmacyId, pharmacyName);
-        
+
         console.log('✅ Medicine added successfully:', medicine);
         toast.success('تم إضافة الدواء بنجاح وهو في انتظار المراجعة');
         return medicine;
@@ -292,7 +294,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           name: error.name,
           stack: error.stack
         });
-        
+
         // رسائل خطأ أكثر وضوحاً
         if (error.message.includes('اسم الدواء')) {
           toast.error('اسم الدواء مطلوب (حرفين على الأقل)');
@@ -305,7 +307,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
         } else {
           toast.error(error.message || 'فشل في إضافة الدواء');
         }
-        
+
         setError(error);
         return null;
       }
@@ -316,7 +318,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   const editMedicine = useCallback(
     async (id: string, data: UpdateMedicineInput): Promise<boolean> => {
       const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-      
+
       if (!effectivePharmacyId) {
         toast.error('يجب تسجيل الدخول أولاً');
         return false;
@@ -338,7 +340,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   const deleteMedicineHandler = useCallback(
     async (id: string): Promise<boolean> => {
       const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-      
+
       if (!effectivePharmacyId) {
         toast.error('يجب تسجيل الدخول أولاً');
         return false;
@@ -359,9 +361,9 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const refreshMedicines = useCallback(async () => {
     const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-    
+
     if (!effectivePharmacyId) return;
-    
+
     try {
       setIsLoading(true);
       const grouped = await getMedicinesGroupedByStatus(effectivePharmacyId);
@@ -380,9 +382,9 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const checkCanAdd = useCallback(async (): Promise<boolean> => {
     const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
-    
+
     if (!effectivePharmacyId) return false;
-    
+
     try {
       const info = await canPharmacyAddMedicine(effectivePharmacyId);
       const remaining = Math.max(0, info.limit - info.currentCount);

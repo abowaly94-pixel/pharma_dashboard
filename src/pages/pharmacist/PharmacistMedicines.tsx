@@ -94,7 +94,7 @@ export default function PharmacistMedicines() {
         if (isOpen) {
           setIsAddEditDialogOpen(true);
           setFormData(savedFormData);
-          
+
           // If editing, find the medicine by ID
           if (editingMedicineId) {
             const medicine = medicines.find(m => m.id === editingMedicineId);
@@ -140,7 +140,7 @@ export default function PharmacistMedicines() {
     setImageLoadError(false);
     // Reset uploaded images tracker
     setUploadedImagesInSession([]);
-    
+
     if (medicine) {
       setEditingMedicine(medicine);
       setFormData({
@@ -229,7 +229,7 @@ export default function PharmacistMedicines() {
       if (editingMedicine) {
         const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
         const newImageUrl = formData.subabaseImageUrl;
-        
+
         // احذف الصورة القديمة إذا:
         // 1. كانت موجودة
         // 2. تم تغييرها (الصورة الجديدة مختلفة)
@@ -237,9 +237,9 @@ export default function PharmacistMedicines() {
         if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes('supabase.co/storage')) {
           console.log('🗑️ حذف الصورة القديمة من Supabase:', oldImageUrl);
           toast.info('جاري حذف الصورة القديمة...');
-          
+
           const deleteResult = await deleteImageFromSupabase(oldImageUrl);
-          
+
           if (deleteResult.success) {
             console.log('✅ تم حذف الصورة القديمة بنجاح');
             toast.success('تم حذف الصورة القديمة من التخزين');
@@ -260,6 +260,8 @@ export default function PharmacistMedicines() {
         manufacturer: formData.manufacturer.trim(),
         subabaseImageUrl: formData.subabaseImageUrl,
         subabaseORImageUrl: formData.subabaseImageUrl,
+        isNewProduct: formData.isNewProduct,
+        discountRating: formData.discountRating,
         expiryDate: new Date(),
       };
 
@@ -328,7 +330,7 @@ export default function PharmacistMedicines() {
 
       const compressedSize = formatFileSize(compressedFile.size);
       const savings = Math.round((1 - compressedFile.size / file.size) * 100);
-      
+
       console.log('📸 Image compression:', {
         original: originalSize,
         compressed: compressedSize,
@@ -363,7 +365,7 @@ export default function PharmacistMedicines() {
     if (uploadedImagesInSession.length > 0) {
       console.log('🗑️ حذف الصور المرفوعة في الجلسة:', uploadedImagesInSession);
       toast.info('جاري حذف الصور المرفوعة...');
-      
+
       for (const imageUrl of uploadedImagesInSession) {
         if (imageUrl.includes('supabase.co/storage')) {
           const result = await deleteImageFromSupabase(imageUrl);
@@ -374,10 +376,10 @@ export default function PharmacistMedicines() {
           }
         }
       }
-      
+
       toast.success('تم حذف الصور المرفوعة');
     }
-    
+
     setUploadedImagesInSession([]);
     setIsAddEditDialogOpen(false);
   };
@@ -393,7 +395,7 @@ export default function PharmacistMedicines() {
 
     try {
       console.log('🎨 بدء إزالة الخلفية للصورة:', formData.subabaseImageUrl);
-      
+
       const result = await removeImageBackground(formData.subabaseImageUrl);
 
       if (!result.success || !result.blob) {
@@ -409,21 +411,21 @@ export default function PharmacistMedicines() {
       // حذف الصورة القديمة من Supabase إذا كانت موجودة
       const currentImageUrl = formData.subabaseImageUrl;
       const originalImageUrl = formData.subabaseORImageUrl;
-      
+
       console.log('📋 معلومات الصور:', {
         currentImageUrl,
         originalImageUrl,
         isFromSupabase: currentImageUrl.includes('supabase.co/storage')
       });
-      
+
       // احذف الصورة الحالية إذا كانت من Supabase
       // (سواء كانت معالجة سابقة أو صورة أصلية من Supabase)
       if (currentImageUrl.includes('supabase.co/storage')) {
         console.log('🗑️ حذف الصورة القديمة من Supabase:', currentImageUrl);
         toast.info('جاري حذف الصورة القديمة...');
-        
+
         const deleteResult = await deleteImageFromSupabase(currentImageUrl);
-        
+
         if (deleteResult.success) {
           console.log('✅ تم حذف الصورة القديمة بنجاح');
           toast.success('تم حذف الصورة القديمة');
@@ -439,7 +441,7 @@ export default function PharmacistMedicines() {
       console.log('📤 رفع الصورة المعالجة الجديدة...');
       const originalSize = formatFileSize(file.size);
       toast.info(`جاري ضغط ورفع الصورة المعالجة... (${originalSize})`);
-      
+
       // ضغط الصورة المعالجة قبل الرفع (مع الحفاظ على الشفافية)
       const compressedFile = await compressImage(file, {
         maxWidth: 800,       // أبعاد أصغر للضغط الأفضل
@@ -450,7 +452,7 @@ export default function PharmacistMedicines() {
 
       const compressedSize = formatFileSize(compressedFile.size);
       const savings = Math.round((1 - compressedFile.size / file.size) * 100);
-      
+
       console.log('📸 Background removed image compression:', {
         original: originalSize,
         compressed: compressedSize,
@@ -460,31 +462,31 @@ export default function PharmacistMedicines() {
       if (savings > 10) {
         toast.success(`تم ضغط الصورة المعالجة! (${originalSize} → ${compressedSize})`);
       }
-      
+
       const uploadResult = await uploadImageToSupabase(compressedFile);
 
       if (uploadResult.success && uploadResult.url) {
         console.log('✅ تم رفع الصورة المعالجة بنجاح:', uploadResult.url);
-        
+
         // حفظ الصورة الأصلية في subabaseORImageUrl إذا لم تكن محفوظة
         // إذا كانت الصورة الأصلية من الإنترنت (ليست من Supabase)، احتفظ بها
-        const savedOriginalUrl = originalImageUrl || 
-                                 (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
-        
+        const savedOriginalUrl = originalImageUrl ||
+          (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
+
         console.log('💾 حفظ البيانات:', {
           newImageUrl: uploadResult.url,
           savedOriginalUrl
         });
-        
-        setFormData({ 
-          ...formData, 
+
+        setFormData({
+          ...formData,
           subabaseImageUrl: uploadResult.url,
           subabaseORImageUrl: savedOriginalUrl
         });
-        
+
         // تتبع الصورة المعالجة المرفوعة حديثاً
         setUploadedImagesInSession(prev => [...prev, uploadResult.url]);
-        
+
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
         console.error('❌ فشل رفع الصورة المعالجة:', uploadResult.error);
@@ -630,8 +632,8 @@ export default function PharmacistMedicines() {
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full transition-all duration-300 ${!limitInfo.canAdd ? 'bg-red-500' :
-                        limitInfo.remaining <= 3 ? 'bg-orange-500' :
-                          'bg-green-500'
+                      limitInfo.remaining <= 3 ? 'bg-orange-500' :
+                        'bg-green-500'
                       }`}
                     style={{ width: `${Math.min(100, (limitInfo.currentCount / limitInfo.limit) * 100)}%` }}
                   ></div>
@@ -787,6 +789,16 @@ export default function PharmacistMedicines() {
                       )}
                     </div>
 
+                    {/* Badges - Top Left */}
+                    <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+                      {medicine.isNewProduct && (
+                        <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 shadow-md font-bold font-cairo animate-pulse">
+                          جديد
+                        </Badge>
+                      )}
+
+                    </div>
+
                     {/* Out of Stock */}
                     {medicine.quantity === 0 && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-xl">
@@ -825,10 +837,15 @@ export default function PharmacistMedicines() {
                           <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-1">
                         <div className={`text-sm font-medium ${medicine.quantity > 10 ? 'text-green-600' : medicine.quantity > 0 ? 'text-orange-500' : 'text-red-500'}`}>
                           الكمية: {medicine.quantity}
                         </div>
+                        {medicine.discountRating > 0 && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-red-50 text-red-600 border-red-200 font-bold w-fit">
+                            خصم {medicine.discountRating}%
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -1080,10 +1097,10 @@ export default function PharmacistMedicines() {
                   <div className="relative">
                     <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${formData.subabaseImageUrl
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : isUploading
-                            ? 'bg-amber-400 text-white cursor-wait'
-                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : isUploading
+                          ? 'bg-amber-400 text-white cursor-wait'
+                          : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
                         }`}>
                         {isUploading ? (
                           <>
@@ -1150,7 +1167,7 @@ export default function PharmacistMedicines() {
                           </span>
                         </div>
                       )}
-                      
+
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         {!imageLoadError ? (
                           <img
@@ -1224,19 +1241,19 @@ export default function PharmacistMedicines() {
                                     toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
                                   }
                                 }
-                                
+
                                 // حذف الصورة الأصلية من Supabase إذا كانت موجودة ومختلفة
                                 if (hasOriginal && originalImageUrl.includes('supabase.co/storage')) {
                                   console.log('🗑️ حذف الصورة الأصلية:', originalImageUrl);
                                   const originalResult = await deleteImageFromSupabase(originalImageUrl);
-                                  
+
                                   if (originalResult.success) {
                                     console.log('✅ تم حذف الصورة الأصلية بنجاح');
                                   } else {
                                     console.error('❌ فشل حذف الصورة الأصلية:', originalResult.error);
                                   }
                                 }
-                                
+
                                 // تحديث الـ state
                                 if (hasOriginal && !originalImageUrl.includes('supabase.co/storage')) {
                                   // إذا كانت الصورة الأصلية من الإنترنت، نرجع لها
@@ -1245,7 +1262,7 @@ export default function PharmacistMedicines() {
                                   // إذا لا، نفرغ الحقول
                                   setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
                                 }
-                                
+
                                 if (!isSupabaseImage) {
                                   toast.success('تم إزالة الصورة');
                                 }
@@ -1287,7 +1304,7 @@ export default function PharmacistMedicines() {
                             ? 'يجب إدخال عنوان الصيدلية بالكامل من صفحة الإعدادات أولاً'
                             : !formData.subabaseImageUrl
                               ? 'يجب رفع صورة للدواء أولاً'
-                        : ''
+                              : ''
                   }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

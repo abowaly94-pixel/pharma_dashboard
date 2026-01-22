@@ -61,7 +61,7 @@ export default function AdminMedicines() {
     description: '',
     price: 0,
     quantity: 0,
-    pharmacyId: 0,
+    pharmacyId: '',
     pharmacyName: '',
     pharmcyAddress: '',
     category: '',
@@ -85,7 +85,7 @@ export default function AdminMedicines() {
         if (isOpen) {
           setIsAddEditDialogOpen(true);
           setFormData(savedFormData);
-          
+
           // If editing, find the medicine by ID
           if (editingMedicineId) {
             const medicine = medicines.find(m => m.id === editingMedicineId);
@@ -120,7 +120,7 @@ export default function AdminMedicines() {
     setImageLoadError(false);
     // Reset uploaded images tracker
     setUploadedImagesInSession([]);
-    
+
     if (medicine) {
       setEditingMedicine(medicine);
       setFormData({
@@ -153,7 +153,7 @@ export default function AdminMedicines() {
         description: '',
         price: 0,
         quantity: 0,
-        pharmacyId: defaultPharmacy?.pharmacyId || 0,
+        pharmacyId: defaultPharmacy?.pharmacyId || '',
         pharmacyName: defaultPharmacy?.name || '',
         pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
         category: '',
@@ -177,19 +177,19 @@ export default function AdminMedicines() {
     console.log('🚀 handleSubmit called');
     console.log('📝 Form data:', formData);
     console.log('✏️ Editing medicine:', editingMedicine);
-    
+
     // التحقق من وجود صورة
     if (!formData.subabaseImageUrl || formData.subabaseImageUrl.trim() === '') {
       toast.error('يجب رفع صورة للدواء قبل الحفظ');
       return;
     }
-    
+
     // التحقق من وجود عنوان الصيدلية
     if (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5) {
       toast.error('⚠️ يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)');
       return;
     }
-    
+
     // منع الإرسال المتكرر (بعد التحقق من البيانات)
     if (isSaving || savingRef.current) {
       toast.warning('جاري الحفظ... الرجاء الانتظار');
@@ -204,7 +204,7 @@ export default function AdminMedicines() {
       if (editingMedicine) {
         const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
         const newImageUrl = formData.subabaseImageUrl;
-        
+
         // احذف الصورة القديمة إذا:
         // 1. كانت موجودة
         // 2. تم تغييرها (الصورة الجديدة مختلفة)
@@ -212,9 +212,9 @@ export default function AdminMedicines() {
         if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes('supabase.co/storage')) {
           console.log('🗑️ حذف الصورة القديمة من Supabase:', oldImageUrl);
           toast.info('جاري حذف الصورة القديمة...');
-          
+
           const deleteResult = await deleteImageFromSupabase(oldImageUrl);
-          
+
           if (deleteResult.success) {
             console.log('✅ تم حذف الصورة القديمة بنجاح');
             toast.success('تم حذف الصورة القديمة من التخزين');
@@ -224,12 +224,12 @@ export default function AdminMedicines() {
           }
         }
       }
-      
+
       // حفظ البيانات
       const dataToSave = {
         ...formData,
       };
-      
+
       if (editingMedicine) {
         await updateMedicine(editingMedicine.id, dataToSave);
         toast.success('تم تحديث الدواء بنجاح');
@@ -237,7 +237,7 @@ export default function AdminMedicines() {
         await addMedicine(dataToSave);
         toast.success('تم إضافة الدواء بنجاح');
       }
-      
+
       setIsAddEditDialogOpen(false);
     } catch (error) {
       console.error('Error saving medicine:', error);
@@ -281,7 +281,7 @@ export default function AdminMedicines() {
 
       const compressedSize = formatFileSize(compressedFile.size);
       const savings = Math.round((1 - compressedFile.size / file.size) * 100);
-      
+
       console.log('📸 Image compression:', {
         original: originalSize,
         compressed: compressedSize,
@@ -294,7 +294,7 @@ export default function AdminMedicines() {
 
       // رفع الصورة المضغوطة
       const result = await uploadImageToSupabase(compressedFile);
-      
+
       if (result.success && result.url) {
         setFormData({ ...formData, subabaseImageUrl: result.url });
         // تتبع الصورة المرفوعة حديثاً
@@ -326,10 +326,10 @@ export default function AdminMedicines() {
 
     try {
       console.log('🎨 بدء إزالة الخلفية للصورة:', formData.subabaseImageUrl);
-      
+
       // Remove background
       const result = await removeImageBackground(formData.subabaseImageUrl);
-      
+
       if (!result.success || !result.blob) {
         console.error('❌ فشل إزالة الخلفية:', result.error);
         toast.error(result.error || 'فشل إزالة الخلفية');
@@ -340,25 +340,25 @@ export default function AdminMedicines() {
       console.log('✅ تمت إزالة الخلفية بنجاح');
       // Convert blob to file
       const file = new File([result.blob], 'medicine-no-bg.png', { type: 'image/png' });
-      
+
       // حذف الصورة القديمة من Supabase إذا كانت موجودة
       const currentImageUrl = formData.subabaseImageUrl;
       const originalImageUrl = formData.subabaseORImageUrl;
-      
+
       console.log('📋 معلومات الصور:', {
         currentImageUrl,
         originalImageUrl,
         isFromSupabase: currentImageUrl.includes('supabase.co/storage')
       });
-      
+
       // احذف الصورة الحالية إذا كانت من Supabase
       // (سواء كانت معالجة سابقة أو صورة أصلية من Supabase)
       if (currentImageUrl.includes('supabase.co/storage')) {
         console.log('🗑️ حذف الصورة القديمة من Supabase:', currentImageUrl);
         toast.info('جاري حذف الصورة القديمة...');
-        
+
         const deleteResult = await deleteImageFromSupabase(currentImageUrl);
-        
+
         if (deleteResult.success) {
           console.log('✅ تم حذف الصورة القديمة بنجاح');
           toast.success('تم حذف الصورة القديمة');
@@ -369,12 +369,12 @@ export default function AdminMedicines() {
       } else {
         console.log('ℹ️ الصورة الحالية ليست من Supabase، لن يتم حذفها');
       }
-      
+
       // رفع الصورة الجديدة
       console.log('📤 رفع الصورة المعالجة الجديدة...');
       const originalSize = formatFileSize(file.size);
       toast.info(`جاري ضغط ورفع الصورة المعالجة... (${originalSize})`);
-      
+
       // ضغط الصورة المعالجة قبل الرفع (مع الحفاظ على الشفافية)
       const compressedFile = await compressImage(file, {
         maxWidth: 800,       // أبعاد أصغر للضغط الأفضل
@@ -385,7 +385,7 @@ export default function AdminMedicines() {
 
       const compressedSize = formatFileSize(compressedFile.size);
       const savings = Math.round((1 - compressedFile.size / file.size) * 100);
-      
+
       console.log('📸 Background removed image compression:', {
         original: originalSize,
         compressed: compressedSize,
@@ -395,31 +395,31 @@ export default function AdminMedicines() {
       if (savings > 10) {
         toast.success(`تم ضغط الصورة المعالجة! (${originalSize} → ${compressedSize})`);
       }
-      
+
       const uploadResult = await uploadImageToSupabase(compressedFile);
-      
+
       if (uploadResult.success && uploadResult.url) {
         console.log('✅ تم رفع الصورة المعالجة بنجاح:', uploadResult.url);
-        
+
         // حفظ الصورة الأصلية في subabaseORImageUrl إذا لم تكن محفوظة
         // إذا كانت الصورة الأصلية من الإنترنت (ليست من Supabase)، احتفظ بها
-        const savedOriginalUrl = originalImageUrl || 
-                                 (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
-        
+        const savedOriginalUrl = originalImageUrl ||
+          (!currentImageUrl.includes('supabase.co/storage') ? currentImageUrl : '');
+
         console.log('💾 حفظ البيانات:', {
           newImageUrl: uploadResult.url,
           savedOriginalUrl
         });
-        
-        setFormData({ 
-          ...formData, 
+
+        setFormData({
+          ...formData,
           subabaseImageUrl: uploadResult.url,
           subabaseORImageUrl: savedOriginalUrl
         });
-        
+
         // تتبع الصورة المعالجة المرفوعة حديثاً
         setUploadedImagesInSession(prev => [...prev, uploadResult.url]);
-        
+
         toast.success('تم إزالة الخلفية ورفع الصورة بنجاح! 🎉\nيمكنك حذف الصورة إذا لم تعجبك');
       } else {
         console.error('❌ فشل رفع الصورة المعالجة:', uploadResult.error);
@@ -438,7 +438,7 @@ export default function AdminMedicines() {
     if (uploadedImagesInSession.length > 0) {
       console.log('🗑️ حذف الصور المرفوعة في الجلسة:', uploadedImagesInSession);
       toast.info('جاري حذف الصور المرفوعة...');
-      
+
       for (const imageUrl of uploadedImagesInSession) {
         if (imageUrl.includes('supabase.co/storage')) {
           const result = await deleteImageFromSupabase(imageUrl);
@@ -449,10 +449,10 @@ export default function AdminMedicines() {
           }
         }
       }
-      
+
       toast.success('تم حذف الصور المرفوعة');
     }
-    
+
     setUploadedImagesInSession([]);
     setIsAddEditDialogOpen(false);
   };
@@ -627,17 +627,17 @@ export default function AdminMedicines() {
                       <Eye className="w-3 h-3 ml-1" />
                       عرض
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="h-8 w-8 p-0 border-gray-200 hover:bg-green-50 hover:border-green-300"
                       onClick={() => handleOpenAddEdit(medicine)}
                     >
                       <Edit className="w-3 h-3" />
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="h-8 w-8 p-0 border-gray-200 hover:bg-red-50 hover:border-red-300 text-red-500 hover:text-red-600"
                       onClick={() => handleDelete(medicine.id)}
                     >
@@ -656,7 +656,7 @@ export default function AdminMedicines() {
             handleCancelDialog();
           }
         }}>
-          <DialogContent 
+          <DialogContent
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
@@ -673,7 +673,7 @@ export default function AdminMedicines() {
                   <Package className="w-5 h-5 text-blue-600" />
                   المعلومات الأساسية
                 </h3>
-                
+
                 <div className="grid grid-cols-[2fr,1fr] gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="font-cairo text-sm font-semibold text-gray-700">اسم الدواء *</Label>
@@ -767,7 +767,7 @@ export default function AdminMedicines() {
                   <Building2 className="w-5 h-5 text-purple-600" />
                   معلومات الصيدلية
                 </h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="pharmacyName" className="font-cairo text-sm font-semibold text-gray-700">
                     اسم الصيدلية (اكتب أو اختر) *
@@ -775,7 +775,7 @@ export default function AdminMedicines() {
                   <Autocomplete
                     options={pharmacies
                       .map((pharmacy) => ({
-                        value: pharmacy.pharmacyId.toString(),
+                        value: pharmacy.pharmacyId,
                         label: pharmacy.name
                       }))}
                     value={formData.pharmacyName}
@@ -783,11 +783,11 @@ export default function AdminMedicines() {
                       setFormData({
                         ...formData,
                         pharmacyName: value,
-                        pharmacyId: 0
+                        pharmacyId: ''
                       });
                     }}
                     onSelectOption={(option) => {
-                      const selectedPharmacy = pharmacies.find(p => p.pharmacyId.toString() === option.value);
+                      const selectedPharmacy = pharmacies.find(p => p.pharmacyId === option.value);
                       if (selectedPharmacy) {
                         setFormData({
                           ...formData,
@@ -804,7 +804,7 @@ export default function AdminMedicines() {
                     💡 اكتب لرؤية الاقتراحات أو أدخل اسم جديد
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="pharmcyAddress" className="font-cairo text-sm font-semibold text-red-600 flex items-center gap-1">
                     <MapPin className="w-4 h-4 text-red-600" />
@@ -835,7 +835,7 @@ export default function AdminMedicines() {
                   <Star className="w-5 h-5 text-green-600" />
                   خيارات إضافية
                 </h3>
-                
+
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="bg-white p-3 rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
                     <label className="flex items-center gap-3 cursor-pointer">
@@ -861,9 +861,9 @@ export default function AdminMedicines() {
                       <input
                         type="checkbox"
                         checked={formData.discountRating > 0}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          discountRating: e.target.checked ? 10 : 0 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          discountRating: e.target.checked ? 10 : 0
                         })}
                         className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                       />
@@ -883,9 +883,9 @@ export default function AdminMedicines() {
                           min="0"
                           max="100"
                           value={formData.discountRating === 0 ? '' : formData.discountRating}
-                          onChange={(e) => setFormData({ 
-                            ...formData, 
-                            discountRating: parseInt(e.target.value) || 0 
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            discountRating: parseInt(e.target.value) || 0
                           })}
                           placeholder="أدخل نسبة الخصم (اختياري)"
                           className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
@@ -903,18 +903,17 @@ export default function AdminMedicines() {
                   صورة الدواء *
                 </h3>
                 <p className="text-xs text-red-600 font-cairo font-bold">⚠️ يجب رفع صورة للدواء قبل الحفظ - هذا الحقل إلزامي</p>
-                
+
                 <div className="space-y-3">
                   {/* Upload Button */}
                   <div className="relative">
                     <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${
-                        formData.subabaseImageUrl 
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${formData.subabaseImageUrl
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : isUploading
                             ? 'bg-amber-400 text-white cursor-wait'
                             : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
-                      }`}>
+                        }`}>
                         {isUploading ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -941,7 +940,7 @@ export default function AdminMedicines() {
                       />
                     </label>
                   </div>
-                  
+
                   {/* Divider */}
                   {!formData.subabaseImageUrl && (
                     <div className="flex items-center gap-3">
@@ -950,12 +949,12 @@ export default function AdminMedicines() {
                       <div className="flex-1 h-px bg-amber-300"></div>
                     </div>
                   )}
-                  
+
                   {/* URL Input - Hidden if image is from Supabase (processed) for security */}
                   {!formData.subabaseImageUrl.includes('supabase.co/storage') && (
                     <div className="space-y-2">
                       <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
-                      <Input 
+                      <Input
                         id="imageUrlInputAdmin"
                         type="url"
                         value={formData.subabaseImageUrl}
@@ -968,7 +967,7 @@ export default function AdminMedicines() {
                       />
                     </div>
                   )}
-                  
+
                   {/* Image Preview - Shows when URL is valid */}
                   {formData.subabaseImageUrl && formData.subabaseImageUrl.trim() && (
                     <div className="space-y-3">
@@ -980,12 +979,12 @@ export default function AdminMedicines() {
                           </span>
                         </div>
                       )}
-                      
+
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
                         {!imageLoadError ? (
-                          <img 
-                            src={formData.subabaseImageUrl} 
-                            alt="Preview" 
+                          <img
+                            src={formData.subabaseImageUrl}
+                            alt="Preview"
                             className="w-full h-full object-contain p-3"
                             onError={() => {
                               setImageLoadError(true);
@@ -1054,19 +1053,19 @@ export default function AdminMedicines() {
                                     toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
                                   }
                                 }
-                                
+
                                 // حذف الصورة الأصلية من Supabase إذا كانت موجودة ومختلفة
                                 if (hasOriginal && originalImageUrl.includes('supabase.co/storage')) {
                                   console.log('🗑️ حذف الصورة الأصلية:', originalImageUrl);
                                   const originalResult = await deleteImageFromSupabase(originalImageUrl);
-                                  
+
                                   if (originalResult.success) {
                                     console.log('✅ تم حذف الصورة الأصلية بنجاح');
                                   } else {
                                     console.error('❌ فشل حذف الصورة الأصلية:', originalResult.error);
                                   }
                                 }
-                                
+
                                 // تحديث الـ state
                                 if (hasOriginal && !originalImageUrl.includes('supabase.co/storage')) {
                                   // إذا كانت الصورة الأصلية من الإنترنت، نرجع لها
@@ -1075,7 +1074,7 @@ export default function AdminMedicines() {
                                   // إذا لا، نفرغ الحقول
                                   setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
                                 }
-                                
+
                                 if (!isSupabaseImage) {
                                   toast.success('تم إزالة الصورة');
                                 }
@@ -1095,23 +1094,23 @@ export default function AdminMedicines() {
 
               {/* Footer Buttons */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={handleCancelDialog}
                   className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
                 >
                   إلغاء
                 </Button>
-                <Button 
+                <Button
                   type="submit"
                   disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5}
                   title={
-                    !formData.subabaseImageUrl 
-                      ? 'يجب رفع صورة للدواء أولاً' 
+                    !formData.subabaseImageUrl
+                      ? 'يجب رفع صورة للدواء أولاً'
                       : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5)
-                      ? 'يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)'
-                      : ''
+                        ? 'يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)'
+                        : ''
                   }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1124,8 +1123,8 @@ export default function AdminMedicines() {
 
         {/* View Details Dialog */}
         <Dialog open={!!selectedMedicine} onOpenChange={() => setSelectedMedicine(null)}>
-          <DialogContent 
-            className="max-w-3xl" 
+          <DialogContent
+            className="max-w-3xl"
             dir="rtl"
             onPointerDownOutside={() => setSelectedMedicine(null)}
           >
