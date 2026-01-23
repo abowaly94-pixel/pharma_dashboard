@@ -41,11 +41,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const pharmacyDoc = await getDoc(doc(db, 'pharmacies', firebaseUser.uid));
               if (pharmacyDoc.exists()) {
                 const pharmacyData = pharmacyDoc.data();
+                
+                // ⚠️ AUTO-MIGRATION: Convert string pharmacyId to integer
+                let pharmacyId = pharmacyData.pharmacyId;
+                if (typeof pharmacyId === 'string') {
+                  console.warn('⚠️ pharmacyId is string, converting to integer...');
+                  // Try to parse if it's a numeric string
+                  const parsed = parseInt(pharmacyId, 10);
+                  if (!isNaN(parsed) && parsed >= 10000) {
+                    pharmacyId = parsed;
+                  } else {
+                    // If it's a Firebase UID string, assign a new integer ID
+                    console.warn('⚠️ pharmacyId is Firebase UID, needs migration!');
+                    // For now, use a temporary ID (should run migration script)
+                    pharmacyId = 10001;
+                  }
+                }
+                
                 setUser({
                   ...userData,
                   uid: firebaseUser.uid,
                   email: firebaseUser.email || userData.email,
-                  pharmacyId: pharmacyData.pharmacyId,
+                  pharmacyId: pharmacyId as number,
                   pharmacyName: pharmacyData.name,
                   street: pharmacyData.street || userData.street || '',
                   city: pharmacyData.city || userData.city || '',

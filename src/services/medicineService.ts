@@ -145,7 +145,7 @@ export async function createMedicine(
       subabaseORImageUrl: input.subabaseORImageUrl || input.subabaseImageUrl || '',
       isNewProduct: input.isNewProduct || false,
       discountRating: input.discountRating || 0,
-      pharmacyId: pharmacyId, // Store as string (UID)
+      pharmacyId: pharmacyId, // Store as integer (numeric ID)
       pharmacyName,
       pharmcyAddress, // Add pharmacy address
       status: 'pending' as MedicineStatus, // Always pending

@@ -269,6 +269,18 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
         return null;
       }
 
+      // ⚠️ CRITICAL: Convert to integer if it's a string (for backward compatibility)
+      const pharmacyIdAsNumber = typeof effectivePharmacyId === 'string' 
+        ? parseInt(effectivePharmacyId, 10) 
+        : effectivePharmacyId;
+
+      // Validate that it's a valid number
+      if (isNaN(pharmacyIdAsNumber) || pharmacyIdAsNumber < 10000) {
+        toast.error('معرف الصيدلية غير صحيح. يرجى تسجيل الخروج والدخول مرة أخرى.');
+        console.error('Invalid pharmacyId:', effectivePharmacyId, '→', pharmacyIdAsNumber);
+        return null;
+      }
+
       if (!limitInfo.canAdd) {
         const errorMsg = limitInfo.message || 'تم الوصول للحد الأقصى من الأدوية المسموح بها';
         toast.error(errorMsg);
@@ -277,13 +289,14 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
 
       try {
         console.log('🔍 Adding medicine with data:', {
-          pharmacyId: effectivePharmacyId,
+          pharmacyId: pharmacyIdAsNumber,
+          pharmacyIdType: typeof pharmacyIdAsNumber,
           pharmacyName: user.pharmacyName,
           data
         });
 
         const pharmacyName = user.pharmacyName || 'صيدلية';
-        const medicine = await createMedicine(data, effectivePharmacyId, pharmacyName);
+        const medicine = await createMedicine(data, pharmacyIdAsNumber, pharmacyName);
 
         console.log('✅ Medicine added successfully:', medicine);
         toast.success('تم إضافة الدواء بنجاح وهو في انتظار المراجعة');
@@ -326,8 +339,18 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
         return false;
       }
 
+      // Convert to integer if it's a string
+      const pharmacyIdAsNumber = typeof effectivePharmacyId === 'string' 
+        ? parseInt(effectivePharmacyId, 10) 
+        : effectivePharmacyId;
+
+      if (isNaN(pharmacyIdAsNumber)) {
+        toast.error('معرف الصيدلية غير صحيح');
+        return false;
+      }
+
       try {
-        await updateMedicine(id, data, effectivePharmacyId);
+        await updateMedicine(id, data, pharmacyIdAsNumber);
         toast.success('تم تحديث الدواء بنجاح');
         return true;
       } catch (err) {
@@ -348,8 +371,18 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
         return false;
       }
 
+      // Convert to integer if it's a string
+      const pharmacyIdAsNumber = typeof effectivePharmacyId === 'string' 
+        ? parseInt(effectivePharmacyId, 10) 
+        : effectivePharmacyId;
+
+      if (isNaN(pharmacyIdAsNumber)) {
+        toast.error('معرف الصيدلية غير صحيح');
+        return false;
+      }
+
       try {
-        await deleteMedicine(id, effectivePharmacyId);
+        await deleteMedicine(id, pharmacyIdAsNumber);
         toast.success('تم حذف الدواء والصورة بنجاح');
         return true;
       } catch (err) {
@@ -366,9 +399,16 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
 
     if (!effectivePharmacyId) return;
 
+    // Convert to integer if it's a string
+    const pharmacyIdAsNumber = typeof effectivePharmacyId === 'string' 
+      ? parseInt(effectivePharmacyId, 10) 
+      : effectivePharmacyId;
+
+    if (isNaN(pharmacyIdAsNumber)) return;
+
     try {
       setIsLoading(true);
-      const grouped = await getMedicinesGroupedByStatus(effectivePharmacyId);
+      const grouped = await getMedicinesGroupedByStatus(pharmacyIdAsNumber);
       const allMedicines = [
         ...grouped.pending,
         ...grouped.approved,
@@ -387,8 +427,15 @@ export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesR
 
     if (!effectivePharmacyId) return false;
 
+    // Convert to integer if it's a string
+    const pharmacyIdAsNumber = typeof effectivePharmacyId === 'string' 
+      ? parseInt(effectivePharmacyId, 10) 
+      : effectivePharmacyId;
+
+    if (isNaN(pharmacyIdAsNumber)) return false;
+
     try {
-      const info = await canPharmacyAddMedicine(effectivePharmacyId);
+      const info = await canPharmacyAddMedicine(pharmacyIdAsNumber);
       const remaining = Math.max(0, info.limit - info.currentCount);
       setLimitInfo({
         canAdd: info.canAdd,
