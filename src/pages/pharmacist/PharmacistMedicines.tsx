@@ -725,7 +725,7 @@ export default function PharmacistMedicines() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-auto items-start">
             {filteredMedicines.map((medicine, index) => {
               const medicineStatus = medicine.status;
               const rejectionNotes = medicine.rejectionNotes;
@@ -808,7 +808,7 @@ export default function PharmacistMedicines() {
                   </div>
 
                   {/* Content */}
-                  <CardContent className="p-4 space-y-3">
+                  <CardContent className="p-4 space-y-3 flex flex-col">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 mb-1">{medicine.name}</h3>
@@ -851,16 +851,25 @@ export default function PharmacistMedicines() {
 
                     {/* Rejection Notes */}
                     {rejectionNotes && (
-                      <Alert className="border-red-200 bg-red-50">
-                        <AlertCircle className="w-3 h-3 text-red-600" />
-                        <AlertDescription className="text-xs text-red-600 font-cairo">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 transition-all duration-200">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <p className="text-xs font-bold text-red-800 flex-1 text-right">
+                            سبب الرفض:
+                          </p>
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                        </div>
+                        <div 
+                          className="max-h-16 overflow-y-auto text-xs text-red-700 leading-relaxed pl-1 whitespace-pre-wrap break-words scrollbar-thin scrollbar-thumb-red-300 scrollbar-track-red-100 hover:scrollbar-thumb-red-400" 
+                          dir="rtl" 
+                          style={{ direction: 'rtl' }}
+                        >
                           {rejectionNotes}
-                        </AlertDescription>
-                      </Alert>
+                        </div>
+                      </div>
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100 mt-auto">
                       <Button
                         variant="outline"
                         size="sm"

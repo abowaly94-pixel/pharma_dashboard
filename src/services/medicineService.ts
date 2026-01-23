@@ -604,6 +604,7 @@ export async function canPharmacyAddMedicine(pharmacyId: number): Promise<{
 
 /**
  * حساب العدد الفعلي للأدوية من كلا الـ collections
+ * ملاحظة: الأدوية المرفوضة لا تُحسب ضمن الحد الأقصى
  */
 async function getActualMedicineCount(pharmacyId: number): Promise<number> {
   try {
@@ -614,11 +615,13 @@ async function getActualMedicineCount(pharmacyId: number): Promise<number> {
       where('deleted', '==', false)
     );
 
-    // عد الأدوية المعلقة والمرفوضة (غير المحذوفة) من pending_medicines collection
+    // عد الأدوية المعلقة فقط (غير المحذوفة وغير المرفوضة) من pending_medicines collection
+    // الأدوية المرفوضة لا تُحسب ضمن الحد الأقصى
     const pendingQuery = query(
       collection(db, PENDING_MEDICINES_COLLECTION),
       where('pharmacyId', '==', pharmacyId),
-      where('deleted', '==', false)
+      where('deleted', '==', false),
+      where('status', '==', 'pending')
     );
 
     const [approvedSnapshot, pendingSnapshot] = await Promise.all([
@@ -631,7 +634,8 @@ async function getActualMedicineCount(pharmacyId: number): Promise<number> {
       approvedIds: approvedSnapshot.docs.map(d => d.id),
       pending: pendingSnapshot.docs.length,
       pendingIds: pendingSnapshot.docs.map(d => d.id),
-      total: approvedSnapshot.docs.length + pendingSnapshot.docs.length
+      total: approvedSnapshot.docs.length + pendingSnapshot.docs.length,
+      note: 'Rejected medicines are NOT counted towards the limit'
     });
 
     return approvedSnapshot.docs.length + pendingSnapshot.docs.length;

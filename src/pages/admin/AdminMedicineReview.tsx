@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   MapPin,
   Star,
+  AlertCircle,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -686,9 +687,20 @@ export default function AdminMedicineReview() {
                   </div>
 
                   {medicine.rejectionNotes && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-red-700 mb-1">ملاحظات الرفض:</p>
-                      <p className="text-sm text-red-600">{medicine.rejectionNotes}</p>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 transition-all duration-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs font-semibold text-red-800 flex-1 text-right">
+                          ملاحظات الرفض:
+                        </p>
+                        <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                      </div>
+                      <div 
+                        className="max-h-24 overflow-y-auto text-sm text-red-700 leading-relaxed pl-1 whitespace-pre-wrap break-words scrollbar-thin scrollbar-thumb-red-300 scrollbar-track-red-100 hover:scrollbar-thumb-red-400" 
+                        dir="rtl" 
+                        style={{ direction: 'rtl' }}
+                      >
+                        {medicine.rejectionNotes}
+                      </div>
                     </div>
                   )}
 
