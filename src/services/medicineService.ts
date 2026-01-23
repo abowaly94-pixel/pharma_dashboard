@@ -56,7 +56,7 @@ function mapFirestoreToMedicine(id: string, data: Record<string, unknown>): Medi
     expiryDate: data.expiryDate ? (data.expiryDate as Timestamp).toDate() : new Date(),
     subabaseImageUrl: data.subabaseImageUrl as string || data.subabaseORImageUrl as string || '',
     subabaseORImageUrl: data.subabaseORImageUrl as string || data.subabaseImageUrl as string || '',
-    pharmacyId: data.pharmacyId as string,
+    pharmacyId: data.pharmacyId as number,
     pharmacyName: data.pharmacyName as string,
     pharmcyAddress: data.pharmcyAddress as string || 'غير محدد',
     status: (data.status as MedicineStatus) || 'pending',
@@ -97,21 +97,21 @@ function validateMedicineInput(input: CreateMedicineInput): void {
  */
 export async function createMedicine(
   input: CreateMedicineInput,
-  pharmacyId: string,
+  pharmacyId: number,
   pharmacyName: string
 ): Promise<MedicineWithApproval> {
   validateMedicineInput(input);
 
   try {
-    // Validating pharmacyId format (should be UUID string now)
-    if (!pharmacyId || pharmacyId.length < 5) {
+    // Validating pharmacyId format (should be integer now)
+    if (!pharmacyId || pharmacyId < 10000) {
       throw new ValidationError('معرف الصيدلية غير صحيح', 'pharmacyId', 'INVALID_FORMAT');
     }
 
-    // Check if pharmacy can add more medicines using pharmacyId (string reference)
-    const pharmacy = await getPharmacyById(pharmacyId);
+    // Check if pharmacy can add more medicines using pharmacyId (integer reference)
+    const pharmacy = await getPharmacyByPharmacyId(pharmacyId);
     if (!pharmacy) {
-      throw new NotFoundError('pharmacy', pharmacyId);
+      throw new NotFoundError('pharmacy', String(pharmacyId));
     }
 
     if (pharmacy.currentMedicineCount >= pharmacy.medicineLimit) {
@@ -194,7 +194,7 @@ export async function createMedicine(
  * Requirement 3.3: Display medicines grouped by status
  * يجلب من كلا الـ collections: pending_medicines و medicines
  */
-export async function getMedicinesByPharmacy(pharmacyId: string): Promise<MedicineWithApproval[]> {
+export async function getMedicinesByPharmacy(pharmacyId: number): Promise<MedicineWithApproval[]> {
   try {
     // جلب الأدوية المعتمدة من medicines collection
     const approvedQuery = query(
@@ -232,7 +232,7 @@ export async function getMedicinesByPharmacy(pharmacyId: string): Promise<Medici
 /**
  * جلب الأدوية مجمعة حسب الحالة
  */
-export async function getMedicinesGroupedByStatus(pharmacyId: string): Promise<GroupedMedicines> {
+export async function getMedicinesGroupedByStatus(pharmacyId: number): Promise<GroupedMedicines> {
   const medicines = await getMedicinesByPharmacy(pharmacyId);
 
   return {
@@ -324,16 +324,14 @@ async function getMedicineCollection(id: string): Promise<string> {
 export async function updateMedicine(
   id: string,
   input: UpdateMedicineInput,
-  pharmacyId: string
+  pharmacyId: number
 ): Promise<void> {
   try {
     const medicine = await getMedicineById(id);
     const collectionName = await getMedicineCollection(id);
 
-    // Check ownership - compare as strings to handle both types
-    const medicinePharmacyId = String(medicine.pharmacyId);
-    const inputPharmacyId = String(pharmacyId);
-    if (medicinePharmacyId !== inputPharmacyId) {
+    // Check ownership - compare as integers
+    if (medicine.pharmacyId !== pharmacyId) {
       throw new AuthorizationError('لا يمكنك تعديل هذا الدواء', 'RESOURCE_NOT_OWNED');
     }
 
@@ -549,15 +547,15 @@ export async function filterMedicines(filters: MedicineFilters): Promise<Medicin
  * التحقق من إمكانية إضافة دواء
  * يحسب العدد الفعلي من الأدوية (غير المحذوفة) من كلا الـ collections
  */
-export async function canPharmacyAddMedicine(pharmacyId: string): Promise<{
+export async function canPharmacyAddMedicine(pharmacyId: number): Promise<{
   canAdd: boolean;
   currentCount: number;
   limit: number;
   message?: string;
 }> {
   try {
-    // Direct string usage
-    const pharmacy = await getPharmacyById(pharmacyId);
+    // Direct integer usage
+    const pharmacy = await getPharmacyByPharmacyId(pharmacyId);
     if (!pharmacy) {
       return { canAdd: false, currentCount: 0, limit: 0, message: 'الصيدلية غير موجودة' };
     }
@@ -607,7 +605,7 @@ export async function canPharmacyAddMedicine(pharmacyId: string): Promise<{
 /**
  * حساب العدد الفعلي للأدوية من كلا الـ collections
  */
-async function getActualMedicineCount(pharmacyId: string): Promise<number> {
+async function getActualMedicineCount(pharmacyId: number): Promise<number> {
   try {
     // عد الأدوية المعتمدة (غير المحذوفة) من medicines collection
     const approvedQuery = query(
@@ -664,16 +662,14 @@ async function syncPharmacyMedicineCount(pharmacyDocId: string, actualCount: num
  */
 export async function deleteMedicine(
   id: string,
-  pharmacyId: string
+  pharmacyId: number
 ): Promise<void> {
   try {
     const medicine = await getMedicineById(id);
     const collectionName = await getMedicineCollection(id);
 
-    // Check ownership - compare as strings to handle both types
-    const medicinePharmacyId = String(medicine.pharmacyId);
-    const inputPharmacyId = String(pharmacyId);
-    if (medicinePharmacyId !== inputPharmacyId) {
+    // Check ownership - compare as integers
+    if (medicine.pharmacyId !== pharmacyId) {
       throw new AuthorizationError('لا يمكنك حذف هذا الدواء', 'RESOURCE_NOT_OWNED');
     }
 
@@ -705,8 +701,11 @@ export async function deleteMedicine(
       updatedAt: serverTimestamp(),
     });
 
-    // Update pharmacy medicine count
-    await updateMedicineCount(pharmacyId, -1);
+    // Update pharmacy medicine count - need to get pharmacy by pharmacyId
+    const pharmacy = await getPharmacyByPharmacyId(pharmacyId);
+    if (pharmacy) {
+      await updateMedicineCount(pharmacy.id, -1);
+    }
 
     console.log('✅ تم حذف الدواء والصورة بنجاح');
   } catch (error) {

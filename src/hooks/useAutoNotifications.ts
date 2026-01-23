@@ -31,7 +31,7 @@ export function useAutoNotifications() {
   const notifyOrderStatusChange = useCallback(async (
     orderId: string,
     status: string,
-    pharmacyId: string
+    pharmacyId: number
   ) => {
     try {
       const statusMessages: Record<string, string> = {
@@ -46,7 +46,7 @@ export function useAutoNotifications() {
         title: 'تحديث حالة الطلب',
         body: `تم تحديث حالة الطلب #${orderId} إلى: ${statusMessages[status] || status}`,
         type: 'order',
-        targetUsers: [pharmacyId],
+        targetUsers: [String(pharmacyId)],
         actionUrl: '/pharmacist/orders',
         data: { orderId, status }
       });
@@ -78,14 +78,14 @@ export function useAutoNotifications() {
    */
   const notifyMedicineApproved = useCallback(async (
     medicineName: string,
-    pharmacyId: string
+    pharmacyId: number
   ) => {
     try {
       await sendNotification({
         title: 'تمت الموافقة على الدواء',
         body: `تمت الموافقة على الدواء: ${medicineName}`,
         type: 'medicine',
-        targetUsers: [pharmacyId],
+        targetUsers: [String(pharmacyId)],
         actionUrl: '/pharmacist/medicines',
         data: { medicineName, status: 'approved' }
       });
@@ -99,7 +99,7 @@ export function useAutoNotifications() {
    */
   const notifyMedicineRejected = useCallback(async (
     medicineName: string,
-    pharmacyId: string,
+    pharmacyId: number,
     reason?: string
   ) => {
     try {
@@ -107,7 +107,7 @@ export function useAutoNotifications() {
         title: 'تم رفض الدواء',
         body: `تم رفض الدواء: ${medicineName}${reason ? ` - السبب: ${reason}` : ''}`,
         type: 'medicine',
-        targetUsers: [pharmacyId],
+        targetUsers: [String(pharmacyId)],
         actionUrl: '/pharmacist/medicines',
         data: { medicineName, status: 'rejected', reason }
       });
@@ -122,14 +122,14 @@ export function useAutoNotifications() {
   const notifyLowStock = useCallback(async (
     medicineName: string,
     currentStock: number,
-    pharmacyId: string
+    pharmacyId: number
   ) => {
     try {
       await sendNotification({
         title: 'تنبيه: مخزون منخفض',
         body: `مخزون الدواء ${medicineName} منخفض (${currentStock} وحدة متبقية)`,
         type: 'medicine',
-        targetUsers: [pharmacyId],
+        targetUsers: [String(pharmacyId)],
         actionUrl: '/pharmacist/medicines',
         data: { medicineName, currentStock }
       });

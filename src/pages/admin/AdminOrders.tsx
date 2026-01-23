@@ -77,7 +77,7 @@ export default function AdminOrders() {
     // Find the order to get pharmacy information
     const order = orders.find(o => o.id === orderId);
     if (order && order.pharmacyId) {
-      await notifyOrderStatusChange(order.orderId, newStatus, order.pharmacyId.toString());
+      await notifyOrderStatusChange(order.orderId, newStatus, order.pharmacyId);
     }
 
     if (selectedOrder?.id === orderId) {

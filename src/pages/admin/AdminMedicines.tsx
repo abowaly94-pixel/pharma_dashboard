@@ -61,7 +61,7 @@ export default function AdminMedicines() {
     description: '',
     price: 0,
     quantity: 0,
-    pharmacyId: '',
+    pharmacyId: 0,
     pharmacyName: '',
     pharmcyAddress: '',
     category: '',
@@ -153,7 +153,7 @@ export default function AdminMedicines() {
         description: '',
         price: 0,
         quantity: 0,
-        pharmacyId: defaultPharmacy?.pharmacyId || '',
+        pharmacyId: defaultPharmacy?.pharmacyId || 0,
         pharmacyName: defaultPharmacy?.name || '',
         pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
         category: '',
@@ -775,19 +775,19 @@ export default function AdminMedicines() {
                   <Autocomplete
                     options={pharmacies
                       .map((pharmacy) => ({
-                        value: pharmacy.pharmacyId,
+                        value: String(pharmacy.pharmacyId),
                         label: pharmacy.name
                       }))}
                     value={formData.pharmacyName}
                     onValueChange={(value) => {
-                      setFormData({
+      setFormData({
                         ...formData,
                         pharmacyName: value,
-                        pharmacyId: ''
+                        pharmacyId: 0
                       });
                     }}
                     onSelectOption={(option) => {
-                      const selectedPharmacy = pharmacies.find(p => p.pharmacyId === option.value);
+                      const selectedPharmacy = pharmacies.find(p => String(p.pharmacyId) === option.value);
                       if (selectedPharmacy) {
                         setFormData({
                           ...formData,

@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { Order, CartItem } from '@/types';
 import { toast } from 'sonner';
 
-export function useOrders(pharmacyId?: string, options?: { enabled?: boolean }) {
+export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -51,7 +51,7 @@ interface UsePharmacyMedicinesReturn {
   checkCanAdd: () => Promise<boolean>;
 }
 
-export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesReturn {
+export function usePharmacyMedicines(pharmacyId?: number): UsePharmacyMedicinesReturn {
   const { user } = useAuth();
   const [medicines, setMedicines] = useState<MedicineWithApproval[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +66,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   // Real-time listener for pharmacy medicines from both collections
   useEffect(() => {
-    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
     if (!effectivePharmacyId) {
       console.log('⚠️ No pharmacy ID found', {
@@ -209,7 +209,9 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
           rejected: medicines.filter(m => m.status === 'rejected').length,
         });
 
-        const info = await canPharmacyAddMedicine(effectivePharmacyId);
+        // Ensure effectivePharmacyId is a number
+        const pharmacyIdNum = typeof effectivePharmacyId === 'string' ? parseInt(effectivePharmacyId, 10) : effectivePharmacyId;
+        const info = await canPharmacyAddMedicine(pharmacyIdNum);
         const remaining = Math.max(0, info.limit - info.currentCount);
 
         console.log('✅ Limit info received:', {
@@ -260,7 +262,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const addMedicine = useCallback(
     async (data: CreateMedicineInput): Promise<MedicineWithApproval | null> => {
-      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
       if (!effectivePharmacyId || !user) {
         toast.error('يجب تسجيل الدخول أولاً');
@@ -317,7 +319,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const editMedicine = useCallback(
     async (id: string, data: UpdateMedicineInput): Promise<boolean> => {
-      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
       if (!effectivePharmacyId) {
         toast.error('يجب تسجيل الدخول أولاً');
@@ -339,7 +341,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
 
   const deleteMedicineHandler = useCallback(
     async (id: string): Promise<boolean> => {
-      const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+      const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
       if (!effectivePharmacyId) {
         toast.error('يجب تسجيل الدخول أولاً');
@@ -360,7 +362,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   );
 
   const refreshMedicines = useCallback(async () => {
-    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
     if (!effectivePharmacyId) return;
 
@@ -381,7 +383,7 @@ export function usePharmacyMedicines(pharmacyId?: string): UsePharmacyMedicinesR
   }, [pharmacyId, user]);
 
   const checkCanAdd = useCallback(async (): Promise<boolean> => {
-    const effectivePharmacyId = pharmacyId || user?.pharmacyId?.toString();
+    const effectivePharmacyId = pharmacyId || user?.pharmacyId;
 
     if (!effectivePharmacyId) return false;
 

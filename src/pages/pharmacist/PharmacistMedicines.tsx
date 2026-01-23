@@ -42,7 +42,7 @@ export default function PharmacistMedicines() {
     editMedicine,
     deleteMedicine: deleteMedicineFromHook,
     checkCanAdd,
-  } = usePharmacyMedicines(user?.pharmacyId?.toString());
+  } = usePharmacyMedicines(user?.pharmacyId);
 
   const { notifyNewMedicine, notifyLowStock } = useAutoNotifications();
 
@@ -274,7 +274,7 @@ export default function PharmacistMedicines() {
           toast.success('تم تحديث الدواء بنجاح');
           // Check for low stock notification
           if (dataToSave.quantity > 0 && dataToSave.quantity <= 5) {
-            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId?.toString() || "");
+            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId || 0);
           }
         }
       } else {
@@ -288,7 +288,7 @@ export default function PharmacistMedicines() {
 
           // Check if initially added with low stock
           if (dataToSave.quantity > 0 && dataToSave.quantity <= 5) {
-            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId?.toString() || "");
+            await notifyLowStock(dataToSave.name, dataToSave.quantity, user?.pharmacyId || 0);
           }
         }
       }

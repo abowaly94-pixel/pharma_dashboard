@@ -17,7 +17,7 @@ import { Medicine } from '@/types';
 import { toast } from 'sonner';
 import { deleteImageFromSupabase } from '@/lib/supabase';
 
-export function useMedicines(pharmacyId?: string, options?: { enabled?: boolean }) {
+export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);

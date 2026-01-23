@@ -44,7 +44,7 @@ const USERS_COLLECTION = 'users';
 function mapFirestoreToPharmacy(id: string, data: Record<string, unknown>): PharmacyAccount {
   return {
     id,
-    pharmacyId: data.pharmacyId as string,
+    pharmacyId: data.pharmacyId as number,
     name: data.name as string,
     email: data.email as string,
     address: data.address as string,
@@ -68,6 +68,24 @@ function mapFirestoreToPharmacy(id: string, data: Record<string, unknown>): Phar
     governorate: (data.governorate as string) || '',
     postalCode: (data.postalCode as string) || '',
   };
+}
+
+/**
+ * توليد رقم صيدلية فريد (integer)
+ * يبدأ من 10001 ويزيد تلقائياً
+ */
+async function generateUniquePharmacyId(): Promise<number> {
+  const pharmaciesRef = collection(db, PHARMACIES_COLLECTION);
+  const q = query(pharmaciesRef, orderBy('pharmacyId', 'desc'));
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    return 10001; // أول رقم صيدلية
+  }
+  
+  const lastPharmacy = snapshot.docs[0].data();
+  const lastId = lastPharmacy.pharmacyId as number;
+  return lastId + 1;
 }
 
 /**
@@ -182,10 +200,9 @@ export async function createPharmacy(
     await secondaryAuth.signOut();
     console.log('✅ Signed out from secondary auth');
 
-    // Generate pharmacy ID
-    // Use userId as the pharmacyId (string) to ensure uniqueness and persistent association
-    const pharmacyId = userId;
-    console.log('✅ Using User ID as Pharmacy ID:', pharmacyId);
+    // Generate unique numeric pharmacy ID
+    const pharmacyId = await generateUniquePharmacyId();
+    console.log('✅ Generated Pharmacy ID:', pharmacyId);
 
     // Create pharmacy document
     const pharmacyData = {
@@ -320,7 +337,7 @@ export async function getPharmacyById(id: string): Promise<PharmacyAccount> {
 /**
  * جلب صيدلية بواسطة رقم الصيدلية
  */
-export async function getPharmacyByPharmacyId(pharmacyId: string): Promise<PharmacyAccount | null> {
+export async function getPharmacyByPharmacyId(pharmacyId: number): Promise<PharmacyAccount | null> {
   try {
     const q = query(
       collection(db, PHARMACIES_COLLECTION),
@@ -574,7 +591,7 @@ export async function deletePharmacyPermanently(id: string): Promise<{
 
     const pharmacyData = docSnap.data();
 
-    const pharmacyId = pharmacyData.pharmacyId as string;
+    const pharmacyId = pharmacyData.pharmacyId as number;
 
     console.log(`🗑️ بدء حذف الصيدلية: ${pharmacyData.name} (ID: ${pharmacyId})`);
 

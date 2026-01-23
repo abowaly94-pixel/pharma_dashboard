@@ -545,9 +545,9 @@ export default function AdminMedicineReview() {
               />
             </div>
             <Select
-              value={filters.pharmacyId || 'all'}
+              value={filters.pharmacyId ? String(filters.pharmacyId) : 'all'}
               onValueChange={(value) =>
-                setFilters({ ...filters, pharmacyId: value === 'all' ? undefined : value })
+                setFilters({ ...filters, pharmacyId: value === 'all' ? undefined : Number(value) })
               }
             >
               <SelectTrigger className="w-[200px]">
