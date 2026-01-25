@@ -34,6 +34,7 @@ import {
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { AttachmentPreview } from '@/components/orders/AttachmentPreview';
+import { MedicineImage } from '@/components/ui/medicine-image';
 
 const statusConfig = {
   pending: { label: 'قيد الانتظار', class: 'badge-warning', icon: Clock },
@@ -105,16 +106,16 @@ export default function AdminOrders() {
           className="flex flex-col md:flex-row gap-4"
         >
           <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="بحث برقم الطلب أو اسم العميل..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-10 font-cairo"
+              className="pr-10 font-cairo h-11 bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-48 font-cairo">
+            <SelectTrigger className="w-full md:w-48 font-cairo h-11 bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
               <Filter className="w-4 h-4 ml-2" />
               <SelectValue placeholder="الحالة" />
             </SelectTrigger>
@@ -196,7 +197,19 @@ export default function AdminOrders() {
                           <span className="text-sm">{order.cartItem.length} منتج</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-semibold">{order.totalAmount} ج.م</span>
+                          <span className="font-semibold text-green-600">
+                            {(() => {
+                              // حساب المبلغ الصحيح بناءً على الأسعار بعد الخصم
+                              const correctSubtotal = order.cartItem.reduce((sum, item) => {
+                                const price = item.medicineEntity.price;
+                                const discount = item.medicineEntity.discountRating || 0;
+                                const finalPrice = price - (price * discount / 100);
+                                return sum + (finalPrice * item.count);
+                              }, 0);
+                              const correctTotal = correctSubtotal + (order.deliveryFee || 0);
+                              return correctTotal.toFixed(2);
+                            })()} ج.م
+                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm">{order.paymentMethodName}</span>
@@ -400,16 +413,14 @@ export default function AdminOrders() {
                   <div className="divide-y divide-border border rounded-lg">
                     {selectedOrder.cartItem.map((item, index) => (
                       <div key={index} className="flex items-center gap-4 p-4">
-                        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                          {(item.medicineEntity.subabaseImageUrl || item.medicineEntity.subabaseORImageUrl) ? (
-                            <img
-                              src={item.medicineEntity.subabaseImageUrl || item.medicineEntity.subabaseORImageUrl}
-                              alt={item.medicineEntity.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Package className="w-8 h-8 text-muted-foreground/50" />
-                          )}
+                        <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border-2 border-gray-100 shadow-sm">
+                          <MedicineImage
+                            imageUrl={item.medicineEntity.subabaseImageUrl}
+                            originalImageUrl={item.medicineEntity.subabaseORImageUrl}
+                            name={item.medicineEntity.name}
+                            objectFit="contain"
+                            className="p-1"
+                          />
                         </div>
                         <div className="flex-1">
                           <p className="font-medium">{item.medicineEntity.name}</p>
@@ -418,13 +429,17 @@ export default function AdminOrders() {
                         <div className="text-left">
                           {item.medicineEntity.discountRating > 0 ? (
                             <div className="flex flex-col">
-                              <p className="text-xs text-gray-400 line-through">{item.medicineEntity.price} ج.م</p>
-                              <p className="font-medium">
-                                {(item.medicineEntity.price * (1 - item.medicineEntity.discountRating / 100)).toFixed(2)} ج.م
+                              <p className="text-xs text-gray-400 line-through">{item.medicineEntity.price.toFixed(2)} ج.م</p>
+                              <p className="font-medium text-green-600">
+                                {(() => {
+                                  const discountAmount = item.medicineEntity.price * (item.medicineEntity.discountRating / 100);
+                                  const finalPrice = item.medicineEntity.price - discountAmount;
+                                  return finalPrice.toFixed(2);
+                                })()} ج.م
                               </p>
                             </div>
                           ) : (
-                            <p className="font-medium">{item.medicineEntity.price} ج.م</p>
+                            <p className="font-medium">{item.medicineEntity.price.toFixed(2)} ج.م</p>
                           )}
                           <p className="text-sm text-muted-foreground">الكمية: {item.count}</p>
                         </div>
@@ -437,15 +452,36 @@ export default function AdminOrders() {
                 <div className="bg-muted rounded-lg p-4 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground font-cairo">المجموع الفرعي:</span>
-                    <span>{selectedOrder.subtotal} ج.م</span>
+                    <span className="text-green-600 font-semibold">
+                      {(() => {
+                        const correctSubtotal = selectedOrder.cartItem.reduce((sum, item) => {
+                          const price = item.medicineEntity.price;
+                          const discount = item.medicineEntity.discountRating || 0;
+                          const finalPrice = price - (price * discount / 100);
+                          return sum + (finalPrice * item.count);
+                        }, 0);
+                        return correctSubtotal.toFixed(2);
+                      })()} ج.م
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground font-cairo">رسوم التوصيل:</span>
-                    <span>{selectedOrder.deliveryFee} ج.م</span>
+                    <span>{selectedOrder.deliveryFee.toFixed(2)} ج.م</span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
                     <span className="font-cairo">الإجمالي:</span>
-                    <span className="text-primary">{selectedOrder.totalAmount} ج.م</span>
+                    <span className="text-primary">
+                      {(() => {
+                        const correctSubtotal = selectedOrder.cartItem.reduce((sum, item) => {
+                          const price = item.medicineEntity.price;
+                          const discount = item.medicineEntity.discountRating || 0;
+                          const finalPrice = price - (price * discount / 100);
+                          return sum + (finalPrice * item.count);
+                        }, 0);
+                        const correctTotal = correctSubtotal + selectedOrder.deliveryFee;
+                        return correctTotal.toFixed(2);
+                      })()} ج.م
+                    </span>
                   </div>
                 </div>
               </div>

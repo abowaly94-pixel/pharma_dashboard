@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Medicine } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { MedicineImage } from '@/components/ui/medicine-image';
 
 interface AllMedicinesTableProps {
   medicines: Medicine[];
@@ -78,17 +79,13 @@ export function AllMedicinesTable({ medicines }: AllMedicinesTableProps) {
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    {(medicine.subabaseImageUrl || medicine.subabaseORImageUrl) ? (
-                      <img 
-                        src={medicine.subabaseImageUrl || medicine.subabaseORImageUrl} 
-                        alt={medicine.name} 
-                        className="w-12 h-12 rounded-xl object-cover shadow-sm border border-gray-100"
+                    <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm border border-gray-100 flex-shrink-0">
+                      <MedicineImage
+                        imageUrl={medicine.subabaseImageUrl}
+                        originalImageUrl={medicine.subabaseORImageUrl}
+                        name={medicine.name}
                       />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center shadow-md">
-                        <span className="text-white font-bold text-lg">{medicine.name.charAt(0)}</span>
-                      </div>
-                    )}
+                    </div>
                     <div>
                       <span className="text-sm font-semibold text-gray-800">{medicine.name}</span>
                       <p className="text-xs text-gray-500 mt-0.5">{medicine.code}</p>
@@ -98,13 +95,17 @@ export function AllMedicinesTable({ medicines }: AllMedicinesTableProps) {
                 <td className="px-6 py-4">
                   {medicine.discountRating > 0 ? (
                     <div className="flex flex-col">
-                      <span className="text-xs text-gray-400 line-through">{medicine.price} ج.م</span>
+                      <span className="text-xs text-gray-400 line-through">{medicine.price.toFixed(2)} ج.م</span>
                       <span className="text-sm font-bold text-green-600">
-                        {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                        {(() => {
+                          const discountAmount = medicine.price * (medicine.discountRating / 100);
+                          const finalPrice = medicine.price - discountAmount;
+                          return finalPrice.toFixed(2);
+                        })()} ج.م
                       </span>
                     </div>
                   ) : (
-                    <span className="text-sm font-bold text-green-600">{medicine.price} ج.م</span>
+                    <span className="text-sm font-bold text-green-600">{medicine.price.toFixed(2)} ج.م</span>
                   )}
                 </td>
                 <td className="px-6 py-4">

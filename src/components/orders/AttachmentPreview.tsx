@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FileText, ReceiptText } from 'lucide-react';
+import { SafeImage } from '@/components/ui/safe-image';
 
 interface PreviewData {
   type: 'prescription' | 'payment';
@@ -52,11 +53,11 @@ export function AttachmentPreview({ preview, onClose }: AttachmentPreviewProps) 
             <div className="px-6">
               <div className="rounded-2xl border border-border bg-muted/30 overflow-hidden shadow-inner">
                 {isImage ? (
-                  <img
+                  <SafeImage
                     src={preview.url}
                     alt={preview.title}
-                    className="w-full h-[70vh] object-contain bg-background"
-                    loading="lazy"
+                    className="h-[70vh] object-contain bg-background"
+                    fallbackMessage="لا يمكن عرض هذه الصورة. يرجى التأكد من رفعها على السيرفر."
                   />
                 ) : (
                   <iframe

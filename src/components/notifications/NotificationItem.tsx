@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNotifications, Notification } from '@/contexts/NotificationContext';
 import { motion } from 'framer-motion';
+import { SafeImage } from '@/components/ui/safe-image';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -83,11 +84,13 @@ export function NotificationItem({ notification }: NotificationItemProps) {
         </div>
       </div>
       {notification.imageUrl && (
-        <img
-          src={notification.imageUrl}
-          alt=""
-          className="mt-2 rounded-lg w-full h-32 object-cover"
-        />
+        <div className="mt-2 rounded-lg w-full h-32 overflow-hidden">
+          <SafeImage
+            src={notification.imageUrl}
+            alt=""
+            fallbackMessage="لا يمكن عرض صورة الإشعار"
+          />
+        </div>
       )}
     </motion.div>
   );

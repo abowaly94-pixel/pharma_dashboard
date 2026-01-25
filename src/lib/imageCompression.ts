@@ -150,17 +150,9 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * معاينة الصورة قبل الرفع
+ * معاينة الصورة قبل الرفع - تم تعطيلها لمنع data URLs
+ * @deprecated استخدم رفع الصورة مباشرة بدون معاينة
  */
 export function createImagePreview(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      resolve(e.target?.result as string);
-    };
-    
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
+  return Promise.reject(new Error('معاينة الصور المحلية غير مسموحة. يرجى رفع الصورة أولاً.'));
 }

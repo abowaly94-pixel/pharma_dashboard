@@ -6,13 +6,13 @@ import { useState } from 'react';
 import { Upload, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { compressImage, formatFileSize, createImagePreview } from '@/lib/imageCompression';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { supabase } from '@/lib/supabase';
+import { SafeImage } from '@/components/ui/safe-image';
 
 export function ImageUploadExample() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [compressedFile, setCompressedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [uploadedUrl, setUploadedUrl] = useState<string>('');
 
@@ -21,10 +21,6 @@ export function ImageUploadExample() {
     if (!file) return;
 
     setSelectedFile(file);
-    
-    // إنشاء معاينة
-    const previewUrl = await createImagePreview(file);
-    setPreview(previewUrl);
 
     // ضغط الصورة
     const compressed = await compressImage(file, {
@@ -97,16 +93,15 @@ export function ImageUploadExample() {
       {selectedFile && compressedFile && (
         <Card>
           <CardContent className="p-6 space-y-4">
-            {/* Image Preview */}
-            {preview && (
-              <div className="relative w-full h-64 bg-muted rounded-lg overflow-hidden">
-                <img
-                  src={preview}
-                  alt="Preview"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
+            {/* Image Preview - معطل لمنع data URLs */}
+            <div className="relative w-full h-64 bg-muted rounded-lg overflow-hidden">
+              <SafeImage
+                src=""
+                alt="Preview"
+                fallbackMessage={`تم اختيار: ${selectedFile.name}\nيرجى رفع الصورة لعرضها`}
+                className="w-full h-full object-contain"
+              />
+            </div>
 
             {/* Compression Stats */}
             <div className="grid grid-cols-2 gap-4">
@@ -151,7 +146,7 @@ export function ImageUploadExample() {
       {/* Success Message */}
       {uploadedUrl && (
         <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-6">
+          <CardContent className="p-6 space-y-4">
             <div className="flex items-start gap-3">
               <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
               <div className="space-y-2">
@@ -165,6 +160,15 @@ export function ImageUploadExample() {
                   {uploadedUrl}
                 </a>
               </div>
+            </div>
+            
+            {/* عرض الصورة المرفوعة */}
+            <div className="relative w-full h-64 bg-white rounded-lg overflow-hidden border-2 border-green-200">
+              <SafeImage
+                src={uploadedUrl}
+                alt="Uploaded"
+                className="w-full h-full object-contain"
+              />
             </div>
           </CardContent>
         </Card>

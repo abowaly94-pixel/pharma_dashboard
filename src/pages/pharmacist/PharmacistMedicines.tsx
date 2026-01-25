@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { toast } from 'sonner';
+import { MedicineImage } from '@/components/ui/medicine-image';
 
 export default function PharmacistMedicines() {
   const { user } = useAuth();
@@ -740,32 +741,13 @@ export default function PharmacistMedicines() {
                 >
                   {/* Image */}
                   <div className="relative h-32 bg-muted overflow-hidden rounded-t-xl">
-                    {medicine.subabaseImageUrl ? (
-                      <img
-                        src={medicine.subabaseImageUrl}
-                        alt={medicine.name}
-                        className="w-full h-full object-contain bg-white p-2 group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const placeholder = document.createElement('div');
-                            placeholder.className = 'w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100';
-                            placeholder.innerHTML = `
-                              <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                              </svg>
-                            `;
-                            parent.insertBefore(placeholder, parent.firstChild);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-                        <Package className="w-12 h-12 text-gray-400" />
-                      </div>
-                    )}
+                    <MedicineImage
+                      imageUrl={medicine.subabaseImageUrl}
+                      originalImageUrl={medicine.subabaseORImageUrl}
+                      name={medicine.name}
+                      objectFit="contain"
+                      className="p-2 group-hover:scale-105 transition-transform duration-300 bg-white"
+                    />
 
                     {/* Status Badge - Always visible on top */}
                     <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
@@ -828,19 +810,34 @@ export default function PharmacistMedicines() {
                       <div className="flex flex-col">
                         {medicine.discountRating > 0 ? (
                           <div className="flex flex-col">
-                            <span className="text-sm text-gray-400 line-through">{medicine.price} ج.م</span>
-                            <span className="text-lg font-bold text-blue-600">
-                              {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                            <span className="text-sm text-gray-400 line-through">{medicine.price.toFixed(2)} ج.م</span>
+                            <span className="text-lg font-bold text-green-600">
+                              {(() => {
+                                const discountAmount = medicine.price * (medicine.discountRating / 100);
+                                const finalPrice = medicine.price - discountAmount;
+                                console.log('💰 Price Calculation:', {
+                                  originalPrice: medicine.price,
+                                  discountRating: medicine.discountRating,
+                                  discountAmount,
+                                  finalPrice
+                                });
+                                return finalPrice.toFixed(2);
+                              })()} ج.م
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              الكمية: {medicine.quantity === 1 ? '1' : medicine.quantity}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-lg font-bold text-blue-600">{medicine.price} ج.م</span>
+                          <div className="flex flex-col">
+                            <span className="text-lg font-bold text-blue-600">{medicine.price.toFixed(2)} ج.م</span>
+                            <span className="text-xs text-gray-500">
+                              الكمية: {medicine.quantity === 1 ? '1' : medicine.quantity}
+                            </span>
+                          </div>
                         )}
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <div className={`text-sm font-medium ${medicine.quantity > 10 ? 'text-green-600' : medicine.quantity > 0 ? 'text-orange-500' : 'text-red-500'}`}>
-                          الكمية: {medicine.quantity}
-                        </div>
                         {medicine.discountRating > 0 && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-red-50 text-red-600 border-red-200 font-bold w-fit">
                             خصم {medicine.discountRating}%
@@ -1178,24 +1175,13 @@ export default function PharmacistMedicines() {
                       )}
 
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
-                        {!imageLoadError ? (
-                          <img
-                            src={formData.subabaseImageUrl}
-                            alt="Preview"
-                            className="w-full h-full object-contain p-3"
-                            onError={() => {
-                              setImageLoadError(true);
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo">
-                            <div className="text-center">
-                              <div className="text-4xl mb-2">⚠️</div>
-                              <div className="font-bold">صورة غير صالحة</div>
-                              <div className="text-xs mt-1">تأكد من صحة الرابط</div>
-                            </div>
-                          </div>
-                        )}
+                        <MedicineImage
+                          imageUrl={formData.subabaseImageUrl}
+                          originalImageUrl={formData.subabaseORImageUrl}
+                          name="Preview"
+                          objectFit="contain"
+                          className="p-3"
+                        />
                         <div className="absolute top-2 right-2 flex gap-2">
                           {/* زر حذف الخلفية - يُخفى إذا كانت الصورة معالجة بالفعل أو فاشلة */}
                           {!imageLoadError && !(formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl) && (

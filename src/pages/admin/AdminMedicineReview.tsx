@@ -44,6 +44,7 @@ import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground }
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { MedicineImage } from '@/components/ui/medicine-image';
 
 export default function AdminMedicineReview() {
   const {
@@ -636,17 +637,13 @@ export default function AdminMedicineReview() {
                       />
                     </div>
                   )}
-                  {medicine.subabaseImageUrl ? (
-                    <img
-                      src={medicine.subabaseImageUrl}
-                      alt={medicine.name}
-                      className="w-full h-full object-contain p-4"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-16 h-16 text-gray-400" />
-                    </div>
-                  )}
+                  <MedicineImage
+                    imageUrl={medicine.subabaseImageUrl}
+                    originalImageUrl={medicine.subabaseORImageUrl}
+                    name={medicine.name}
+                    objectFit="contain"
+                    className="p-4"
+                  />
                 </div>
 
                 {/* Content */}
@@ -666,13 +663,17 @@ export default function AdminMedicineReview() {
                       <span className="text-muted-foreground">السعر: </span>
                       {medicine.discountRating > 0 ? (
                         <span>
-                          <span className="text-sm text-gray-400 line-through">{medicine.price} ج.م</span>
-                          <span className="font-bold text-primary mr-2">
-                            {(medicine.price * (1 - medicine.discountRating / 100)).toFixed(2)} ج.م
+                          <span className="text-sm text-gray-400 line-through">{medicine.price.toFixed(2)} ج.م</span>
+                          <span className="font-bold text-green-600 mr-2">
+                            {(() => {
+                              const discountAmount = medicine.price * (medicine.discountRating / 100);
+                              const finalPrice = medicine.price - discountAmount;
+                              return finalPrice.toFixed(2);
+                            })()} ج.م
                           </span>
                         </span>
                       ) : (
-                        <span className="font-bold text-primary">{medicine.price} ج.م</span>
+                        <span className="font-bold text-primary">{medicine.price.toFixed(2)} ج.م</span>
                       )}
                     </div>
                     <div>
@@ -762,13 +763,17 @@ export default function AdminMedicineReview() {
                   <p className="text-sm text-muted-foreground">
                     السعر: {selectedMedicine.discountRating > 0 ? (
                       <>
-                        <span className="line-through text-gray-400">{selectedMedicine.price} ج.م</span>
-                        <span className="font-bold text-primary mr-2">
-                          {(selectedMedicine.price * (1 - selectedMedicine.discountRating / 100)).toFixed(2)} ج.م
+                        <span className="line-through text-gray-400">{selectedMedicine.price.toFixed(2)} ج.م</span>
+                        <span className="font-bold text-green-600 mr-2">
+                          {(() => {
+                            const discountAmount = selectedMedicine.price * (selectedMedicine.discountRating / 100);
+                            const finalPrice = selectedMedicine.price - discountAmount;
+                            return finalPrice.toFixed(2);
+                          })()} ج.م
                         </span>
                       </>
                     ) : (
-                      `${selectedMedicine.price} ج.م`
+                      `${selectedMedicine.price.toFixed(2)} ج.م`
                     )}
                   </p>
                 </div>
@@ -1007,22 +1012,13 @@ export default function AdminMedicineReview() {
                       )}
                       
                       <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
-                        {!imageLoadError ? (
-                          <img 
-                            src={editFormData.subabaseImageUrl} 
-                            alt="Preview" 
-                            className="w-full h-full object-contain p-3"
-                            onError={() => setImageLoadError(true)}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-sm text-red-500 font-cairo">
-                            <div className="text-center">
-                              <div className="text-4xl mb-2">⚠️</div>
-                              <div className="font-bold">صورة غير صالحة</div>
-                              <div className="text-xs mt-1">تأكد من صحة الرابط</div>
-                            </div>
-                          </div>
-                        )}
+                        <MedicineImage
+                          imageUrl={editFormData.subabaseImageUrl}
+                          originalImageUrl={editFormData.subabaseORImageUrl}
+                          name="Preview"
+                          objectFit="contain"
+                          className="p-3"
+                        />
                         <div className="absolute top-2 right-2 flex gap-2">
                           {/* Remove background button */}
                           {!imageLoadError && !(editFormData.subabaseORImageUrl && editFormData.subabaseORImageUrl !== editFormData.subabaseImageUrl) && (
