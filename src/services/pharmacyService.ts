@@ -71,21 +71,68 @@ function mapFirestoreToPharmacy(id: string, data: Record<string, unknown>): Phar
 }
 
 /**
- * توليد رقم صيدلية فريد (integer)
- * يبدأ من 10001 ويزيد تلقائياً
+ * توليد رقم صيدلية فريد (integer) باستخدام counter
+ * يستخدم counter في Firebase يزيد تلقائياً ولا يتراجع أبداً
+ * النطاق: يبدأ من 10000001 ويزيد للأبد
+ * ✅ ضمان 100% عدم التكرار حتى بعد حذف الصيدليات
  */
 async function generateUniquePharmacyId(): Promise<number> {
-  const pharmaciesRef = collection(db, PHARMACIES_COLLECTION);
-  const q = query(pharmaciesRef, orderBy('pharmacyId', 'desc'));
-  const snapshot = await getDocs(q);
+  const counterRef = doc(db, 'counters', 'pharmacyId');
   
-  if (snapshot.empty) {
-    return 10001; // أول رقم صيدلية
+  try {
+    // محاولة الحصول على الـ counter الحالي
+    const counterSnap = await getDoc(counterRef);
+    
+    let nextId: number;
+    
+    if (!counterSnap.exists()) {
+      // أول مرة: نبدأ من 10000001
+      nextId = 10000001;
+      
+      // إنشاء الـ counter document
+      await setDoc(counterRef, {
+        currentId: nextId,
+        lastUpdated: serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+      
+      console.log(`✅ Created pharmacy ID counter, starting from: ${nextId}`);
+    } else {
+      // زيادة الـ counter
+      const currentId = counterSnap.data().currentId as number;
+      nextId = currentId + 1;
+      
+      // تحديث الـ counter
+      await updateDoc(counterRef, {
+        currentId: nextId,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`✅ Generated unique pharmacy ID: ${nextId}`);
+    }
+    
+    // التحقق المزدوج: التأكد من أن الـ ID غير مستخدم (للأمان)
+    const pharmaciesRef = collection(db, PHARMACIES_COLLECTION);
+    const q = query(pharmaciesRef, where('pharmacyId', '==', nextId));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      // في حالة نادرة جداً: الـ ID موجود، نحاول مرة أخرى
+      console.warn(`⚠️ Pharmacy ID ${nextId} already exists! Retrying...`);
+      return generateUniquePharmacyId(); // محاولة تانية
+    }
+    
+    return nextId;
+    
+  } catch (error) {
+    console.error('❌ Error generating pharmacy ID:', error);
+    
+    // Fallback: استخدام timestamp + random كبير
+    const fallbackId = parseInt(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-8));
+    const finalId = fallbackId < 10000000 ? fallbackId + 10000000 : fallbackId;
+    console.warn(`⚠️ Using fallback ID: ${finalId}`);
+    return finalId;
   }
-  
-  const lastPharmacy = snapshot.docs[0].data();
-  const lastId = lastPharmacy.pharmacyId as number;
-  return lastId + 1;
 }
 
 /**

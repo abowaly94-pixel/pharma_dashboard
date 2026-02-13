@@ -26,11 +26,18 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
       return;
     }
 
+    // If no pharmacyId provided, don't fetch anything
+    if (pharmacyId === undefined || pharmacyId === null) {
+      setOrders([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     // Create base query - get all orders then filter client-side for pharmacy
-    // This handles cases where orders contain items from multiple pharmacies
     const ordersQuery = query(
       collection(db, 'orders'),
       orderBy('createdAt', 'desc')
@@ -81,39 +88,41 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
           }
         }).filter((order): order is Order => order !== null);
 
-        // Filter orders for specific pharmacy
-        // CRITICAL: Only show orders that have items from this pharmacy
-        if (pharmacyId !== undefined && pharmacyId !== null) {
-          ordersList = ordersList.filter(order => {
-            // Check if any cart item belongs to this pharmacy
-            const hasPharmacyItems = order.cartItem.some(
-              (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
-            );
-            
-            // ONLY return orders that have items from this pharmacy
-            return hasPharmacyItems;
-          }).map(order => {
-            // Filter cart items to show only this pharmacy's items
-            const filteredCartItems = order.cartItem.filter(
-              (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
-            );
+        // Filter orders for specific pharmacy - only show orders with items from this pharmacy
+        ordersList = ordersList.filter(order => {
+          return order.cartItem.some(
+            (item: CartItem) => {
+              const itemPharmacyId = item.medicineEntity?.pharmacyId;
+              const itemIdNum = typeof itemPharmacyId === 'string' ? parseInt(itemPharmacyId, 10) : itemPharmacyId;
+              const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
+              return itemIdNum === targetIdNum;
+            }
+          );
+        }).map(order => {
+          // Filter cart items to show only this pharmacy's items
+          const filteredCartItems = order.cartItem.filter(
+            (item: CartItem) => {
+              const itemPharmacyId = item.medicineEntity?.pharmacyId;
+              const itemIdNum = typeof itemPharmacyId === 'string' ? parseInt(itemPharmacyId, 10) : itemPharmacyId;
+              const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
+              return itemIdNum === targetIdNum;
+            }
+          );
 
-            // Recalculate totals for this pharmacy's items only
-            const pharmacySubtotal = filteredCartItems.reduce(
-              (sum, item) => sum + (item.medicineEntity.price * item.count), 0
-            );
+          // Recalculate totals for this pharmacy's items only
+          const pharmacySubtotal = filteredCartItems.reduce(
+            (sum, item) => sum + (item.medicineEntity.price * item.count), 0
+          );
 
-            return {
-              ...order,
-              cartItem: filteredCartItems,
-              subtotal: pharmacySubtotal,
-              // Calculate total for this pharmacy's items only
-              totalAmount: pharmacySubtotal + order.deliveryFee
-            };
-          });
-        }
+          return {
+            ...order,
+            cartItem: filteredCartItems,
+            subtotal: pharmacySubtotal,
+            // Calculate total for this pharmacy's items only
+            totalAmount: pharmacySubtotal + order.deliveryFee
+          };
+        });
 
-        console.log(`📊 Pharmacy ${pharmacyId} orders:`, ordersList.length);
         setOrders(ordersList);
         setError(null);
         setIsLoading(false);

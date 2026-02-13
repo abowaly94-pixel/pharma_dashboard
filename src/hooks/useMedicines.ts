@@ -41,7 +41,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
 
     try {
       if (pharmacyId !== undefined && pharmacyId !== null) {
-        // For pharmacist - filter by pharmacy first, then try orderBy
+        // For pharmacist - filter by pharmacy
         medicinesQuery = query(
           collection(db, 'medicines'),
           where('pharmacyId', '==', pharmacyId)
@@ -63,7 +63,7 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
               description: data.description || '',
               price: data.price || 0,
               quantity: data.quantity || 0,
-              pharmacyId: data.pharmacyId as string,
+              pharmacyId: typeof data.pharmacyId === 'string' ? parseInt(data.pharmacyId, 10) : (data.pharmacyId || 0),
               pharmacyName: data.pharmacyName || '',
               pharmcyAddress: data.pharmcyAddress || '',
               avgRating: data.avgRating || 0,
