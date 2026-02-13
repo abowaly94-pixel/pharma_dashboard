@@ -82,17 +82,15 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
         }).filter((order): order is Order => order !== null);
 
         // Filter orders for specific pharmacy
-        // Check both order.pharmacyId AND items inside cartItem
+        // CRITICAL: Only show orders that have items from this pharmacy
         if (pharmacyId !== undefined && pharmacyId !== null) {
           ordersList = ordersList.filter(order => {
-            // Check if order has pharmacyId field matching
-            if (order.pharmacyId === pharmacyId) {
-              return true;
-            }
             // Check if any cart item belongs to this pharmacy
             const hasPharmacyItems = order.cartItem.some(
               (item: CartItem) => item.medicineEntity?.pharmacyId === pharmacyId
             );
+            
+            // ONLY return orders that have items from this pharmacy
             return hasPharmacyItems;
           }).map(order => {
             // Filter cart items to show only this pharmacy's items
@@ -109,12 +107,13 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
               ...order,
               cartItem: filteredCartItems,
               subtotal: pharmacySubtotal,
-              // Keep original total for reference, but show pharmacy-specific subtotal
+              // Calculate total for this pharmacy's items only
               totalAmount: pharmacySubtotal + order.deliveryFee
             };
           });
         }
 
+        console.log(`📊 Pharmacy ${pharmacyId} orders:`, ordersList.length);
         setOrders(ordersList);
         setError(null);
         setIsLoading(false);
