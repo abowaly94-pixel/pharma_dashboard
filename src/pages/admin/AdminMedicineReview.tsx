@@ -760,6 +760,10 @@ export default function AdminMedicineReview() {
                   <p className="text-sm text-muted-foreground">
                     الصيدلية: {selectedMedicine.pharmacyName}
                   </p>
+                  <p className="text-sm text-muted-foreground flex items-start gap-1">
+                    <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <span>العنوان: {selectedMedicine.pharmcyAddress || 'غير محدد'}</span>
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     السعر: {selectedMedicine.discountRating > 0 ? (
                       <>

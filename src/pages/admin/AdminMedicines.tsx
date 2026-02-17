@@ -156,7 +156,7 @@ export default function AdminMedicines() {
         quantity: 0,
         pharmacyId: defaultPharmacy?.pharmacyId || 0,
         pharmacyName: defaultPharmacy?.name || '',
-        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}, ${defaultPharmacy.city}` : '',
+        pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}، ${defaultPharmacy.city}` : '',
         category: '',
         manufacturer: '',
         subabaseImageUrl: '',
@@ -186,8 +186,8 @@ export default function AdminMedicines() {
     }
 
     // التحقق من وجود عنوان الصيدلية
-    if (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5) {
-      toast.error('⚠️ يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)');
+    if (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10) {
+      toast.error('⚠️ يجب إدخال عنوان الصيدلية بالتفصيل الكامل (10 أحرف على الأقل)');
       return;
     }
 
@@ -785,7 +785,7 @@ export default function AdminMedicines() {
                           ...formData,
                           pharmacyId: selectedPharmacy.pharmacyId,
                           pharmacyName: selectedPharmacy.name,
-                          pharmcyAddress: `${selectedPharmacy.address}, ${selectedPharmacy.city}`
+                          pharmcyAddress: `${selectedPharmacy.address}، ${selectedPharmacy.city}`
                         });
                       }
                     }}
@@ -800,23 +800,26 @@ export default function AdminMedicines() {
                 <div className="space-y-2">
                   <Label htmlFor="pharmcyAddress" className="font-cairo text-sm font-semibold text-red-600 flex items-center gap-1">
                     <MapPin className="w-4 h-4 text-red-600" />
-                    عنوان الصيدلية بالتفصيل *
-                    {(!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5) && (
-                      <span className="text-xs text-red-500">(مطلوب - 5 أحرف على الأقل)</span>
+                    عنوان الصيدلية بالتفصيل الكامل *
+                    {(!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10) && (
+                      <span className="text-xs text-red-500">(مطلوب - 10 أحرف على الأقل)</span>
                     )}
                   </Label>
                   <Textarea
                     id="pharmcyAddress"
                     value={formData.pharmcyAddress}
                     onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })}
-                    placeholder="الشارع، المدينة، المحافظة، الرمز البريدي"
-                    rows={2}
+                    placeholder="مثال: شارع الملك فهد، حي النخيل، الرياض، المملكة العربية السعودية، 12345"
+                    rows={3}
                     required
-                    className={`text-sm resize-none ${!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5 ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-green-500 bg-white'} focus:ring-purple-500`}
+                    className={`text-sm resize-none ${!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-green-500 bg-white'} focus:ring-purple-500`}
                     dir="rtl"
                   />
+                  <p className="text-xs text-gray-600 font-cairo">
+                    💡 اكتب العنوان الكامل: الشارع، الحي، المدينة، المحافظة، الرمز البريدي
+                  </p>
                   <p className="text-xs text-red-600 font-bold">
-                    ⚠️ يجب إدخال العنوان بالكامل (الشارع، المدينة، المحافظة)
+                    ⚠️ هذا العنوان سيظهر للعملاء في التطبيق - تأكد من دقته
                   </p>
                 </div>
               </div>
@@ -1085,12 +1088,12 @@ export default function AdminMedicines() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5}
+                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10}
                   title={
                     !formData.subabaseImageUrl
                       ? 'يجب رفع صورة للدواء أولاً'
-                      : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 5)
-                        ? 'يجب إدخال عنوان الصيدلية بالتفصيل (5 أحرف على الأقل)'
+                      : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10)
+                        ? 'يجب إدخال عنوان الصيدلية بالتفصيل الكامل (10 أحرف على الأقل)'
                         : ''
                   }
                   className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1174,6 +1177,13 @@ export default function AdminMedicines() {
                       <div>
                         <span className="text-muted-foreground font-cairo">الصيدلية:</span>
                         <p className="font-bold">{selectedMedicine.pharmacyName}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground font-cairo flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          عنوان الصيدلية:
+                        </span>
+                        <p className="font-bold text-sm mt-1">{selectedMedicine.pharmcyAddress || 'غير محدد'}</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground font-cairo">التقييم:</span>
