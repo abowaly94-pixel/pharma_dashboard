@@ -261,7 +261,7 @@ export async function createPharmacy(
       phoneNumber: input.phoneNumber,
       ownerName: input.ownerName.trim(),
       licenseNumber: input.licenseNumber.trim(),
-      status: 'inactive' as PharmacyStatus,
+      status: 'active' as PharmacyStatus, // Active by default so pharmacist can login immediately
       medicineLimit: input.medicineLimit || 100,
       currentMedicineCount: 0,
       emailVerified: false,
