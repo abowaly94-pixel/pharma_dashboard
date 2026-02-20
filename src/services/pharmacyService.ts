@@ -156,6 +156,10 @@ function validatePharmacyInput(input: CreatePharmacyInput): void {
     throw new ValidationError('العنوان مطلوب ويجب أن يكون مفصلاً (10 أحرف على الأقل)', 'address', 'REQUIRED');
   }
 
+  if (!input.city || input.city.trim().length < 2) {
+    throw new ValidationError('المدينة مطلوبة', 'city', 'REQUIRED');
+  }
+
   if (!input.phoneNumber || input.phoneNumber.length < 10) {
     throw new ValidationError('رقم الهاتف غير صالح', 'phoneNumber', 'INVALID_PHONE');
   }
@@ -252,12 +256,12 @@ export async function createPharmacy(
       pharmacyId,
       name: input.name.trim(),
       email: input.email.toLowerCase(),
-      address: input.address.trim(),
-      ...(input.city && { city: input.city.trim() }), // Only add city if provided
+      address: input.address.trim(), // This is the detailed address
+      city: input.city.trim(), // This is just the city name
       phoneNumber: input.phoneNumber,
       ownerName: input.ownerName.trim(),
       licenseNumber: input.licenseNumber.trim(),
-      status: 'inactive' as PharmacyStatus, // Always start as inactive
+      status: 'inactive' as PharmacyStatus,
       medicineLimit: input.medicineLimit || 100,
       currentMedicineCount: 0,
       emailVerified: false,

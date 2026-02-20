@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, Building2, Phone, Mail, MapPin, Edit,
-  CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound, Trash2
+  CheckCircle, XCircle, AlertTriangle, Pill, Eye, EyeOff, MoreVertical, KeyRound, Trash2, Settings, AlertCircle
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,7 @@ export default function AdminPharmacies() {
     phoneNumber: '',
     ownerName: '',
     licenseNumber: '',
-    medicineLimit: 0,
+    medicineLimit: 100,
   });
 
 
@@ -201,8 +201,8 @@ export default function AdminPharmacies() {
     }
 
     // Validate address length
-    if (formData.address.trim().length < 5) {
-      toast.error('⚠️ عنوان الصيدلية يجب أن يكون 5 أحرف على الأقل');
+    if (formData.address.trim().length < 10) {
+      toast.error('⚠️ عنوان الصيدلية يجب أن يكون 10 أحرف على الأقل');
       return;
     }
 
@@ -245,7 +245,7 @@ export default function AdminPharmacies() {
             phoneNumber: '',
             ownerName: '',
             licenseNumber: '',
-            medicineLimit: 0,
+            medicineLimit: 100,
           });
           setShowPassword(false);
         }
@@ -566,55 +566,65 @@ export default function AdminPharmacies() {
                   : 'املأ جميع البيانات المطلوبة لإنشاء حساب صيدلية جديد'}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Basic Info */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 font-cairo">المعلومات الأساسية</h3>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Info Section */}
+              <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-base font-bold text-blue-900 font-cairo flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  المعلومات الأساسية
+                </h3>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name" className="text-sm">اسم الصيدلية *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-semibold">اسم الصيدلية *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
-                      placeholder="أدخل اسم الصيدلية"
+                      className="bg-white"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="licenseNumber" className="text-sm">رقم الترخيص *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseNumber" className="text-sm font-semibold">رقم الترخيص *</Label>
                     <Input
                       id="licenseNumber"
                       value={formData.licenseNumber}
                       onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                       required
                       minLength={5}
-                      placeholder="أدخل رقم الترخيص"
+                      className="bg-white"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ownerName" className="text-sm">اسم المالك *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ownerName" className="text-sm font-semibold">اسم المالك *</Label>
                     <Input
                       id="ownerName"
                       value={formData.ownerName}
                       onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
                       required
-                      placeholder="أدخل اسم المالك"
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-sm font-semibold">المدينة *</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      required
+                      className="bg-white"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="address" className="text-sm font-bold text-red-600 flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    عنوان الصيدلية بالتفصيل *
-                    {(!formData.address || formData.address.trim().length < 10) && (
-                      <span className="text-xs text-red-500">(مطلوب - 10 أحرف على الأقل)</span>
-                    )}
+                <div className="space-y-2">
+                  <Label htmlFor="address" className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-red-600" />
+                    <span className="text-red-600">عنوان الصيدلية بالتفصيل *</span>
                   </Label>
                   <Input
                     id="address"
@@ -622,23 +632,26 @@ export default function AdminPharmacies() {
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
                     minLength={10}
-                    placeholder="صفط الخمار، اسفل المجمع الطبي، المنيا"
-                    className={`font-cairo ${!formData.address || formData.address.trim().length < 10 ? 'border-red-500 focus:border-red-600' : 'border-green-500'}`}
+                    className={`font-cairo bg-white ${!formData.address || formData.address.trim().length < 10 ? 'border-red-400' : 'border-green-500'}`}
                     dir="rtl"
                   />
-                  <p className="text-xs text-red-600 font-bold">
-                    ⚠️ يجب إدخال العنوان بالكامل (الشارع، المدينة، المحافظة)
+                  <p className="text-xs text-orange-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    يجب إدخال العنوان بالكامل (الشارع، المدينة، المحافظة)
                   </p>
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="space-y-3 pt-3 border-t">
-                <h3 className="text-sm font-semibold text-gray-700 font-cairo">معلومات الاتصال</h3>
+              {/* Contact Info Section */}
+              <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <h3 className="text-base font-bold text-green-900 font-cairo flex items-center gap-2">
+                  <Phone className="w-5 h-5" />
+                  معلومات الاتصال
+                </h3>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="phoneNumber" className="text-sm">رقم الهاتف *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber" className="text-sm font-semibold">رقم الهاتف *</Label>
                     <Input
                       id="phoneNumber"
                       value={formData.phoneNumber}
@@ -646,11 +659,11 @@ export default function AdminPharmacies() {
                       required
                       minLength={10}
                       dir="ltr"
-                      placeholder="أدخل رقم الهاتف"
+                      className="bg-white"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-sm">البريد الإلكتروني *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-semibold">البريد الإلكتروني *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -659,14 +672,14 @@ export default function AdminPharmacies() {
                       required
                       disabled={!!editingPharmacy}
                       dir="ltr"
-                      placeholder="أدخل البريد الإلكتروني"
+                      className="bg-white"
                     />
                   </div>
                 </div>
 
                 {!editingPharmacy && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="password" className="text-sm">كلمة المرور *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-semibold">كلمة المرور *</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -675,8 +688,7 @@ export default function AdminPharmacies() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required={!editingPharmacy}
                         minLength={8}
-                        placeholder="أدخل كلمة مرور قوية (8 أحرف على الأقل)"
-                        className="pl-10"
+                        className="pl-10 bg-white"
                         dir="ltr"
                       />
                       <button
@@ -691,20 +703,23 @@ export default function AdminPharmacies() {
                 )}
               </div>
 
-              {/* Settings */}
-              <div className="space-y-3 pt-3 border-t">
-                <h3 className="text-sm font-semibold text-gray-700 font-cairo">الإعدادات</h3>
+              {/* Settings Section */}
+              <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <h3 className="text-base font-bold text-purple-900 font-cairo flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  الإعدادات
+                </h3>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="medicineLimit" className="text-sm">الحد الأقصى للأدوية *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="medicineLimit" className="text-sm font-semibold">الحد الأقصى للأدوية *</Label>
                   <Input
                     id="medicineLimit"
                     type="number"
                     min={1}
                     required
-                    value={formData.medicineLimit === 0 ? '' : formData.medicineLimit}
+                    value={formData.medicineLimit || ''}
                     onChange={(e) => setFormData({ ...formData, medicineLimit: parseInt(e.target.value) || 0 })}
-                    placeholder="أدخل الحد الأقصى للأدوية"
+                    className="bg-white"
                   />
                   <p className="text-xs text-muted-foreground">
                     عدد الأدوية التي يمكن للصيدلية إضافتها
@@ -737,7 +752,7 @@ export default function AdminPharmacies() {
                   disabled={
                     !formData.name ||
                     !formData.email ||
-                    !formData.address || formData.address.trim().length < 5 ||
+                    !formData.address || formData.address.trim().length < 10 ||
                     !formData.city ||
                     !formData.phoneNumber ||
                     !formData.ownerName ||
@@ -746,8 +761,8 @@ export default function AdminPharmacies() {
                     (!editingPharmacy && (!formData.password || formData.password.length < 8))
                   }
                   title={
-                    !formData.address || formData.address.trim().length < 5
-                      ? 'يجب إدخال عنوان الصيدلية بالكامل (5 أحرف على الأقل)'
+                    !formData.address || formData.address.trim().length < 10
+                      ? 'يجب إدخال عنوان الصيدلية بالكامل (10 أحرف على الأقل)'
                       : ''
                   }
                 >
