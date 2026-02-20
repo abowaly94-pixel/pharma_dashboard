@@ -144,7 +144,7 @@ export interface PharmacyAccount {
   name: string;
   email: string;
   address: string;
-  city: string;
+  city?: string; // Optional - for backward compatibility
   phoneNumber: string;
   ownerName: string;
   licenseNumber: string;
@@ -171,7 +171,7 @@ export interface CreatePharmacyInput {
   email: string;
   password: string;
   address: string;
-  city: string;
+  city?: string; // Optional - for backward compatibility
   phoneNumber: string;
   ownerName: string;
   licenseNumber: string;

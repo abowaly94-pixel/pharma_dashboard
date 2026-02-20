@@ -606,24 +606,14 @@ export default function AdminPharmacies() {
                       placeholder="أدخل اسم المالك"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="city" className="text-sm">المدينة *</Label>
-                    <Input
-                      id="city"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      required
-                      placeholder="أدخل اسم المدينة"
-                    />
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="address" className="text-sm font-bold text-red-600 flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
                     عنوان الصيدلية بالتفصيل *
-                    {(!formData.address || formData.address.trim().length < 5) && (
-                      <span className="text-xs text-red-500">(مطلوب - 5 أحرف على الأقل)</span>
+                    {(!formData.address || formData.address.trim().length < 10) && (
+                      <span className="text-xs text-red-500">(مطلوب - 10 أحرف على الأقل)</span>
                     )}
                   </Label>
                   <Input
@@ -631,9 +621,9 @@ export default function AdminPharmacies() {
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     required
-                    minLength={5}
-                    placeholder="مثال: شارع الجمهورية، بني سويف، المنيا"
-                    className={`font-cairo ${!formData.address || formData.address.trim().length < 5 ? 'border-red-500 focus:border-red-600' : 'border-green-500'}`}
+                    minLength={10}
+                    placeholder="صفط الخمار، اسفل المجمع الطبي، المنيا"
+                    className={`font-cairo ${!formData.address || formData.address.trim().length < 10 ? 'border-red-500 focus:border-red-600' : 'border-green-500'}`}
                     dir="rtl"
                   />
                   <p className="text-xs text-red-600 font-bold">

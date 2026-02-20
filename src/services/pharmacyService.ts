@@ -152,12 +152,8 @@ function validatePharmacyInput(input: CreatePharmacyInput): void {
     throw new ValidationError('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'password', 'WEAK_PASSWORD');
   }
 
-  if (!input.address || input.address.trim().length < 5) {
-    throw new ValidationError('العنوان مطلوب', 'address', 'REQUIRED');
-  }
-
-  if (!input.city || input.city.trim().length < 2) {
-    throw new ValidationError('المدينة مطلوبة', 'city', 'REQUIRED');
+  if (!input.address || input.address.trim().length < 10) {
+    throw new ValidationError('العنوان مطلوب ويجب أن يكون مفصلاً (10 أحرف على الأقل)', 'address', 'REQUIRED');
   }
 
   if (!input.phoneNumber || input.phoneNumber.length < 10) {
@@ -257,7 +253,7 @@ export async function createPharmacy(
       name: input.name.trim(),
       email: input.email.toLowerCase(),
       address: input.address.trim(),
-      city: input.city.trim(),
+      ...(input.city && { city: input.city.trim() }), // Only add city if provided
       phoneNumber: input.phoneNumber,
       ownerName: input.ownerName.trim(),
       licenseNumber: input.licenseNumber.trim(),
