@@ -122,12 +122,8 @@ export async function createMedicine(
     }
 
     // Build pharmacy address from detailed fields
-    const pharmcyAddress = [
-      pharmacy.street,
-      pharmacy.city,
-      pharmacy.governorate,
-      pharmacy.postalCode
-    ].filter(Boolean).join(', ') || pharmacy.address || 'غير محدد';
+    // استخدام العنوان التفصيلي الكامل اللي الأدمن دخله
+    const pharmcyAddress = pharmacy.address || 'غير محدد';
 
     // Generate unique ID - يتم الحفظ في pending_medicines فقط
     const medicineId = doc(collection(db, PENDING_MEDICINES_COLLECTION)).id;
