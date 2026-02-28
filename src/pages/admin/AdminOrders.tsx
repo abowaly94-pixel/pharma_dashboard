@@ -221,9 +221,14 @@ export default function AdminOrders() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-muted-foreground">
-                            {format(new Date(order.createdAt), 'dd MMM yyyy', { locale: ar })}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">
+                              {format(new Date(order.createdAt), 'dd MMM yyyy', { locale: ar })}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(order.createdAt), 'hh:mm a', { locale: ar })}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2 justify-end">

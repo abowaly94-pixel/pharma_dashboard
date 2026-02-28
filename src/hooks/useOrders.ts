@@ -48,11 +48,17 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
         let ordersList = snapshot.docs.map(doc => {
           const data = doc.data();
           try {
+            // Extract pharmacyId from first cart item if not at order level
+            const cartItems = Array.isArray(data.cartItem) ? data.cartItem : [];
+            const firstPharmacyId = cartItems.length > 0 
+              ? cartItems[0]?.medicineEntity?.pharmacyId 
+              : undefined;
+
             return {
               id: doc.id,
               orderId: data.orderId || doc.id,
               userId: data.userId || '',
-              cartItem: Array.isArray(data.cartItem) ? data.cartItem : [],
+              cartItem: cartItems,
               orderStatus: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].includes(data.orderStatus)
                 ? data.orderStatus
                 : 'pending',
@@ -73,7 +79,7 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
               pharmacyWalletNumber: data.pharmacyWalletNumber || null,
               paymentProofUrl: data.paymentProofUrl || null,
               prescriptionUrl: data.prescriptionUrl || '',
-              pharmacyId: data.pharmacyId,
+              pharmacyId: data.pharmacyId || firstPharmacyId,
               createdAt: data.createdAt instanceof Timestamp
                 ? data.createdAt.toDate()
                 : (data.createdAt ? new Date(data.createdAt) : new Date()),
