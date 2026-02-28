@@ -50,7 +50,7 @@ const isImageFile = (url?: string) => {
 };
 
 export default function AdminOrders() {
-  const { orders, isLoading, error, updateOrderStatus } = useOrders();
+  const { orders, isLoading, error, updateOrderStatus } = useOrders(undefined, { isAdminView: true });
   const { notifyOrderStatusChange } = useAutoNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');

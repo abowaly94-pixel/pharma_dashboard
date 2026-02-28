@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { Order, CartItem } from '@/types';
 import { toast } from 'sonner';
 
-export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) {
+export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; isAdminView?: boolean }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +26,8 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
       return;
     }
 
-    // If no pharmacyId provided, don't fetch anything
-    if (pharmacyId === undefined || pharmacyId === null) {
+    // If no pharmacyId provided and not admin view, don't fetch anything
+    if (!options?.isAdminView && (pharmacyId === undefined || pharmacyId === null)) {
       setOrders([]);
       setError(null);
       setIsLoading(false);
@@ -88,6 +88,14 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
           }
         }).filter((order): order is Order => order !== null);
 
+        // If admin view, return all orders without filtering
+        if (options?.isAdminView) {
+          setOrders(ordersList);
+          setError(null);
+          setIsLoading(false);
+          return;
+        }
+
         // Filter orders for specific pharmacy - only show orders with items from this pharmacy
         ordersList = ordersList.filter(order => {
           return order.cartItem.some(
@@ -136,7 +144,7 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean }) 
     );
 
     return () => unsubscribe();
-  }, [pharmacyId, options?.enabled]);
+  }, [pharmacyId, options?.enabled, options?.isAdminView]);
 
   const updateOrderStatus = async (orderId: string, status: Order['orderStatus']) => {
     try {
