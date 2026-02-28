@@ -15,7 +15,7 @@ import {
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useOrders } from "@/hooks/useOrders";
+import { useOrdersOptimized } from '@/hooks/useOrdersOptimized';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { Order } from '@/types';
 import {
@@ -50,7 +50,10 @@ const isImageFile = (url?: string) => {
 };
 
 export default function AdminOrders() {
-  const { orders, isLoading, error, updateOrderStatus } = useOrders(undefined, { isAdminView: true });
+  const { orders, isLoading, error, updateOrderStatus } = useOrdersOptimized(undefined, { 
+    isAdminView: true,
+    useCache: false // Don't use cache in orders page for real-time updates
+  });
   const { notifyOrderStatusChange } = useAutoNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -60,6 +63,11 @@ export default function AdminOrders() {
     url: string;
     title: string;
   } | null>(null);
+
+  // Debug logging
+  console.log('AdminOrders - orders:', orders);
+  console.log('AdminOrders - isLoading:', isLoading);
+  console.log('AdminOrders - error:', error);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =

@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { 
   Pill, 
   ShoppingCart, 
-  Users, 
   TrendingUp,
   Package,
   Clock,
@@ -11,15 +10,15 @@ import {
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { SalesChart, OrderStatusChart } from '@/components/dashboard/Charts';
 import { useMedicines } from '@/hooks/useMedicines';
-import { useOrders } from '@/hooks/useOrders';
-import { useUsers } from '@/hooks/useUsers';
+import { useOrdersOptimized } from '@/hooks/useOrdersOptimized';
 
 export default function AdminDashboard() {
   const { medicines, isLoading: medicinesLoading } = useMedicines();
-  const { orders, isLoading: ordersLoading } = useOrders();
-  const { users, isLoading: usersLoading } = useUsers();
+  const { orders, isLoading: ordersLoading } = useOrdersOptimized(undefined, { 
+    isAdminView: true, 
+    useCache: true 
+  });
 
   // Calculate real statistics from Firebase data
   const totalRevenue = orders.reduce((sum, order) => {
@@ -28,9 +27,6 @@ export default function AdminDashboard() {
   }, 0);
   
   const pendingOrders = orders.filter(o => o.orderStatus === 'pending').length;
-  
-  // Filter only regular users (exclude admins and pharmacists)
-  const regularUsers = users.filter(u => !u.role || u.role === 'user');
   
   // Count orders delivered today
   const deliveredToday = orders.filter(o => {
@@ -61,12 +57,11 @@ export default function AdminDashboard() {
     ordersTrend = Math.round(((ordersThisMonth - ordersLastMonth) / ordersLastMonth) * 100);
   }
 
-  const isLoading = medicinesLoading || ordersLoading || usersLoading;
+  const isLoading = medicinesLoading || ordersLoading;
 
   const displayStats = {
     medicines: medicines.length,
     orders: orders.length,
-    users: regularUsers.length,
     revenue: totalRevenue,
     pending: pendingOrders,
     delivered: deliveredToday,
@@ -78,15 +73,15 @@ export default function AdminDashboard() {
       <div className="space-y-8">
         {/* Stats Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="stat-card animate-pulse">
                 <div className="h-20 bg-muted rounded" />
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <StatCard
               title="إجمالي الإيرادات"
               value={`${displayStats.revenue.toLocaleString()} ج.م`}
@@ -95,25 +90,18 @@ export default function AdminDashboard() {
               delay={0}
             />
             <StatCard
-              title="المستخدمين"
-              value={displayStats.users}
-              icon={Users}
-              color="success"
-              delay={1}
-            />
-            <StatCard
               title="إجمالي الطلبات"
               value={displayStats.orders}
               icon={ShoppingCart}
               color="accent"
-              delay={2}
+              delay={1}
             />
             <StatCard
               title="إجمالي الأدوية"
               value={displayStats.medicines}
               icon={Pill}
               color="primary"
-              delay={3}
+              delay={2}
             />
           </div>
         )}
@@ -184,16 +172,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Charts Row */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-        >
-          <SalesChart orders={orders} />
-          <OrderStatusChart orders={orders} />
-        </motion.div>
       </div>
     </DashboardLayout>
   );

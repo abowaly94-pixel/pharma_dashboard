@@ -35,7 +35,6 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: 'الرئيسية', path: '/admin' },
   { icon: Pill, label: 'الأدوية', path: '/admin/medicines' },
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
-  { icon: Users, label: 'المستخدمين', path: '/admin/users' },
   { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
   { icon: ClipboardCheck, label: 'مراجعة الأدوية', path: '/admin/medicine-review' },
   { icon: Bell, label: 'الإشعارات', path: '/admin/notifications' },

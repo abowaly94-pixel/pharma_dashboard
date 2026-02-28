@@ -13,7 +13,6 @@ import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMedicines from "./pages/admin/AdminMedicines";
 import AdminOrders from "./pages/admin/AdminOrders";
-import AdminUsers from "./pages/admin/AdminUsers";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPharmacies from "./pages/admin/AdminPharmacies";
 import AdminMedicineReview from "./pages/admin/AdminMedicineReview";
@@ -118,14 +117,6 @@ const App = () => {
                     element={
                       <ProtectedRoute requiredRole="admin">
                         <AdminOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/users"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminUsers />
                       </ProtectedRoute>
                     }
                   />

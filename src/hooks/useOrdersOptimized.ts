@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import {
   collection,
-  onSnapshot,
+  getDocs,
   query,
   doc,
   updateDoc,
   Timestamp,
-  orderBy
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Order, CartItem } from '@/types';
 import { toast } from 'sonner';
 
-export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; isAdminView?: boolean }) {
+// Cache للطلبات - يوفر عمليات القراءة من Firebase
+const ordersCache = {
+  data: null as Order[] | null,
+  timestamp: 0,
+  ttl: 5 * 60 * 1000 // 5 دقائق
+};
+
+export function useOrdersOptimized(pharmacyId?: number, options?: { enabled?: boolean; isAdminView?: boolean; useCache?: boolean }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,25 +41,32 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      setError(null);
 
-    // Create base query - get all orders then filter client-side for pharmacy
-    const ordersQuery = query(
-      collection(db, 'orders'),
-      orderBy('createdAt', 'desc')
-    );
+      try {
+        // Check cache first
+        if (options?.useCache && ordersCache.data && (Date.now() - ordersCache.timestamp) < ordersCache.ttl) {
+          console.log('useOrdersOptimized - Using cached data');
+          setOrders(ordersCache.data);
+          setIsLoading(false);
+          return;
+        }
 
-    const unsubscribe = onSnapshot(ordersQuery,
-      (snapshot) => {
-        console.log('useOrders - snapshot received, docs count:', snapshot.docs.length);
-        console.log('useOrders - isAdminView:', options?.isAdminView);
-        
+        // Create query - get recent orders only (last 100)
+        const ordersQuery = query(
+          collection(db, 'orders'),
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+
+        const snapshot = await getDocs(ordersQuery);
+        console.log('useOrdersOptimized - Fetched orders:', snapshot.docs.length);
+
         let ordersList = snapshot.docs.map(doc => {
           const data = doc.data();
-          console.log('useOrders - processing order:', doc.id, data);
           try {
-            // Extract pharmacyId from first cart item if not at order level
             const cartItems = Array.isArray(data.cartItem) ? data.cartItem : [];
             const firstPharmacyId = cartItems.length > 0 
               ? cartItems[0]?.medicineEntity?.pharmacyId 
@@ -99,16 +114,21 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
 
         // If admin view, return all orders without filtering
         if (options?.isAdminView) {
-          console.log('useOrders - Admin view, returning all orders:', ordersList.length);
+          console.log('useOrdersOptimized - Admin view, returning all orders:', ordersList.length);
+          
+          // Cache the data
+          ordersCache.data = ordersList;
+          ordersCache.timestamp = Date.now();
+          
           setOrders(ordersList);
           setError(null);
           setIsLoading(false);
           return;
         }
 
-        console.log('useOrders - Pharmacy view, filtering for pharmacyId:', pharmacyId);
+        console.log('useOrdersOptimized - Pharmacy view, filtering for pharmacyId:', pharmacyId);
 
-        // Filter orders for specific pharmacy - only show orders with items from this pharmacy
+        // Filter orders for specific pharmacy
         ordersList = ordersList.filter(order => {
           return order.cartItem.some(
             (item: CartItem) => {
@@ -119,7 +139,6 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
             }
           );
         }).map(order => {
-          // Filter cart items to show only this pharmacy's items
           const filteredCartItems = order.cartItem.filter(
             (item: CartItem) => {
               const itemPharmacyId = item.medicineEntity?.pharmacyId;
@@ -129,7 +148,6 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
             }
           );
 
-          // Recalculate totals for this pharmacy's items only
           const pharmacySubtotal = filteredCartItems.reduce(
             (sum, item) => sum + (item.medicineEntity.price * item.count), 0
           );
@@ -138,7 +156,6 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
             ...order,
             cartItem: filteredCartItems,
             subtotal: pharmacySubtotal,
-            // Calculate total for this pharmacy's items only
             totalAmount: pharmacySubtotal + order.deliveryFee
           };
         });
@@ -146,17 +163,16 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
         setOrders(ordersList);
         setError(null);
         setIsLoading(false);
-      },
-      (err) => {
+      } catch (err) {
         console.error('Error fetching orders:', err);
         setError('Failed to fetch orders');
         setIsLoading(false);
         toast.error('حدث خطأ أثناء تحميل الطلبات');
       }
-    );
+    };
 
-    return () => unsubscribe();
-  }, [pharmacyId, options?.enabled, options?.isAdminView]);
+    fetchOrders();
+  }, [pharmacyId, options?.enabled, options?.isAdminView, options?.useCache]);
 
   const updateOrderStatus = async (orderId: string, status: Order['orderStatus']) => {
     try {
@@ -165,6 +181,15 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
         orderStatus: status,
         updatedAt: Timestamp.now()
       });
+      
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, orderStatus: status } : order
+      ));
+      
+      // Invalidate cache
+      ordersCache.data = null;
+      
       toast.success('تم تحديث حالة الطلب بنجاح');
     } catch (err) {
       console.error('Error updating order status:', err);
@@ -172,5 +197,10 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
     }
   };
 
-  return { orders, isLoading, error, updateOrderStatus };
+  const refreshOrders = () => {
+    ordersCache.data = null;
+    setIsLoading(true);
+  };
+
+  return { orders, isLoading, error, updateOrderStatus, refreshOrders };
 }
