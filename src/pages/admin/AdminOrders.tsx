@@ -16,7 +16,6 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrdersOptimized } from '@/hooks/useOrdersOptimized';
-import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { Order } from '@/types';
 import {
   Dialog,
@@ -50,11 +49,15 @@ const isImageFile = (url?: string) => {
 };
 
 export default function AdminOrders() {
-  const { orders, isLoading, error, updateOrderStatus } = useOrdersOptimized(undefined, { 
+  const {
+    orders,
+    isLoading,
+    error,
+    updateOrderStatus
+  } = useOrdersOptimized(undefined, { 
     isAdminView: true,
     useCache: false // Don't use cache in orders page for real-time updates
   });
-  const { notifyOrderStatusChange } = useAutoNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -82,12 +85,6 @@ export default function AdminOrders() {
 
   const handleStatusChange = async (orderId: string, newStatus: Order['orderStatus']) => {
     await updateOrderStatus(orderId, newStatus);
-
-    // Find the order to get pharmacy information
-    const order = orders.find(o => o.id === orderId);
-    if (order && order.pharmacyId) {
-      await notifyOrderStatusChange(order.orderId, newStatus, order.pharmacyId);
-    }
 
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, orderStatus: newStatus } : null);

@@ -6,13 +6,64 @@ export type PharmacyStatus = 'active' | 'inactive' | 'suspended';
 /** حالة الدواء في نظام المراجعة */
 export type MedicineStatus = 'pending' | 'approved' | 'rejected';
 
+// ==================== Category Types ====================
+
+/** قسم المنتجات (المستوى الأول) */
+export interface Section {
+  id: string;
+  name: string;
+  nameEn?: string;
+  description?: string;
+  icon?: string;
+  isActive: boolean;
+  order?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
+}
+
+/** تصنيف الدواء */
+export interface MedicineCategory {
+  id: string;
+  name: string;
+  nameEn: string;
+  sectionId?: string; // ربط الفئة بالقسم
+  sectionName?: string; // اسم القسم للعرض
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+}
+
+/** بيانات إنشاء تصنيف جديد */
+export interface CreateCategoryInput {
+  name: string;
+  nameEn: string;
+  description?: string;
+  sectionId?: string;
+  sectionName?: string;
+}
+
+/** بيانات تحديث التصنيف */
+export interface UpdateCategoryInput {
+  name?: string;
+  nameEn?: string;
+  description?: string;
+  sectionId?: string;
+  sectionName?: string;
+  isActive?: boolean;
+}
+
 // ==================== Core Interfaces ====================
 
 export interface Medicine {
   id: string;
   name: string;
+  nameEn?: string; // اسم الدواء بالإنجليزية
   code: string;
   description: string;
+  descriptionEn?: string; // وصف الدواء بالإنجليزية
   price: number;
   quantity: number;
   pharmacyId: number;
@@ -27,8 +78,15 @@ export interface Medicine {
   subabaseImageUrl: string; // الحقل الأساسي للصور من Supabase
   subabaseORImageUrl?: string; // حقل قديم للتوافق مع البيانات القديمة
   category?: string;
+  categoryEn?: string; // اسم الفئة بالإنجليزية
+  categoryId?: string; // معرف الفئة
+  sectionId?: string; // معرف القسم
+  sectionName?: string; // اسم القسم للعرض
+  sectionNameEn?: string; // اسم القسم بالإنجليزية
   manufacturer?: string;
-  expiryDate?: Date;
+  pharmacyPrice?: number; // سعر الصيدلية
+  pharmacyDiscount?: number; // خصم الصيدليات
+  expiryDate?: Date | string; // تاريخ الانتهاء
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -232,6 +290,11 @@ export interface CreateMedicineInput {
   price: number;
   quantity: number;
   category: string;
+  categoryEn?: string; // اسم الفئة بالإنجليزية
+  categoryId?: string;
+  sectionId?: string;
+  sectionName?: string;
+  sectionNameEn?: string; // اسم القسم بالإنجليزية
   manufacturer: string;
   expiryDate: Date;
   subabaseImageUrl: string;
@@ -248,6 +311,11 @@ export interface UpdateMedicineInput {
   price?: number;
   quantity?: number;
   category?: string;
+  categoryEn?: string; // اسم الفئة بالإنجليزية
+  categoryId?: string;
+  sectionId?: string;
+  sectionName?: string;
+  sectionNameEn?: string; // اسم القسم بالإنجليزية
   manufacturer?: string;
   expiryDate?: Date;
   subabaseImageUrl?: string;

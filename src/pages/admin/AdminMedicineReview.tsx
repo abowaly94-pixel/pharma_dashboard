@@ -37,7 +37,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useMedicineApproval } from '@/hooks/useMedicineApproval';
-import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MedicineWithApproval } from '@/types';
 import { toast } from 'sonner';
 import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground } from '@/lib/supabase';
@@ -45,6 +44,7 @@ import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MedicineImage } from '@/components/ui/medicine-image';
+import { CategorySelect } from '@/components/forms/CategorySelect';
 
 export default function AdminMedicineReview() {
   const {
@@ -57,8 +57,6 @@ export default function AdminMedicineReview() {
     approve,
     reject,
   } = useMedicineApproval();
-
-  const { notifyMedicineApproved, notifyMedicineRejected } = useAutoNotifications();
 
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineWithApproval | null>(null);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -161,6 +159,12 @@ export default function AdminMedicineReview() {
 
     if (!editFormData.subabaseImageUrl || editFormData.subabaseImageUrl.trim() === '') {
       toast.error('يجب وجود صورة للدواء');
+      return;
+    }
+
+    // التحقق من اختيار التصنيف
+    if (!editFormData.category || editFormData.category.trim() === '') {
+      toast.error('يجب اختيار تصنيف الدواء');
       return;
     }
 
@@ -346,16 +350,16 @@ export default function AdminMedicineReview() {
     if (reviewAction === 'approve') {
       const success = await approve(selectedMedicine.id);
       if (success) {
-        await notifyMedicineApproved(selectedMedicine.name, selectedMedicine.pharmacyId);
+        toast.success('تمت الموافقة على الدواء بنجاح');
       }
     } else {
       if (!rejectionNotes.trim()) {
-        toast.error('يرجى إدخال ملاحظات الرفض');
+        toast.error('يرجى إدخال سبب الرفض');
         return;
       }
       const success = await reject(selectedMedicine.id, rejectionNotes);
       if (success) {
-        await notifyMedicineRejected(selectedMedicine.name, selectedMedicine.pharmacyId, rejectionNotes);
+        toast.success('تم رفض الدواء بنجاح');
       }
     }
 
@@ -412,11 +416,6 @@ export default function AdminMedicineReview() {
       const success = await approve(id);
       if (success) {
         successCount++;
-        // Find the medicine to get info for notification
-        const med = pendingMedicines.find(m => m.id === id);
-        if (med) {
-          await notifyMedicineApproved(med.name, med.pharmacyId);
-        }
       } else {
         failCount++;
       }
@@ -910,13 +909,14 @@ export default function AdminMedicineReview() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-category" className="font-cairo text-sm font-semibold text-gray-700">الفئة</Label>
-                    <Input
-                      id="edit-category"
+                    <Label htmlFor="edit-category" className="font-cairo text-sm font-semibold text-gray-700">
+                      التصنيف * <span className="text-xs text-red-600">(إلزامي)</span>
+                    </Label>
+                    <CategorySelect
                       value={editFormData.category}
-                      onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
-                      placeholder="مسكنات، مضادات..."
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      onChange={(value) => setEditFormData({ ...editFormData, category: value })}
+                      required={true}
+                      placeholder="اختر تصنيف الدواء..."
                     />
                   </div>
                   <div className="space-y-2">

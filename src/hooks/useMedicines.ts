@@ -17,6 +17,15 @@ import { Medicine } from '@/types';
 import { toast } from 'sonner';
 import { deleteImageFromSupabase } from '@/lib/supabase';
 
+function parseExpiryDate(value: unknown): Date | string | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as any).toDate === 'function') {
+    return (value as any).toDate();
+  }
+  return undefined;
+}
+
 export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean }) {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [filteredMedicines, setFilteredMedicines] = useState<Medicine[]>([]);
@@ -59,8 +68,10 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
             return {
               id: doc.id,
               name: data.name || 'دواء غير معروف',
+              nameEn: data.nameEn || '',
               code: data.code || '',
               description: data.description || '',
+              descriptionEn: data.descriptionEn || '',
               price: data.price || 0,
               quantity: data.quantity || 0,
               pharmacyId: typeof data.pharmacyId === 'string' ? parseInt(data.pharmacyId, 10) : (data.pharmacyId || 0),
@@ -75,8 +86,13 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
               subabaseImageUrl: data.subabaseImageUrl || data.subabaseORImageUrl || '', // الحقل الأساسي
               subabaseORImageUrl: data.subabaseORImageUrl || '', // للتوافق مع البيانات القديمة
               category: data.category || '',
+              categoryId: data.categoryId || '',
+              sectionId: data.sectionId || '',
+              sectionName: data.sectionName || '',
               manufacturer: data.manufacturer || '',
-              expiryDate: data.expiryDate?.toDate(),
+              pharmacyPrice: data.pharmacyPrice || 0,
+              pharmacyDiscount: data.pharmacyDiscount || 0,
+              expiryDate: parseExpiryDate(data.expiryDate),
               createdAt: data.createdAt?.toDate() || new Date(),
               updatedAt: data.updatedAt?.toDate()
             } as Medicine;
@@ -89,8 +105,13 @@ export function useMedicines(pharmacyId?: number, options?: { enabled?: boolean 
             return dateB.getTime() - dateA.getTime();
           });
 
-          setMedicines(medicinesList);
-          setFilteredMedicines(medicinesList);
+          // Remove duplicates by medicine code (not document ID)
+          const uniqueMedicines = medicinesList.filter((m, index, self) =>
+            index === self.findIndex((t) => t.code === m.code)
+          );
+
+          setMedicines(uniqueMedicines);
+          setFilteredMedicines(uniqueMedicines);
           setIsLoading(false);
         },
         (err) => {

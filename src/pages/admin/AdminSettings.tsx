@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Bell, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff, Copy, Check, Trash2, Plus, RefreshCw, Smartphone, Info, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Settings, User, Mail, Phone, Shield, LogOut, Key, Eye, EyeOff, Copy, Check, Trash2, Plus, RefreshCw, Info, AlertTriangle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -44,7 +44,6 @@ export default function AdminSettings() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // User Settings
-  const [notifications, setNotifications] = useState(true);
   const [emailAlerts, setEmailAlerts] = useState(true);
 
   // API Keys Management
@@ -57,12 +56,6 @@ export default function AdminSettings() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set());
   const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
-
-  // FCM Settings
-  const [fcmAccessToken, setFcmAccessToken] = useState('');
-  const [showFcmToken, setShowFcmToken] = useState(false);
-  const [isSavingFcm, setIsSavingFcm] = useState(false);
-  const [fcmTokenSaved, setFcmTokenSaved] = useState(false);
 
   // Profile Data
   const [profileData, setProfileData] = useState({
@@ -81,74 +74,8 @@ export default function AdminSettings() {
 
       // Load API keys
       loadApiKeys();
-
-      // Load FCM settings
-      loadFcmSettings();
     }
   }, [user]);
-
-  const loadFcmSettings = async () => {
-    try {
-      const settingsRef = doc(db, 'system_settings', 'fcm_config');
-      const settingsDoc = await getDoc(settingsRef);
-
-      if (settingsDoc.exists()) {
-        const data = settingsDoc.data();
-        if (data?.accessToken) {
-          setFcmAccessToken(data.accessToken);
-          setFcmTokenSaved(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading FCM settings:', error);
-    }
-  };
-
-  const handleSaveFcmToken = async () => {
-    if (!fcmAccessToken.trim()) {
-      toast.error('يرجى إدخال Access Token');
-      return;
-    }
-
-    setIsSavingFcm(true);
-    try {
-      const settingsRef = doc(db, 'system_settings', 'fcm_config');
-      await setDoc(settingsRef, {
-        accessToken: fcmAccessToken.trim(),
-        updatedAt: new Date(),
-        updatedBy: user?.uid,
-      }, { merge: true });
-
-      setFcmTokenSaved(true);
-      toast.success('تم حفظ Access Token بنجاح');
-    } catch (error: any) {
-      console.error('Error saving FCM token:', error);
-      toast.error('فشل حفظ Access Token: ' + (error.message || 'خطأ غير معروف'));
-    } finally {
-      setIsSavingFcm(false);
-    }
-  };
-
-  const handleDeleteFcmToken = async () => {
-    setIsSavingFcm(true);
-    try {
-      const settingsRef = doc(db, 'system_settings', 'fcm_config');
-      await setDoc(settingsRef, {
-        accessToken: null,
-        updatedAt: new Date(),
-        updatedBy: user?.uid,
-      }, { merge: true });
-
-      setFcmAccessToken('');
-      setFcmTokenSaved(false);
-      toast.success('تم حذف Access Token');
-    } catch (error: any) {
-      console.error('Error deleting FCM token:', error);
-      toast.error('فشل حذف Access Token');
-    } finally {
-      setIsSavingFcm(false);
-    }
-  };
 
   const loadApiKeys = async () => {
     try {
@@ -947,181 +874,6 @@ export default function AdminSettings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* FCM / Push Notifications Settings */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-3 font-cairo">
-                    <Smartphone className="w-5 h-5 text-primary" />
-                    إعدادات Push Notifications
-                  </CardTitle>
-                  <CardDescription className="font-cairo mt-1">
-                    تكوين FCM لإرسال إشعارات للموبايل
-                  </CardDescription>
-                </div>
-                {fcmTokenSaved && (
-                  <Badge className="bg-success text-white font-cairo">
-                    ✓ مُفعّل
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5 space-y-4">
-                <div className="flex items-center gap-2 text-primary">
-                  <Key className="w-5 h-5" />
-                  <h3 className="font-cairo font-semibold">FCM Access Token</h3>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-cairo">
-                    Access Token <span className="text-muted-foreground text-xs">(مطلوب لإرسال Push Notifications)</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showFcmToken ? "text" : "password"}
-                      value={fcmAccessToken}
-                      onChange={(e) => {
-                        setFcmAccessToken(e.target.value);
-                        setFcmTokenSaved(false);
-                      }}
-                      placeholder="أدخل FCM Access Token"
-                      className="font-mono pl-12"
-                      dir="ltr"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute left-2 top-0 bottom-0 my-auto h-8 w-8 p-0"
-                      onClick={() => setShowFcmToken(!showFcmToken)}
-                    >
-                      {showFcmToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <a
-                    href="https://developers.google.com/oauthplayground/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    احصل على Access Token من OAuth Playground
-                  </a>
-                  <div className="flex gap-2">
-                    {fcmTokenSaved && fcmAccessToken && (
-                      <Button
-                        variant="outline"
-                        onClick={handleDeleteFcmToken}
-                        disabled={isSavingFcm}
-                        className="font-cairo text-destructive border-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4 ml-2" />
-                        حذف
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleSaveFcmToken}
-                      disabled={isSavingFcm || !fcmAccessToken.trim()}
-                      className="font-cairo"
-                    >
-                      <Check className="w-4 h-4 ml-2" />
-                      {isSavingFcm ? 'جاري الحفظ...' : 'حفظ Token'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Instructions */}
-              <div className="bg-muted/50 p-4 rounded-lg space-y-4">
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-cairo font-bold text-amber-900 text-sm">💡 تنبيه بخصوص الخطأ 401:</p>
-                    <p className="text-xs text-amber-800 leading-relaxed">
-                      هذا المفتاح (Access Token) مؤقت وتنتهي صلاحيته تلقائياً كل **60 دقيقة**. إذا ظهر لك خطأ "401" عند الإرسال، فهذا يعني أنك بحاجة لتوليد مفتاح جديد من الرابط أعلاه وحفظه هنا.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="font-cairo font-medium text-sm mb-2 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-primary" />
-                    كيفية الحصول على Access Token:
-                  </p>
-                  <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                    <li>اذهب إلى <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OAuth 2.0 Playground</a></li>
-                    <li>اضغط على أيقونة الإعدادات (⚙️)</li>
-                    <li>فعّل "Use your own OAuth credentials"</li>
-                    <li>أدخل OAuth Client ID و Secret من Firebase Console</li>
-                    <li>في الخطوة 1، اختر "Firebase Cloud Messaging API v1"</li>
-                    <li>اضغط "Authorize APIs" ثم "Exchange authorization code"</li>
-                    <li>انسخ "Access token" والصقه هنا</li>
-                  </ol>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Notifications Settings */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 font-cairo">
-                <Bell className="w-5 h-5 text-primary" />
-                الإشعارات
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="font-cairo font-medium">
-                    إشعارات النظام
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    استقبال إشعارات الطلبات والمستخدمين الجدد
-                  </p>
-                </div>
-                <Switch
-                  checked={notifications}
-                  onCheckedChange={setNotifications}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="font-cairo font-medium">
-                    تنبيهات البريد الإلكتروني
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    إرسال التنبيهات المهمة عبر البريد
-                  </p>
-                </div>
-                <Switch
-                  checked={emailAlerts}
-                  onCheckedChange={setEmailAlerts}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
 
         {/* System Info */}
         <motion.div

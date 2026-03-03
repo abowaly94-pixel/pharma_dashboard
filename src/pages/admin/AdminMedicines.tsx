@@ -19,6 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useMedicines } from '@/hooks/useMedicines';
 import { usePharmacies } from '@/hooks/usePharmacies';
+import { useCategories } from '@/hooks/useCategories';
+import { useSections } from '@/hooks/useSections';
 import { Medicine } from '@/types';
 import {
   Dialog,
@@ -46,6 +48,8 @@ import { MedicineImage } from '@/components/ui/medicine-image';
 export default function AdminMedicines() {
   const { medicines, isLoading, addMedicine, updateMedicine, deleteMedicine, searchQuery, setSearchQuery } = useMedicines();
   const { pharmacies } = usePharmacies();
+  const { categories, isLoading: categoriesLoading } = useCategories(true); // Active categories only
+  const { sections, isLoading: sectionsLoading } = useSections(true); // Active sections only
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState<Medicine | null>(null);
@@ -56,17 +60,29 @@ export default function AdminMedicines() {
   const savingRef = useRef(false); // حماية إضافية من race conditions
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
   const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
+  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // فلتر الفئات
+  const [selectedSection, setSelectedSection] = useState<string>('all'); // فلتر الأقسام
   const [formData, setFormData] = useState({
     name: '',
+    nameEn: '',
     code: '',
     description: '',
+    descriptionEn: '',
     price: 0,
     quantity: 0,
     pharmacyId: 0,
     pharmacyName: '',
     pharmcyAddress: '',
     category: '',
+    categoryId: '',
+    categoryEn: '',
+    sectionId: '',
+    sectionName: '',
+    sectionNameEn: '',
     manufacturer: '',
+    pharmacyPrice: 0,
+    pharmacyDiscount: 0,
+    expiryDate: '',
     subabaseImageUrl: '',
     subabaseORImageUrl: '', // الصورة الأصلية قبل إزالة الخلفية
     avgRating: 0,
@@ -116,6 +132,16 @@ export default function AdminMedicines() {
     }
   }, [isAddEditDialogOpen, formData, editingMedicine]);
 
+  // Update selectedMedicine when medicines data changes (real-time update)
+  useEffect(() => {
+    if (selectedMedicine) {
+      const updatedMedicine = medicines.find(m => m.id === selectedMedicine.id);
+      if (updatedMedicine) {
+        setSelectedMedicine(updatedMedicine);
+      }
+    }
+  }, [medicines, selectedMedicine?.id]);
+
   const handleOpenAddEdit = (medicine?: Medicine) => {
     // Reset image error state
     setImageLoadError(false);
@@ -126,15 +152,25 @@ export default function AdminMedicines() {
       setEditingMedicine(medicine);
       setFormData({
         name: medicine.name,
+        nameEn: (medicine as any).nameEn || '',
         code: medicine.code,
         description: medicine.description,
+        descriptionEn: (medicine as any).descriptionEn || '',
         price: medicine.price,
         quantity: medicine.quantity,
         pharmacyId: medicine.pharmacyId,
         pharmacyName: medicine.pharmacyName,
         pharmcyAddress: medicine.pharmcyAddress,
         category: medicine.category || '',
+        categoryId: (medicine as any).categoryId || '',
+        categoryEn: (medicine as any).categoryEn || '',
+        sectionId: (medicine as any).sectionId || '',
+        sectionName: (medicine as any).sectionName || '',
+        sectionNameEn: (medicine as any).sectionNameEn || '',
         manufacturer: medicine.manufacturer || '',
+        pharmacyPrice: (medicine as any).pharmacyPrice || 0,
+        pharmacyDiscount: (medicine as any).pharmacyDiscount || 0,
+        expiryDate: (medicine as any).expiryDate || '',
         subabaseImageUrl: (medicine as any).subabaseImageUrl || medicine.subabaseORImageUrl || '',
         subabaseORImageUrl: medicine.subabaseORImageUrl || '',
         avgRating: medicine.avgRating,
@@ -150,15 +186,25 @@ export default function AdminMedicines() {
       const defaultPharmacy = pharmacies[0];
       setFormData({
         name: '',
+        nameEn: '',
         code: `MED-${Date.now()}`,
         description: '',
+        descriptionEn: '',
         price: 0,
         quantity: 0,
         pharmacyId: defaultPharmacy?.pharmacyId || 0,
         pharmacyName: defaultPharmacy?.name || '',
         pharmcyAddress: defaultPharmacy ? `${defaultPharmacy.address}، ${defaultPharmacy.city}` : '',
         category: '',
+        categoryId: '',
+        categoryEn: '',
+        sectionId: '',
+        sectionName: '',
+        sectionNameEn: '',
         manufacturer: '',
+        pharmacyPrice: 0,
+        pharmacyDiscount: 0,
+        expiryDate: '',
         subabaseImageUrl: '',
         subabaseORImageUrl: '',
         avgRating: 0,
@@ -182,6 +228,18 @@ export default function AdminMedicines() {
     // التحقق من وجود صورة
     if (!formData.subabaseImageUrl || formData.subabaseImageUrl.trim() === '') {
       toast.error('يجب رفع صورة للدواء قبل الحفظ');
+      return;
+    }
+
+    // التحقق من اختيار القسم
+    if (!formData.sectionId || formData.sectionId.trim() === '') {
+      toast.error('⚠️ يجب اختيار القسم للدواء');
+      return;
+    }
+
+    // التحقق من اختيار الفئة
+    if (!formData.categoryId || formData.categoryId.trim() === '') {
+      toast.error('⚠️ يجب اختيار فئة للدواء');
       return;
     }
 
@@ -458,6 +516,32 @@ export default function AdminMedicines() {
     setIsAddEditDialogOpen(false);
   };
 
+  // Update category filter when section changes
+  useEffect(() => {
+    if (selectedSection === 'all') {
+      setSelectedCategory('all');
+    } else {
+      // Reset category when section changes
+      setSelectedCategory('all');
+    }
+  }, [selectedSection]);
+
+  // فلترة الأدوية حسب القسم والفئة
+  const filteredMedicines = medicines.filter(medicine => {
+    // Filter by section first
+    if (selectedSection !== 'all') {
+      const medicineSectionId = (medicine as any).sectionId;
+      if (medicineSectionId !== selectedSection) {
+        return false;
+      }
+    }
+    // Then filter by category
+    if (selectedCategory !== 'all') {
+      return medicine.category === selectedCategory;
+    }
+    return true;
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -469,7 +553,12 @@ export default function AdminMedicines() {
         >
           <div>
             <h1 className="text-3xl font-bold font-cairo">إدارة الأدوية</h1>
-            <p className="text-muted-foreground">عرض وإدارة جميع الأدوية في النظام ({medicines.length} دواء)</p>
+            <p className="text-muted-foreground">
+              عرض وإدارة جميع الأدوية في النظام 
+              ({filteredMedicines.length} دواء
+              {selectedSection !== 'all' && sections.find(s => s.id === selectedSection) && ` في قسم "${sections.find(s => s.id === selectedSection)?.name}"`}
+              {selectedCategory !== 'all' && ` في فئة "${selectedCategory}"`})
+            </p>
           </div>
           <Button onClick={() => handleOpenAddEdit()} className="gradient-primary text-primary-foreground font-cairo">
             <Plus className="w-5 h-5 ml-2" />
@@ -477,13 +566,14 @@ export default function AdminMedicines() {
           </Button>
         </motion.div>
 
-        {/* Search */}
+        {/* Search and Filter */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
+          className="flex flex-col md:flex-row gap-3"
         >
-          <div className="relative">
+          <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               placeholder="بحث بالاسم، الكود، الصيدلية، الفئة..."
@@ -491,6 +581,59 @@ export default function AdminMedicines() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pr-10 font-cairo"
             />
+          </div>
+          <div className="w-full md:w-48">
+            <Select
+              value={selectedSection}
+              onValueChange={setSelectedSection}
+            >
+              <SelectTrigger className="h-10 font-cairo">
+                <SelectValue placeholder="جميع الأقسام" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الأقسام</SelectItem>
+                {sectionsLoading ? (
+                  <div className="p-2 text-center text-sm text-gray-500">جاري التحميل...</div>
+                ) : sections.length === 0 ? (
+                  <div className="p-2 text-center text-sm text-gray-500">لا توجد أقسام</div>
+                ) : (
+                  sections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.icon} {section.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-48">
+            <Select
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+              disabled={selectedSection === 'all'}
+            >
+              <SelectTrigger className={`h-10 font-cairo ${selectedSection === 'all' ? 'opacity-50' : ''}`}>
+                <SelectValue placeholder={selectedSection === 'all' ? 'اختر القسم أولاً' : 'جميع الفئات'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الفئات</SelectItem>
+                {selectedSection === 'all' ? (
+                  <div className="p-2 text-center text-sm text-gray-500">اختر قسم أولاً</div>
+                ) : categoriesLoading ? (
+                  <div className="p-2 text-center text-sm text-gray-500">جاري التحميل...</div>
+                ) : categories.filter(cat => cat.sectionId === selectedSection).length === 0 ? (
+                  <div className="p-2 text-center text-sm text-gray-500">لا توجد فئات</div>
+                ) : (
+                  categories
+                    .filter(cat => cat.sectionId === selectedSection)
+                    .map((cat) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
         </motion.div>
 
@@ -513,15 +656,20 @@ export default function AdminMedicines() {
               ))}
             </div>
           </div>
-        ) : medicines.length === 0 ? (
+        ) : filteredMedicines.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">لا توجد أدوية</h3>
-            <p className="text-muted-foreground">لم يتم العثور على أي أدوية في قاعدة البيانات</p>
+            <p className="text-muted-foreground">
+              {selectedSection !== 'all' || selectedCategory !== 'all'
+                ? `لم يتم العثور على أدوية ${selectedSection !== 'all' && sections.find(s => s.id === selectedSection) ? `في قسم "${sections.find(s => s.id === selectedSection)?.name}"` : ''} ${selectedCategory !== 'all' ? `في فئة "${selectedCategory}"` : ''}`
+                : 'لم يتم العثور على أي أدوية في قاعدة البيانات'
+              }
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {medicines.map((medicine, index) => (
+            {filteredMedicines.map((medicine, index) => (
               <motion.div
                 key={medicine.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -649,230 +797,128 @@ export default function AdminMedicines() {
           }
         }}>
           <DialogContent
-            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            className="max-w-xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
-              <DialogTitle className="font-cairo text-xl">
+              <DialogTitle className="font-cairo text-base">
                 {editingMedicine ? 'تعديل الدواء' : 'إضافة دواء جديد'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Section 1: Basic Info */}
-              <div className="space-y-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Package className="w-5 h-5 text-blue-600" />
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Section 1: Basic Info - Professional Clean Design */}
+              <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold font-cairo text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Package className="w-4 h-4 text-slate-600" />
                   المعلومات الأساسية
                 </h3>
 
-                <div className="grid grid-cols-[2fr,1fr] gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="font-cairo text-sm font-semibold text-gray-700">اسم الدواء *</Label>
+                {/* Names Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name" className="font-cairo text-xs font-medium text-gray-700">اسم الدواء بالعربي *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
-                      placeholder="أدخل اسم الدواء"
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="مثال: بنادول"
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                      dir="rtl"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="code" className="font-cairo text-sm font-semibold text-gray-700">الكود</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nameEn" className="font-cairo text-xs font-medium text-gray-700">اسم الدواء بالإنجليزي</Label>
                     <Input
-                      id="code"
-                      value={formData.code}
-                      readOnly
-                      disabled
-                      className="h-10 bg-gray-100 cursor-not-allowed text-gray-600 border-gray-300"
+                      id="nameEn"
+                      value={formData.nameEn}
+                      onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                      placeholder="Example: Panadol"
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                      dir="ltr"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="font-cairo text-sm font-semibold text-gray-700">الوصف</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    placeholder="أضف وصف تفصيلي للدواء..."
-                    className="text-sm resize-none bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="font-cairo text-sm font-semibold text-gray-700">السعر (ج.م) *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.price === 0 ? '' : formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                      required
-                      placeholder="أدخل السعر بالجنيه"
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                {/* Descriptions Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="description" className="font-cairo text-xs font-medium text-gray-700">الوصف بالعربي</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                      placeholder="وصف تفصيلي للدواء..."
+                      className="text-sm resize-none bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                      dir="rtl"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity" className="font-cairo text-sm font-semibold text-gray-700">الكمية *</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="0"
-                      value={formData.quantity === 0 ? '' : formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
-                      required
-                      placeholder="أدخل الكمية المتاحة"
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category" className="font-cairo text-sm font-semibold text-gray-700">الفئة</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="مسكنات، مضادات..."
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="manufacturer" className="font-cairo text-sm font-semibold text-gray-700">الشركة المصنعة</Label>
-                    <Input
-                      id="manufacturer"
-                      value={formData.manufacturer}
-                      onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
-                      placeholder="اسم الشركة"
-                      className="h-10 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  <div className="space-y-1.5">
+                    <Label htmlFor="descriptionEn" className="font-cairo text-xs font-medium text-gray-700">الوصف بالإنجليزي</Label>
+                    <Textarea
+                      id="descriptionEn"
+                      value={formData.descriptionEn}
+                      onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
+                      rows={3}
+                      placeholder="Detailed description..."
+                      className="text-sm resize-none bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                      dir="ltr"
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Section 2: Pharmacy Info */}
-              <div className="space-y-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-purple-600" />
-                  معلومات الصيدلية
-                </h3>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pharmacyName" className="font-cairo text-sm font-semibold text-gray-700">
-                    اسم الصيدلية (اكتب أو اختر) *
-                  </Label>
-                  <Autocomplete
-                    options={pharmacies
-                      .map((pharmacy) => ({
-                        value: String(pharmacy.pharmacyId),
-                        label: pharmacy.name
-                      }))}
-                    value={formData.pharmacyName}
-                    onValueChange={(value) => {
-      setFormData({
-                        ...formData,
-                        pharmacyName: value,
-                        pharmacyId: 0
-                      });
-                    }}
-                    onSelectOption={(option) => {
-                      const selectedPharmacy = pharmacies.find(p => String(p.pharmacyId) === option.value);
-                      if (selectedPharmacy) {
-                        setFormData({
-                          ...formData,
-                          pharmacyId: selectedPharmacy.pharmacyId,
-                          pharmacyName: selectedPharmacy.name,
-                          pharmcyAddress: `${selectedPharmacy.address}، ${selectedPharmacy.city}`
-                        });
-                      }
-                    }}
-                    placeholder="اكتب اسم الصيدلية..."
-                    className="h-10 bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
-                  />
-                  <p className="text-xs text-gray-500">
-                    💡 اكتب لرؤية الاقتراحات أو أدخل اسم جديد
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pharmcyAddress" className="font-cairo text-sm font-semibold text-red-600 flex items-center gap-1">
-                    <MapPin className="w-4 h-4 text-red-600" />
-                    عنوان الصيدلية بالتفصيل الكامل *
-                    {(!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10) && (
-                      <span className="text-xs text-red-500">(مطلوب - 10 أحرف على الأقل)</span>
-                    )}
-                  </Label>
-                  <Textarea
-                    id="pharmcyAddress"
-                    value={formData.pharmcyAddress}
-                    onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })}
-                    placeholder="مثال: شارع الملك فهد، حي النخيل، الرياض، المملكة العربية السعودية، 12345"
-                    rows={3}
-                    required
-                    className={`text-sm resize-none ${!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-green-500 bg-white'} focus:ring-purple-500`}
-                    dir="rtl"
-                  />
-                  <p className="text-xs text-gray-600 font-cairo">
-                    💡 اكتب العنوان الكامل: الشارع، الحي، المدينة، المحافظة، الرمز البريدي
-                  </p>
-                  <p className="text-xs text-red-600 font-bold">
-                    ⚠️ هذا العنوان سيظهر للعملاء في التطبيق - تأكد من دقته
-                  </p>
-                </div>
-              </div>
-
-              {/* Section 3: Additional Options */}
-              <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-green-600" />
-                  خيارات إضافية
-                </h3>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div className="bg-white p-3 rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isNewProduct}
-                        onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                {/* Price, Quantity, Discount - Compact Row */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="price" className="font-cairo text-xs font-medium text-gray-700">السعر (ج.م) *</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.price === 0 ? '' : formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                        required
+                        placeholder="0.00"
+                        className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
                       />
-                      <div className="flex-1">
-                        <span className="text-sm font-bold font-cairo text-gray-900 block">
-                          منتج جديد
-                        </span>
-                        <span className="text-xs text-blue-600 font-cairo">
-                          سيظهر بشارة "جديد"
-                        </span>
-                      </div>
-                    </label>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="quantity" className="font-cairo text-xs font-medium text-gray-700">الكمية *</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        min="0"
+                        value={formData.quantity === 0 ? '' : formData.quantity}
+                        onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+                        required
+                        placeholder="0"
+                        className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                      />
+                    </div>
                   </div>
-
-                  <div className="bg-white p-3 rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors">
-                    <label className="flex items-center gap-3 cursor-pointer">
+                  
+                  {/* Discount - Compact Inline */}
+                  <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
+                        id="discountCheck"
                         checked={formData.discountRating > 0}
                         onChange={(e) => setFormData({
                           ...formData,
                           discountRating: e.target.checked ? 10 : 0
                         })}
-                        className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                        className="w-4 h-4 text-slate-600 rounded border-gray-300 focus:ring-slate-500"
                       />
-                      <div className="flex-1">
-                        <span className="text-sm font-bold font-cairo text-gray-900 block">
-                          تطبيق خصم
-                        </span>
-                        <span className="text-xs text-green-600 font-cairo">
-                          إضافة نسبة خصم
-                        </span>
-                      </div>
-                    </label>
+                      <label htmlFor="discountCheck" className="text-sm text-gray-700 font-cairo cursor-pointer">تطبيق خصم</label>
+                    </div>
+                    
                     {formData.discountRating > 0 && (
-                      <div className="mt-3">
+                      <>
                         <Input
                           type="number"
                           min="0"
@@ -882,100 +928,270 @@ export default function AdminMedicines() {
                             ...formData,
                             discountRating: parseInt(e.target.value) || 0
                           })}
-                          placeholder="أدخل نسبة الخصم (اختياري)"
-                          className="h-9 bg-white border-gray-300 focus:border-green-500 focus:ring-green-500"
+                          placeholder="%"
+                          className="h-8 w-20 text-sm bg-white border-gray-200 focus:border-slate-400"
                         />
-                      </div>
+                        {formData.price > 0 && (
+                          <div className="text-sm font-cairo">
+                            <span className="text-gray-500">بعد الخصم: </span>
+                            <span className="font-bold text-slate-700">
+                              {(formData.price - (formData.price * (formData.discountRating / 100))).toFixed(2)} ج.م
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
+                  </div>
+                </div>
+
+                {/* Section & Category Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sectionId" className="font-cairo text-xs font-medium text-gray-700">القسم *</Label>
+                    <Select
+                      value={formData.sectionId}
+                      onValueChange={(value) => {
+                        const selectedSection = sections.find(s => s.id === value);
+                        setFormData({ 
+                          ...formData, 
+                          sectionId: value, 
+                          sectionName: selectedSection?.name || '',
+                          sectionNameEn: selectedSection?.nameEn || '',
+                          category: '',
+                          categoryId: '',
+                          categoryEn: ''
+                        });
+                      }}
+                      required
+                    >
+                      <SelectTrigger className={`h-9 text-sm ${!formData.sectionId ? 'border-red-300 bg-red-50' : 'bg-gray-50 border-gray-200'}`}>
+                        <SelectValue placeholder={sectionsLoading ? "جاري التحميل..." : "اختر القسم"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sectionsLoading ? (
+                          <div className="p-2 text-center text-xs text-gray-500">جاري التحميل...</div>
+                        ) : sections.length === 0 ? (
+                          <div className="p-2 text-center text-xs text-gray-500">لا توجد أقسام</div>
+                        ) : (
+                          sections.map((section) => (
+                            <SelectItem key={section.id} value={section.id}>
+                              {section.icon} {section.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="category" className="font-cairo text-xs font-medium text-gray-700">الفئة *</Label>
+                    <Select
+                      value={formData.categoryId || formData.category}
+                      onValueChange={(value) => {
+                        const selectedCat = categories.find(c => c.id === value);
+                        setFormData({ 
+                          ...formData, 
+                          categoryId: value,
+                          category: selectedCat?.name || '',
+                          categoryEn: selectedCat?.nameEn || ''
+                        });
+                      }}
+                      required
+                      disabled={!formData.sectionId}
+                    >
+                      <SelectTrigger className={`h-9 text-sm ${!formData.categoryId && !formData.category ? 'border-red-300 bg-red-50' : 'bg-gray-50 border-gray-200'} ${!formData.sectionId ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <SelectValue placeholder={
+                          !formData.sectionId 
+                            ? "اختر القسم أولاً" 
+                            : categoriesLoading 
+                              ? "جاري التحميل..." 
+                              : "اختر الفئة"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoriesLoading ? (
+                          <div className="p-2 text-center text-xs text-gray-500">جاري التحميل...</div>
+                        ) : !formData.sectionId ? (
+                          <div className="p-2 text-center text-xs text-gray-500">يجب اختيار القسم أولاً</div>
+                        ) : categories.filter(cat => cat.sectionId === formData.sectionId).length === 0 ? (
+                          <div className="p-2 text-center text-xs text-gray-500">
+                            لا توجد فئات في هذا القسم
+                          </div>
+                        ) : (
+                          categories
+                            .filter(cat => cat.sectionId === formData.sectionId)
+                            .map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="manufacturer" className="font-cairo text-xs font-medium text-gray-700">الشركة المصنعة</Label>
+                    <Input
+                      id="manufacturer"
+                      value={formData.manufacturer}
+                      onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                      placeholder="اسم الشركة"
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                    />
+                  </div>
+                </div>
+
+                {/* Date Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="expiryDate" className="font-cairo text-xs font-medium text-gray-700">تاريخ الانتهاء</Label>
+                    <Input
+                      id="expiryDate"
+                      type="date"
+                      value={formData.expiryDate || ''}
+                      onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pharmacyDiscount" className="font-cairo text-xs font-medium text-gray-700">خصم الصيدليات (%)</Label>
+                    <Input
+                      id="pharmacyDiscount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.pharmacyDiscount === 0 ? '' : formData.pharmacyDiscount}
+                      onChange={(e) => setFormData({ ...formData, pharmacyDiscount: parseInt(e.target.value) || 0 })}
+                      placeholder="0"
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400 focus:ring-slate-300"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Section 4: Medicine Image */}
-              <div className="space-y-3 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
-                <h3 className="text-base font-bold font-cairo text-gray-800 flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-amber-600" />
+              {/* Section 2: Pharmacy Info - Clean Design */}
+              <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold font-cairo text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Building2 className="w-4 h-4 text-slate-600" />
+                  معلومات الصيدلية
+                </h3>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pharmacyName" className="font-cairo text-xs font-medium text-gray-700">اسم الصيدلية *</Label>
+                    <Autocomplete
+                      options={pharmacies
+                        .map((pharmacy) => ({
+                          value: String(pharmacy.pharmacyId),
+                          label: pharmacy.name
+                        }))}
+                      value={formData.pharmacyName}
+                      onValueChange={(value) => {
+                        setFormData({
+                          ...formData,
+                          pharmacyName: value,
+                          pharmacyId: 0
+                        });
+                      }}
+                      onSelectOption={(option) => {
+                        const selectedPharmacy = pharmacies.find(p => String(p.pharmacyId) === option.value);
+                        if (selectedPharmacy) {
+                          setFormData({
+                            ...formData,
+                            pharmacyId: selectedPharmacy.pharmacyId,
+                            pharmacyName: selectedPharmacy.name,
+                            pharmcyAddress: `${selectedPharmacy.address}، ${selectedPharmacy.city}`
+                          });
+                        }
+                      }}
+                      placeholder="اكتب اسم الصيدلية..."
+                      className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pharmcyAddress" className="font-cairo text-xs font-medium text-gray-700 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      عنوان الصيدلية *
+                    </Label>
+                    <Input
+                      id="pharmcyAddress"
+                      value={formData.pharmcyAddress}
+                      onChange={(e) => setFormData({ ...formData, pharmcyAddress: e.target.value })}
+                      placeholder="18 شارع طه حسين بجوار سوبر ماركت 4m"
+                      required
+                      className={`h-9 text-sm ${!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 ? 'border-red-300 bg-red-50' : 'bg-gray-50 border-gray-200'}`}
+                      dir="rtl"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Medicine Image - Clean Design */}
+              <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold font-cairo text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <ImageIcon className="w-4 h-4 text-slate-600" />
                   صورة الدواء *
                 </h3>
-                <p className="text-xs text-red-600 font-cairo font-bold">⚠️ يجب رفع صورة للدواء قبل الحفظ - هذا الحقل إلزامي</p>
 
                 <div className="space-y-3">
                   {/* Upload Button */}
-                  <div className="relative">
-                    <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                      <div className={`flex items-center justify-center gap-2 h-11 px-4 rounded-lg text-sm font-cairo font-bold shadow-md transition-all ${formData.subabaseImageUrl
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : isUploading
-                            ? 'bg-amber-400 text-white cursor-wait'
-                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg cursor-pointer'
-                        }`}>
-                        {isUploading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>جاري الرفع...</span>
-                          </>
-                        ) : formData.subabaseImageUrl ? (
-                          <>
-                            <ImageIcon className="w-4 h-4" />
-                            <span>يوجد صورة - احذفها للتغيير</span>
-                          </>
-                        ) : (
-                          <>
-                            <ImageIcon className="w-4 h-4" />
-                            <span>📤 رفع صورة من الجهاز</span>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={isUploading || !!formData.subabaseImageUrl}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  {/* Divider */}
-                  {!formData.subabaseImageUrl && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-amber-300"></div>
-                      <span className="text-sm text-gray-600 font-cairo font-semibold">أو</span>
-                      <div className="flex-1 h-px bg-amber-300"></div>
+                  <label className={`block ${formData.subabaseImageUrl ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-md text-sm font-cairo font-medium transition-all ${formData.subabaseImageUrl
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : isUploading
+                          ? 'bg-slate-400 text-white cursor-wait'
+                          : 'bg-slate-600 hover:bg-slate-700 text-white cursor-pointer'
+                      }`}>
+                      {isUploading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>جاري الرفع...</span>
+                        </>
+                      ) : formData.subabaseImageUrl ? (
+                        <>
+                          <ImageIcon className="w-4 h-4" />
+                          <span>يوجد صورة - احذفها للتغيير</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-4 h-4" />
+                          <span>رفع صورة</span>
+                        </>
+                      )}
                     </div>
-                  )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={isUploading || !!formData.subabaseImageUrl}
+                      className="hidden"
+                    />
+                  </label>
 
-                  {/* URL Input - Hidden if image is from Supabase (processed) for security */}
-                  {!formData.subabaseImageUrl.includes('supabase.co/storage') && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-cairo font-semibold text-gray-700">🔗 أضف رابط صورة من الإنترنت</Label>
+                  {/* URL Input - Hidden if image is from Supabase */}
+                  {!formData.subabaseImageUrl.includes('supabase.co/storage') && !formData.subabaseImageUrl && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-gray-200"></div>
+                        <span className="text-xs text-gray-400 font-cairo">أو</span>
+                        <div className="flex-1 h-px bg-gray-200"></div>
+                      </div>
                       <Input
-                        id="imageUrlInputAdmin"
                         type="url"
                         value={formData.subabaseImageUrl}
                         onChange={(e) => {
                           setFormData({ ...formData, subabaseImageUrl: e.target.value });
-                          setImageLoadError(false); // Reset error when URL changes
+                          setImageLoadError(false);
                         }}
-                        placeholder="https://example.com/image.jpg"
-                        className="h-10 bg-white border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                        placeholder="رابط صورة من الإنترنت"
+                        className="h-9 text-sm bg-gray-50 border-gray-200 focus:border-slate-400"
                       />
-                    </div>
+                    </>
                   )}
 
-                  {/* Image Preview - Shows when URL is valid */}
-                  {formData.subabaseImageUrl && formData.subabaseImageUrl.trim() && (
-                    <div className="space-y-3">
-                      {/* Badge للصورة المعالجة */}
-                      {formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl && (
-                        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
-                          <span className="text-purple-600 text-sm font-cairo">
-                            ✨ صورة بدون خلفية - يمكنك حذفها والرجوع للأصلية
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="relative w-full h-40 rounded-xl border-2 border-amber-300 overflow-hidden bg-white shadow-md group">
+                  {/* Image Preview */}
+                  {formData.subabaseImageUrl && (
+                    <div className="space-y-2">
+                      <div className="relative w-full h-32 rounded-lg border border-gray-200 overflow-hidden bg-white">
                         <MedicineImage
                           imageUrl={formData.subabaseImageUrl}
                           originalImageUrl={formData.subabaseORImageUrl}
@@ -983,27 +1199,15 @@ export default function AdminMedicines() {
                           objectFit="contain"
                           className="p-3"
                         />
-                        <div className="absolute top-2 right-2 flex gap-2">
-                          {/* زر حذف الخلفية - يُخفى إذا كانت الصورة معالجة بالفعل أو فاشلة */}
+                        <div className="absolute top-2 right-2 flex gap-1.5">
                           {!imageLoadError && !(formData.subabaseORImageUrl && formData.subabaseORImageUrl !== formData.subabaseImageUrl) && (
                             <button
                               type="button"
                               onClick={handleRemoveBackground}
                               disabled={isRemovingBg}
-                              className="px-3 h-8 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-lg transition-all text-xs font-cairo font-bold"
-                              title="إزالة خلفية الصورة"
+                              className="px-3 h-7 bg-slate-600 hover:bg-slate-700 disabled:bg-gray-300 text-white rounded text-xs font-cairo"
                             >
-                              {isRemovingBg ? (
-                                <>
-                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  <span>جاري...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>✨</span>
-                                  <span>حذف الخلفية</span>
-                                </>
-                              )}
+                              {isRemovingBg ? 'جاري...' : 'حذف الخلفية'}
                             </button>
                           )}
                           <button
@@ -1014,60 +1218,24 @@ export default function AdminMedicines() {
                               const isSupabaseImage = imageUrl.includes('supabase.co/storage');
                               const hasOriginal = originalImageUrl && originalImageUrl !== imageUrl;
 
-                              let confirmMessage = 'هل تريد مسح الصورة؟';
-                              if (isSupabaseImage) {
-                                confirmMessage += '\n\nسيتم حذف الصورة من التخزين فوراً.';
-                              }
-                              if (hasOriginal) {
-                                confirmMessage += '\n\nسيتم الرجوع للصورة الأصلية.';
-                              }
-
-                              if (window.confirm(confirmMessage)) {
-                                // حذف الصورة الحالية من Supabase
+                              if (window.confirm('هل تريد مسح الصورة؟')) {
                                 if (isSupabaseImage) {
-                                  console.log('🗑️ حذف الصورة الحالية:', imageUrl);
-                                  toast.info('جاري حذف الصورة...');
                                   const result = await deleteImageFromSupabase(imageUrl);
-
-                                  if (result.success) {
-                                    console.log('✅ تم حذف الصورة الحالية بنجاح');
-                                    toast.success('تم حذف الصورة بنجاح');
-                                  } else {
-                                    console.error('❌ فشل حذف الصورة الحالية:', result.error);
-                                    toast.error(`فشل حذف الصورة: ${result.error || 'خطأ غير معروف'}`);
-                                  }
+                                  if (result.success) toast.success('تم حذف الصورة');
                                 }
-
-                                // حذف الصورة الأصلية من Supabase إذا كانت موجودة ومختلفة
                                 if (hasOriginal && originalImageUrl.includes('supabase.co/storage')) {
-                                  console.log('🗑️ حذف الصورة الأصلية:', originalImageUrl);
-                                  const originalResult = await deleteImageFromSupabase(originalImageUrl);
-
-                                  if (originalResult.success) {
-                                    console.log('✅ تم حذف الصورة الأصلية بنجاح');
-                                  } else {
-                                    console.error('❌ فشل حذف الصورة الأصلية:', originalResult.error);
-                                  }
+                                  await deleteImageFromSupabase(originalImageUrl);
                                 }
-
-                                // تحديث الـ state
                                 if (hasOriginal && !originalImageUrl.includes('supabase.co/storage')) {
-                                  // إذا كانت الصورة الأصلية من الإنترنت، نرجع لها
                                   setFormData({ ...formData, subabaseImageUrl: originalImageUrl });
                                 } else {
-                                  // إذا لا، نفرغ الحقول
                                   setFormData({ ...formData, subabaseImageUrl: '', subabaseORImageUrl: '' });
-                                }
-
-                                if (!isSupabaseImage) {
-                                  toast.success('تم إزالة الصورة');
                                 }
                               }
                             }}
-                            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
-                            title="حذف الصورة"
+                            className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded flex items-center justify-center"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1076,29 +1244,55 @@ export default function AdminMedicines() {
                 </div>
               </div>
 
+              {/* Section 4: Additional Options - Clean Design */}
+              <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold font-cairo text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Star className="w-4 h-4 text-slate-600" />
+                  خيارات إضافية
+                </h3>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isNewProduct"
+                    checked={formData.isNewProduct}
+                    onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })}
+                    className="w-4 h-4 text-slate-600 rounded border-gray-300 focus:ring-slate-500"
+                  />
+                  <label htmlFor="isNewProduct" className="text-sm font-cairo text-gray-700 cursor-pointer">
+                    منتج جديد
+                    <span className="text-xs text-gray-400 block">سيظهر بشارة "جديد"</span>
+                  </label>
+                </div>
+              </div>
+
               {/* Footer Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-gray-200">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleCancelDialog}
-                  className="h-10 px-6 font-cairo font-semibold border-2 hover:bg-gray-100"
+                  className="h-9 px-5 text-sm font-cairo font-semibold border hover:bg-gray-100"
                 >
                   إلغاء
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10}
+                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 || !formData.sectionId || !formData.categoryId}
                   title={
                     !formData.subabaseImageUrl
                       ? 'يجب رفع صورة للدواء أولاً'
                       : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10)
                         ? 'يجب إدخال عنوان الصيدلية بالتفصيل الكامل (10 أحرف على الأقل)'
-                        : ''
+                        : !formData.sectionId
+                          ? 'يجب اختيار القسم'
+                          : !formData.categoryId
+                            ? 'يجب اختيار الفئة'
+                            : ''
                   }
-                  className="h-10 px-8 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 px-6 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingMedicine ? '💾 حفظ التعديلات' : '➕ إضافة الدواء'}
+                  {editingMedicine ? '💾 حفظ' : '➕ إضافة'}
                 </Button>
               </div>
             </form>
@@ -1151,7 +1345,9 @@ export default function AdminMedicines() {
                         <Badge variant="outline" className="mt-2">{selectedMedicine.category}</Badge>
                       )}
                     </div>
-                    <p className="text-muted-foreground font-cairo">{selectedMedicine.description || 'لا يوجد وصف'}</p>
+                    <p className="text-muted-foreground font-cairo line-clamp-4">
+                      {selectedMedicine.description || 'لا يوجد وصف'}
+                    </p>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground font-cairo">السعر:</span>
@@ -1178,6 +1374,10 @@ export default function AdminMedicines() {
                         <span className="text-muted-foreground font-cairo">الصيدلية:</span>
                         <p className="font-bold">{selectedMedicine.pharmacyName}</p>
                       </div>
+                      <div>
+                        <span className="text-muted-foreground font-cairo">خصم الصيدليات:</span>
+                        <p className="font-bold">{(selectedMedicine as any).pharmacyDiscount || 0}%</p>
+                      </div>
                       <div className="col-span-2">
                         <span className="text-muted-foreground font-cairo flex items-center gap-1">
                           <MapPin className="w-3 h-3" />
@@ -1185,29 +1385,6 @@ export default function AdminMedicines() {
                         </span>
                         <p className="font-bold text-sm mt-1">{selectedMedicine.pharmcyAddress || 'غير محدد'}</p>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground font-cairo">التقييم:</span>
-                        <p className="font-bold flex items-center gap-1">
-                          <Star className="w-4 h-4 text-warning fill-warning" />
-                          {selectedMedicine.avgRating.toFixed(1)} ({selectedMedicine.ratingCount})
-                        </p>
-                      </div>
-                      {selectedMedicine.manufacturer && (
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground font-cairo">الشركة المصنعة:</span>
-                          <p className="font-bold">{selectedMedicine.manufacturer}</p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground font-cairo">المبيعات:</span>
-                        <p className="font-bold">{selectedMedicine.sellingCount}</p>
-                      </div>
-                      {selectedMedicine.discountRating > 0 && (
-                        <div>
-                          <span className="text-muted-foreground font-cairo">الخصم:</span>
-                          <p className="font-bold text-destructive">{selectedMedicine.discountRating}%</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

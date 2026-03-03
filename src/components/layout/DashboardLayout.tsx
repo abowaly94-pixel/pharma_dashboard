@@ -10,13 +10,13 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   ChevronDown,
   Building2,
-  ClipboardCheck
+  ClipboardCheck,
+  Tag,
+  Package
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -37,7 +37,8 @@ const adminNavItems = [
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
   { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
   { icon: ClipboardCheck, label: 'مراجعة الأدوية', path: '/admin/medicine-review' },
-  { icon: Bell, label: 'الإشعارات', path: '/admin/notifications' },
+  { icon: Package, label: 'إدارة الأقسام', path: '/admin/sections' },
+  { icon: Tag, label: 'إدارة التصنيفات', path: '/admin/categories' },
   { icon: Settings, label: 'الإعدادات', path: '/admin/settings' },
 ];
 
@@ -233,8 +234,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <NotificationBell />
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">

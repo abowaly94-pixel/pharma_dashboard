@@ -8,7 +8,6 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePharmacyManagement } from '@/hooks/usePharmacyManagement';
-import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import {
   Dialog,
   DialogContent,
@@ -62,8 +61,6 @@ export default function AdminPharmacies() {
     deletePharmacy
   } = usePharmacyManagement();
 
-  const { notifyPharmacyApproved, notifyPharmacyRejected } = useAutoNotifications();
-
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -98,13 +95,6 @@ export default function AdminPharmacies() {
   const handleConfirmStatusChange = async () => {
     if (selectedPharmacy && pendingStatus) {
       await changePharmacyStatus(selectedPharmacy.id, pendingStatus);
-
-      // Send notification based on status
-      if (pendingStatus === 'active') {
-        await notifyPharmacyApproved(selectedPharmacy.name, selectedPharmacy.id);
-      } else if (pendingStatus === 'suspended') {
-        await notifyPharmacyRejected(selectedPharmacy.name, selectedPharmacy.id, "تم تعليق حسابك من قبل المسؤول");
-      }
 
       setIsStatusDialogOpen(false);
       setSelectedPharmacy(null);

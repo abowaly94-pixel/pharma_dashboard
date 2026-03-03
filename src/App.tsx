@@ -5,18 +5,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Component, type ReactNode } from "react";
 import { AuthProvider } from '@/contexts/AuthContext';
-import { NotificationProvider } from '@/contexts/NotificationContext';
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { NotificationPermissionPrompt } from "@/components/notifications/NotificationPermissionPrompt";
 // Pages
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMedicines from "./pages/admin/AdminMedicines";
 import AdminOrders from "./pages/admin/AdminOrders";
-import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPharmacies from "./pages/admin/AdminPharmacies";
 import AdminMedicineReview from "./pages/admin/AdminMedicineReview";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminCategories from "./pages/admin/AdminCategories";
+import AdminSections from "./pages/admin/AdminSections";
 import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
 import PharmacistOrders from "./pages/pharmacist/PharmacistOrders";
@@ -83,12 +82,10 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <NotificationProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <NotificationPermissionPrompt />
-            <AppErrorBoundary>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppErrorBoundary>
               <BrowserRouter>
                 <Routes>
                   {/* Public Routes */}
@@ -121,14 +118,6 @@ const App = () => {
                     }
                   />
                   <Route
-                    path="/admin/notifications"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminNotifications />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
                     path="/admin/pharmacies"
                     element={
                       <ProtectedRoute requiredRole="admin">
@@ -141,6 +130,22 @@ const App = () => {
                     element={
                       <ProtectedRoute requiredRole="admin">
                         <AdminMedicineReview />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/categories"
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminCategories />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/sections"
+                    element={
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminSections />
                       </ProtectedRoute>
                     }
                   />
@@ -193,7 +198,6 @@ const App = () => {
               </BrowserRouter>
             </AppErrorBoundary>
           </TooltipProvider>
-        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

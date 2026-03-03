@@ -135,6 +135,11 @@ export async function createMedicine(
       price: input.price,
       quantity: input.quantity,
       category: input.category,
+      categoryEn: input.categoryEn || '',
+      categoryId: input.categoryId || '',
+      sectionId: input.sectionId || '',
+      sectionName: input.sectionName || '',
+      sectionNameEn: input.sectionNameEn || '',
       manufacturer: input.manufacturer || '',
       expiryDate: Timestamp.fromDate(input.expiryDate),
       subabaseImageUrl: input.subabaseImageUrl || '',
@@ -349,6 +354,11 @@ export async function updateMedicine(
     if (input.price !== undefined) updateData.price = input.price;
     if (input.quantity !== undefined) updateData.quantity = input.quantity;
     if (input.category) updateData.category = input.category;
+    if (input.categoryEn !== undefined) updateData.categoryEn = input.categoryEn;
+    if (input.categoryId !== undefined) updateData.categoryId = input.categoryId;
+    if (input.sectionId !== undefined) updateData.sectionId = input.sectionId;
+    if (input.sectionName !== undefined) updateData.sectionName = input.sectionName;
+    if (input.sectionNameEn !== undefined) updateData.sectionNameEn = input.sectionNameEn;
     if (input.manufacturer) updateData.manufacturer = input.manufacturer;
     if (input.expiryDate) updateData.expiryDate = Timestamp.fromDate(input.expiryDate);
     if (input.subabaseImageUrl) {
