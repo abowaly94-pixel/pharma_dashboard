@@ -75,6 +75,31 @@ function validateMedicineInput(input: CreateMedicineInput): void {
   if (!input.name || input.name.trim().length < 2) {
     throw new ValidationError('اسم الدواء مطلوب', 'name', 'REQUIRED');
   }
+
+  // التحقق من القسم (Section) - إلزامي
+  if (!input.sectionId || input.sectionId.trim() === '') {
+    throw new ValidationError('يجب اختيار القسم', 'sectionId', 'REQUIRED');
+  }
+  if (!input.sectionName || input.sectionName.trim() === '') {
+    throw new ValidationError('اسم القسم بالعربي مطلوب', 'sectionName', 'REQUIRED');
+  }
+  if (!input.sectionNameEn || input.sectionNameEn.trim() === '') {
+    throw new ValidationError('اسم القسم بالإنجليزي مطلوب', 'sectionNameEn', 'REQUIRED');
+  }
+  if (!input.sectionImageUrl || input.sectionImageUrl.trim() === '') {
+    throw new ValidationError('صورة القسم مطلوبة', 'sectionImageUrl', 'REQUIRED');
+  }
+
+  // التحقق من الفئة (Category) - إلزامي
+  if (!input.categoryId || input.categoryId.trim() === '') {
+    throw new ValidationError('يجب اختيار الفئة', 'categoryId', 'REQUIRED');
+  }
+  if (!input.category || input.category.trim() === '') {
+    throw new ValidationError('اسم الفئة بالعربي مطلوب', 'category', 'REQUIRED');
+  }
+  if (!input.categoryEn || input.categoryEn.trim() === '') {
+    throw new ValidationError('اسم الفئة بالإنجليزي مطلوب', 'categoryEn', 'REQUIRED');
+  }
   if (!input.code || input.code.trim().length < 3) {
     throw new ValidationError('كود الدواء مطلوب', 'code', 'REQUIRED');
   }
@@ -135,12 +160,12 @@ export async function createMedicine(
       price: input.price,
       quantity: input.quantity,
       category: input.category,
-      categoryEn: input.categoryEn || '',
-      categoryId: input.categoryId || '',
-      sectionId: input.sectionId || '',
-      sectionName: input.sectionName || '',
-      sectionNameEn: input.sectionNameEn || '',
-      sectionImageUrl: input.sectionImageUrl || '',
+      categoryEn: input.categoryEn,
+      categoryId: input.categoryId,
+      sectionId: input.sectionId,
+      sectionName: input.sectionName,
+      sectionNameEn: input.sectionNameEn,
+      sectionImageUrl: input.sectionImageUrl,
       sectionOriginalImageUrl: input.sectionOriginalImageUrl || '',
       manufacturer: input.manufacturer || '',
       expiryDate: Timestamp.fromDate(input.expiryDate),
@@ -165,7 +190,14 @@ export async function createMedicine(
       pharmacyId: pharmacyId,
       pharmacyName,
       pharmcyAddress,
-      name: input.name
+      name: input.name,
+      sectionId: input.sectionId,
+      sectionName: input.sectionName,
+      sectionNameEn: input.sectionNameEn,
+      sectionImageUrl: input.sectionImageUrl,
+      categoryId: input.categoryId,
+      category: input.category,
+      categoryEn: input.categoryEn
     });
 
     // الحفظ في pending_medicines فقط - لن يظهر في medicines حتى الموافقة

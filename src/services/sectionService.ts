@@ -50,6 +50,19 @@ export const sectionService = {
   // Add new section
   async addSection(sectionData: Omit<Section, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      // التحقق من البيانات الإلزامية
+      if (!sectionData.name || sectionData.name.trim() === '') {
+        throw new Error('اسم القسم بالعربي مطلوب');
+      }
+      
+      if (!sectionData.nameEn || sectionData.nameEn.trim() === '') {
+        throw new Error('اسم القسم بالإنجليزي مطلوب');
+      }
+      
+      if (!sectionData.sectionImageUrl || sectionData.sectionImageUrl.trim() === '') {
+        throw new Error('صورة القسم مطلوبة');
+      }
+      
       const docRef = await addDoc(collection(db, SECTIONS_COLLECTION), {
         ...sectionData,
         createdAt: Timestamp.now(),
@@ -65,6 +78,19 @@ export const sectionService = {
   // Update section
   async updateSection(id: string, sectionData: Partial<Section>): Promise<void> {
     try {
+      // التحقق من البيانات الإلزامية عند التحديث
+      if (sectionData.name !== undefined && (!sectionData.name || sectionData.name.trim() === '')) {
+        throw new Error('اسم القسم بالعربي مطلوب');
+      }
+      
+      if (sectionData.nameEn !== undefined && (!sectionData.nameEn || sectionData.nameEn.trim() === '')) {
+        throw new Error('اسم القسم بالإنجليزي مطلوب');
+      }
+      
+      if (sectionData.sectionImageUrl !== undefined && (!sectionData.sectionImageUrl || sectionData.sectionImageUrl.trim() === '')) {
+        throw new Error('صورة القسم مطلوبة');
+      }
+      
       const sectionRef = doc(db, SECTIONS_COLLECTION, id);
       await updateDoc(sectionRef, {
         ...sectionData,

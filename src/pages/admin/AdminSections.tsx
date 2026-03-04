@@ -194,7 +194,12 @@ export default function AdminSections() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      toast.error('يجب إدخال اسم القسم');
+      toast.error('يجب إدخال اسم القسم بالعربي');
+      return;
+    }
+
+    if (!formData.nameEn.trim()) {
+      toast.error('يجب إدخال اسم القسم بالإنجليزي');
       return;
     }
 
@@ -205,8 +210,8 @@ export default function AdminSections() {
 
     try {
       const sectionData = {
-        name: formData.name,
-        nameEn: formData.nameEn,
+        name: formData.name.trim(),
+        nameEn: formData.nameEn.trim(),
         sectionImageUrl: formData.imageUrl, // حفظ رابط الصورة
         originalImageUrl: formData.originalImageUrl, // حفظ الصورة الأصلية
         isActive: formData.isActive,
@@ -400,11 +405,12 @@ export default function AdminSections() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="nameEn" className="font-cairo text-sm">اسم القسم بالإنجليزي</Label>
+                <Label htmlFor="nameEn" className="font-cairo text-sm">اسم القسم بالإنجليزي *</Label>
                 <Input
                   id="nameEn"
                   value={formData.nameEn}
                   onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                  required
                   placeholder="Example: Medicines"
                   className="h-10"
                   dir="ltr"

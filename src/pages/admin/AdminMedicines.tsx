@@ -245,9 +245,36 @@ export default function AdminMedicines() {
       return;
     }
 
+    // التحقق من بيانات القسم الكاملة
+    if (!formData.sectionName || formData.sectionName.trim() === '') {
+      toast.error('⚠️ اسم القسم بالعربي مفقود - يرجى إعادة اختيار القسم');
+      return;
+    }
+
+    if (!formData.sectionNameEn || formData.sectionNameEn.trim() === '') {
+      toast.error('⚠️ اسم القسم بالإنجليزي مفقود - يرجى إعادة اختيار القسم');
+      return;
+    }
+
+    if (!formData.sectionImageUrl || formData.sectionImageUrl.trim() === '') {
+      toast.error('⚠️ صورة القسم مفقودة - يرجى إعادة اختيار القسم');
+      return;
+    }
+
     // التحقق من اختيار الفئة
     if (!formData.categoryId || formData.categoryId.trim() === '') {
       toast.error('⚠️ يجب اختيار فئة للدواء');
+      return;
+    }
+
+    // التحقق من بيانات الفئة الكاملة
+    if (!formData.category || formData.category.trim() === '') {
+      toast.error('⚠️ اسم الفئة بالعربي مفقود - يرجى إعادة اختيار الفئة');
+      return;
+    }
+
+    if (!formData.categoryEn || formData.categoryEn.trim() === '') {
+      toast.error('⚠️ اسم الفئة بالإنجليزي مفقود - يرجى إعادة اختيار الفئة');
       return;
     }
 
@@ -267,6 +294,20 @@ export default function AdminMedicines() {
     savingRef.current = true; // حماية فورية
 
     try {
+      // طباعة البيانات للتأكد من اكتمالها
+      console.log('📋 بيانات الدواء قبل الحفظ:', {
+        sectionId: formData.sectionId,
+        sectionName: formData.sectionName,
+        sectionNameEn: formData.sectionNameEn,
+        sectionImageUrl: formData.sectionImageUrl,
+        sectionOriginalImageUrl: formData.sectionOriginalImageUrl,
+        categoryId: formData.categoryId,
+        category: formData.category,
+        categoryEn: formData.categoryEn,
+        name: formData.name,
+        pharmcyAddress: formData.pharmcyAddress
+      });
+
       // توليد كود جديد فريد للأدوية الجديدة فقط
       const dataToSave = editingMedicine 
         ? { ...formData }
@@ -1002,13 +1043,38 @@ export default function AdminMedicines() {
                       value={formData.sectionId}
                       onValueChange={(value) => {
                         const selectedSection = sections.find(s => s.id === value);
+                        
+                        // التحقق من اكتمال بيانات القسم
+                        if (!selectedSection) {
+                          toast.error('القسم المحدد غير موجود');
+                          return;
+                        }
+                        
+                        if (!selectedSection.nameEn || selectedSection.nameEn.trim() === '') {
+                          toast.error('⚠️ القسم المحدد لا يحتوي على اسم إنجليزي. يرجى تحديث القسم أولاً');
+                          return;
+                        }
+                        
+                        if (!selectedSection.sectionImageUrl || selectedSection.sectionImageUrl.trim() === '') {
+                          toast.error('⚠️ القسم المحدد لا يحتوي على صورة. يرجى تحديث القسم أولاً');
+                          return;
+                        }
+                        
+                        console.log('✅ بيانات القسم المختار:', {
+                          id: value,
+                          name: selectedSection.name,
+                          nameEn: selectedSection.nameEn,
+                          sectionImageUrl: selectedSection.sectionImageUrl,
+                          originalImageUrl: selectedSection.originalImageUrl
+                        });
+                        
                         setFormData({ 
                           ...formData, 
                           sectionId: value, 
-                          sectionName: selectedSection?.name || '',
-                          sectionNameEn: selectedSection?.nameEn || '',
-                          sectionImageUrl: selectedSection?.sectionImageUrl || '',
-                          sectionOriginalImageUrl: selectedSection?.originalImageUrl || '',
+                          sectionName: selectedSection.name,
+                          sectionNameEn: selectedSection.nameEn,
+                          sectionImageUrl: selectedSection.sectionImageUrl,
+                          sectionOriginalImageUrl: selectedSection.originalImageUrl || '',
                           category: '',
                           categoryId: '',
                           categoryEn: ''
@@ -1040,11 +1106,29 @@ export default function AdminMedicines() {
                       value={formData.categoryId || formData.category}
                       onValueChange={(value) => {
                         const selectedCat = categories.find(c => c.id === value);
+                        
+                        // التحقق من اكتمال بيانات الفئة
+                        if (!selectedCat) {
+                          toast.error('الفئة المحددة غير موجودة');
+                          return;
+                        }
+                        
+                        if (!selectedCat.nameEn || selectedCat.nameEn.trim() === '') {
+                          toast.error('⚠️ الفئة المحددة لا تحتوي على اسم إنجليزي. يرجى تحديث الفئة أولاً');
+                          return;
+                        }
+                        
+                        console.log('✅ بيانات الفئة المختارة:', {
+                          id: value,
+                          name: selectedCat.name,
+                          nameEn: selectedCat.nameEn
+                        });
+                        
                         setFormData({ 
                           ...formData, 
                           categoryId: value,
-                          category: selectedCat?.name || '',
-                          categoryEn: selectedCat?.nameEn || ''
+                          category: selectedCat.name,
+                          categoryEn: selectedCat.nameEn
                         });
                       }}
                       required

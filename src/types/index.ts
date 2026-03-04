@@ -294,13 +294,13 @@ export interface CreateMedicineInput {
   price: number;
   quantity: number;
   category: string;
-  categoryEn?: string; // اسم الفئة بالإنجليزية
-  categoryId?: string;
-  sectionId?: string;
-  sectionName?: string;
-  sectionNameEn?: string; // اسم القسم بالإنجليزية
-  sectionImageUrl?: string; // صورة القسم
-  sectionOriginalImageUrl?: string; // الصورة الأصلية للقسم
+  categoryEn: string; // اسم الفئة بالإنجليزية - إلزامي
+  categoryId: string; // معرف الفئة - إلزامي
+  sectionId: string; // معرف القسم - إلزامي
+  sectionName: string; // اسم القسم بالعربي - إلزامي
+  sectionNameEn: string; // اسم القسم بالإنجليزية - إلزامي
+  sectionImageUrl: string; // صورة القسم - إلزامي
+  sectionOriginalImageUrl?: string; // الصورة الأصلية للقسم - اختياري
   manufacturer: string;
   expiryDate: Date;
   subabaseImageUrl: string;
