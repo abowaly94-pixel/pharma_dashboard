@@ -15,6 +15,8 @@ export interface Section {
   nameEn?: string;
   description?: string;
   icon?: string;
+  sectionImageUrl?: string; // صورة القسم
+  originalImageUrl?: string; // الصورة الأصلية قبل إزالة الخلفية
   isActive: boolean;
   order?: number;
   createdAt?: Date;
@@ -83,6 +85,8 @@ export interface Medicine {
   sectionId?: string; // معرف القسم
   sectionName?: string; // اسم القسم للعرض
   sectionNameEn?: string; // اسم القسم بالإنجليزية
+  sectionImageUrl?: string; // صورة القسم
+  sectionOriginalImageUrl?: string; // الصورة الأصلية للقسم
   manufacturer?: string;
   pharmacyPrice?: number; // سعر الصيدلية
   pharmacyDiscount?: number; // خصم الصيدليات
@@ -295,6 +299,8 @@ export interface CreateMedicineInput {
   sectionId?: string;
   sectionName?: string;
   sectionNameEn?: string; // اسم القسم بالإنجليزية
+  sectionImageUrl?: string; // صورة القسم
+  sectionOriginalImageUrl?: string; // الصورة الأصلية للقسم
   manufacturer: string;
   expiryDate: Date;
   subabaseImageUrl: string;
@@ -316,6 +322,8 @@ export interface UpdateMedicineInput {
   sectionId?: string;
   sectionName?: string;
   sectionNameEn?: string; // اسم القسم بالإنجليزية
+  sectionImageUrl?: string; // صورة القسم
+  sectionOriginalImageUrl?: string; // الصورة الأصلية للقسم
   manufacturer?: string;
   expiryDate?: Date;
   subabaseImageUrl?: string;

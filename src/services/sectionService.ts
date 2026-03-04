@@ -10,7 +10,7 @@ export const sectionService = {
     try {
       const q = query(
         collection(db, SECTIONS_COLLECTION),
-        orderBy('order', 'asc')
+        orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
@@ -30,7 +30,7 @@ export const sectionService = {
     try {
       // NOTE: Avoid compound query (where + orderBy) to prevent Firestore index requirement.
       // Fetch ordered sections then filter active in memory.
-      const q = query(collection(db, SECTIONS_COLLECTION), orderBy('order', 'asc'));
+      const q = query(collection(db, SECTIONS_COLLECTION), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
 
       return snapshot.docs

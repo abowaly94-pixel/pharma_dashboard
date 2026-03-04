@@ -140,6 +140,8 @@ export async function createMedicine(
       sectionId: input.sectionId || '',
       sectionName: input.sectionName || '',
       sectionNameEn: input.sectionNameEn || '',
+      sectionImageUrl: input.sectionImageUrl || '',
+      sectionOriginalImageUrl: input.sectionOriginalImageUrl || '',
       manufacturer: input.manufacturer || '',
       expiryDate: Timestamp.fromDate(input.expiryDate),
       subabaseImageUrl: input.subabaseImageUrl || '',

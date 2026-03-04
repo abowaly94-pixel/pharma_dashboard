@@ -10,7 +10,8 @@ import {
   Star,
   Image as ImageIcon,
   Building2,
-  MapPin
+  MapPin,
+  Trash
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ import { deleteImageFromSupabase, uploadImageToSupabase, removeImageBackground }
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { toast } from 'sonner';
 import { MedicineImage } from '@/components/ui/medicine-image';
+import { removeDuplicateMedicines } from '@/utils/removeDuplicateMedicines';
 
 export default function AdminMedicines() {
   const { medicines, isLoading, addMedicine, updateMedicine, deleteMedicine, searchQuery, setSearchQuery } = useMedicines();
@@ -79,6 +81,8 @@ export default function AdminMedicines() {
     sectionId: '',
     sectionName: '',
     sectionNameEn: '',
+    sectionImageUrl: '',
+    sectionOriginalImageUrl: '',
     manufacturer: '',
     pharmacyPrice: 0,
     pharmacyDiscount: 0,
@@ -167,6 +171,8 @@ export default function AdminMedicines() {
         sectionId: (medicine as any).sectionId || '',
         sectionName: (medicine as any).sectionName || '',
         sectionNameEn: (medicine as any).sectionNameEn || '',
+        sectionImageUrl: (medicine as any).sectionImageUrl || '',
+        sectionOriginalImageUrl: (medicine as any).sectionOriginalImageUrl || '',
         manufacturer: medicine.manufacturer || '',
         pharmacyPrice: (medicine as any).pharmacyPrice || 0,
         pharmacyDiscount: (medicine as any).pharmacyDiscount || 0,
@@ -201,6 +207,8 @@ export default function AdminMedicines() {
         sectionId: '',
         sectionName: '',
         sectionNameEn: '',
+        sectionImageUrl: '',
+        sectionOriginalImageUrl: '',
         manufacturer: '',
         pharmacyPrice: 0,
         pharmacyDiscount: 0,
@@ -259,6 +267,14 @@ export default function AdminMedicines() {
     savingRef.current = true; // حماية فورية
 
     try {
+      // توليد كود جديد فريد للأدوية الجديدة فقط
+      const dataToSave = editingMedicine 
+        ? { ...formData }
+        : { 
+            ...formData, 
+            code: `MED-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // كود فريد تماماً
+          };
+
       // إذا كان تعديل وتم تغيير الصورة، احذف الصورة القديمة من Supabase
       if (editingMedicine) {
         const oldImageUrl = (editingMedicine as any)?.subabaseImageUrl || editingMedicine?.subabaseORImageUrl;
@@ -285,10 +301,6 @@ export default function AdminMedicines() {
       }
 
       // حفظ البيانات
-      const dataToSave = {
-        ...formData,
-      };
-
       if (editingMedicine) {
         await updateMedicine(editingMedicine.id, dataToSave);
         toast.success('تم تحديث الدواء بنجاح');
@@ -560,10 +572,36 @@ export default function AdminMedicines() {
               {selectedCategory !== 'all' && ` في فئة "${selectedCategory}"`})
             </p>
           </div>
-          <Button onClick={() => handleOpenAddEdit()} className="gradient-primary text-primary-foreground font-cairo">
-            <Plus className="w-5 h-5 ml-2" />
-            إضافة دواء جديد
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={async () => {
+                if (!window.confirm('هل تريد حذف جميع الأدوية المكررة؟ سيتم الاحتفاظ بالأحدث فقط.')) return;
+                const loadingToast = toast.loading('جاري فحص وحذف المكررات...');
+                try {
+                  const result = await removeDuplicateMedicines('medicines');
+                  toast.dismiss(loadingToast);
+                  if (result.duplicatesRemoved > 0) {
+                    toast.success(`تم حذف ${result.duplicatesRemoved} دواء مكرر!`);
+                    window.location.reload();
+                  } else {
+                    toast.info('لا توجد أدوية مكررة');
+                  }
+                } catch (error) {
+                  toast.dismiss(loadingToast);
+                  toast.error('فشل حذف المكررات');
+                }
+              }}
+              variant="outline"
+              className="font-cairo"
+            >
+              <Trash className="w-4 h-4 ml-2" />
+              حذف المكررات
+            </Button>
+            <Button onClick={() => handleOpenAddEdit()} className="gradient-primary text-primary-foreground font-cairo">
+              <Plus className="w-5 h-5 ml-2" />
+              إضافة دواء جديد
+            </Button>
+          </div>
         </motion.div>
 
         {/* Search and Filter */}
@@ -694,6 +732,18 @@ export default function AdminMedicines() {
                       <Badge variant="destructive" className="text-xs px-2 py-1">-{medicine.discountRating}%</Badge>
                     )}
                   </div>
+                  {/* Section Image Badge */}
+                  {(medicine as any).sectionImageUrl && (
+                    <div className="absolute bottom-2 left-2">
+                      <div className="w-10 h-10 rounded-full bg-white shadow-md border border-gray-200 overflow-hidden">
+                        <img 
+                          src={(medicine as any).sectionImageUrl} 
+                          alt={(medicine as any).sectionName || 'قسم'} 
+                          className="w-full h-full object-contain p-1"
+                        />
+                      </div>
+                    </div>
+                  )}
                   {medicine.quantity === 0 && (
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-xl">
                       <span className="text-white font-semibold text-sm bg-red-600 px-3 py-1 rounded-full">نفذت الكمية</span>
@@ -957,6 +1007,8 @@ export default function AdminMedicines() {
                           sectionId: value, 
                           sectionName: selectedSection?.name || '',
                           sectionNameEn: selectedSection?.nameEn || '',
+                          sectionImageUrl: selectedSection?.sectionImageUrl || '',
+                          sectionOriginalImageUrl: selectedSection?.originalImageUrl || '',
                           category: '',
                           categoryId: '',
                           categoryEn: ''
