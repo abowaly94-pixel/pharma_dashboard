@@ -34,11 +34,11 @@ interface DashboardLayoutProps {
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'الرئيسية', path: '/admin' },
   { icon: Pill, label: 'الأدوية', path: '/admin/medicines' },
+  { icon: Package, label: 'إدارة الأقسام', path: '/admin/sections' },
+  { icon: Tag, label: 'إدارة التصنيفات', path: '/admin/categories' },
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
   { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
   { icon: ClipboardCheck, label: 'مراجعة الأدوية', path: '/admin/medicine-review' },
-  { icon: Package, label: 'إدارة الأقسام', path: '/admin/sections' },
-  { icon: Tag, label: 'إدارة التصنيفات', path: '/admin/categories' },
   { icon: Settings, label: 'الإعدادات', path: '/admin/settings' },
 ];
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Package, Eye, EyeOff, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Eye, EyeOff, Image as ImageIcon, RefreshCw, Database } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import { uploadImageToSupabase, deleteImageFromSupabase, removeImageBackground }
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { SafeImage } from '@/components/ui/safe-image';
 import { updateSectionMedicinesImages } from '@/utils/updateMedicineSectionImages';
+import { sectionService } from '@/services/sectionService';
 
 export default function AdminSections() {
   const { sections, isLoading, addSection, updateSection, deleteSection, toggleSectionStatus } = useSections();
@@ -269,6 +270,29 @@ export default function AdminSections() {
     }
   };
 
+  const handleSyncAllSectionsToList = async () => {
+    if (!window.confirm('هل تريد مزامنة جميع الأقسام إلى sections_list؟\nهذا سيسهل استدعاء الأقسام من تطبيق Flutter.')) {
+      return;
+    }
+
+    const loadingToast = toast.loading('جاري مزامنة الأقسام...');
+    
+    try {
+      const result = await sectionService.syncAllSectionsToList();
+      toast.dismiss(loadingToast);
+      
+      if (result.success > 0) {
+        toast.success(`تم مزامنة ${result.success} قسم بنجاح! ${result.failed > 0 ? `فشل ${result.failed}` : ''}`);
+      } else {
+        toast.error('فشلت المزامنة');
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error('حدث خطأ أثناء المزامنة');
+      console.error('Error syncing sections:', error);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -284,10 +308,21 @@ export default function AdminSections() {
               إدارة أقسام المنتجات الرئيسية ({sections.length} قسم)
             </p>
           </div>
-          <Button onClick={() => handleOpenDialog()} className="gradient-primary text-primary-foreground font-cairo">
-            <Plus className="w-5 h-5 ml-2" />
-            إضافة قسم جديد
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSyncAllSectionsToList} 
+              variant="outline"
+              className="font-cairo"
+              title="مزامنة جميع الأقسام إلى sections_list للاستدعاء السهل من Flutter"
+            >
+              <Database className="w-4 h-4 ml-2" />
+              مزامنة للـ Flutter
+            </Button>
+            <Button onClick={() => handleOpenDialog()} className="gradient-primary text-primary-foreground font-cairo">
+              <Plus className="w-5 h-5 ml-2" />
+              إضافة قسم جديد
+            </Button>
+          </div>
         </motion.div>
 
         {/* Sections Grid */}
