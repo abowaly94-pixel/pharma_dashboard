@@ -139,8 +139,12 @@ export async function getAllCategories(activeOnly = false): Promise<MedicineCate
       console.log('✅ Filtered for active categories:', categories.length);
     }
     
-    // Sort by name in memory
-    categories.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    // Sort by creation date (newest first)
+    categories.sort((a, b) => {
+      const dateA = a.createdAt?.getTime() || 0;
+      const dateB = b.createdAt?.getTime() || 0;
+      return dateB - dateA; // الأحدث أولاً
+    });
     
     console.log('✅ Final categories:', categories);
     return categories;
