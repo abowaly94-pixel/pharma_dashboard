@@ -57,6 +57,17 @@ export default function AdminSettings() {
   const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set());
   const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
 
+  // Groq API Keys Management
+  const [geminiKeysList, setGeminiKeysList] = useState<ApiKeyItem[]>([]);
+  const [newGeminiKey, setNewGeminiKey] = useState('');
+  const [newGeminiKeyName, setNewGeminiKeyName] = useState('');
+  const [showNewGeminiKey, setShowNewGeminiKey] = useState(false);
+  const [isAddingGeminiKey, setIsAddingGeminiKey] = useState(false);
+  const [copiedGeminiKeyId, setCopiedGeminiKeyId] = useState<string | null>(null);
+  const [visibleGeminiKeys, setVisibleGeminiKeys] = useState<Set<string>>(new Set());
+  const [testingGeminiKeys, setTestingGeminiKeys] = useState<Set<string>>(new Set());
+  const [geminiKeyToDelete, setGeminiKeyToDelete] = useState<string | null>(null);
+
   // Profile Data
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
@@ -74,8 +85,35 @@ export default function AdminSettings() {
 
       // Load API keys
       loadApiKeys();
+      loadGeminiKeys();
     }
   }, [user]);
+
+  const loadGeminiKeys = async () => {
+    try {
+      const groqKeysRef = doc(db, 'system_settings', 'groq_api_keys');
+      const groqKeysDoc = await getDoc(groqKeysRef);
+
+      if (groqKeysDoc.exists()) {
+        const data = groqKeysDoc.data();
+        const keysList = data.keysList || [];
+
+        const formattedKeys: ApiKeyItem[] = keysList.map((item: any) => ({
+          id: item.id,
+          key: item.key,
+          name: item.name,
+          isActive: item.isActive,
+          addedAt: item.addedAt?.toDate() || new Date(),
+          lastTested: item.lastTested?.toDate(),
+          isValid: item.isValid,
+        }));
+
+        setGeminiKeysList(formattedKeys);
+      }
+    } catch (error) {
+      toast.error('فشل تحميل مفاتيح Groq API');
+    }
+  };
 
   const loadApiKeys = async () => {
     try {
@@ -413,6 +451,255 @@ export default function AdminSettings() {
       }
       return newSet;
     });
+  };
+
+  // Groq API Keys Functions
+  const handleAddGeminiKey = async () => {
+    if (!newGeminiKey.trim()) {
+      toast.error('يرجى إدخال مفتاح Groq API');
+      return;
+    }
+
+    if (!newGeminiKeyName.trim()) {
+      toast.error('يرجى إدخال اسم المفتاح');
+      return;
+    }
+
+    if (geminiKeysList.some(k => k.key === newGeminiKey.trim())) {
+      toast.error('هذا المفتاح موجود بالفعل');
+      return;
+    }
+
+    setIsAddingGeminiKey(true);
+
+    try {
+      const newKey: ApiKeyItem = {
+        id: Date.now().toString(),
+        key: newGeminiKey.trim(),
+        name: newGeminiKeyName.trim(),
+        isActive: geminiKeysList.length === 0,
+        addedAt: new Date(),
+      };
+
+      const updatedList = [...geminiKeysList, newKey];
+
+      const groqKeysRef = doc(db, 'system_settings', 'groq_api_keys');
+      await setDoc(groqKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        groqApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      setGeminiKeysList(updatedList);
+      setNewGeminiKey('');
+      setNewGeminiKeyName('');
+
+      toast.success('تم إضافة مفتاح Groq بنجاح');
+      setTimeout(() => testGeminiKey(newKey.id), 500);
+    } catch (error: any) {
+      console.error('Error adding Groq key:', error);
+      toast.error(`فشل إضافة المفتاح: ${error.message || 'خطأ غير معروف'}`);
+    } finally {
+      setIsAddingGeminiKey(false);
+    }
+  };
+
+  const testGeminiKey = async (keyId: string) => {
+    const keyIndex = geminiKeysList.findIndex(k => k.id === keyId);
+    if (keyIndex === -1) return;
+
+    const key = geminiKeysList[keyIndex];
+    setTestingGeminiKeys(prev => new Set(prev).add(keyId));
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key.key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 10
+        })
+      });
+
+      let isValid = false;
+      let errorMessage = '';
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.choices && data.choices.length > 0) {
+          isValid = true;
+        } else {
+          errorMessage = 'استجابة غير صحيحة من API';
+        }
+      } else {
+        const errorData = await response.json();
+        errorMessage = errorData.error?.message || 'المفتاح غير صحيح';
+      }
+
+      const updatedList = [...geminiKeysList];
+      updatedList[keyIndex] = {
+        ...updatedList[keyIndex],
+        isValid,
+        lastTested: new Date(),
+      };
+
+      setGeminiKeysList(updatedList);
+
+      const groqKeysRef = doc(db, 'system_settings', 'groq_api_keys');
+      await setDoc(groqKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        groqApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      if (isValid) {
+        toast.success('✅ المفتاح صحيح ويعمل بنجاح!');
+      } else {
+        toast.error(`❌ ${errorMessage}`);
+      }
+    } catch (error: any) {
+      console.error('Error testing Groq key:', error);
+      
+      const updatedList = [...geminiKeysList];
+      updatedList[keyIndex] = {
+        ...updatedList[keyIndex],
+        isValid: false,
+        lastTested: new Date(),
+      };
+      setGeminiKeysList(updatedList);
+
+      toast.error('فشل اختبار المفتاح: ' + (error.message || 'خطأ في الاتصال'));
+    } finally {
+      setTestingGeminiKeys(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(keyId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleSetActiveGeminiKey = async (keyId: string) => {
+    try {
+      const updatedList = geminiKeysList.map(k => ({
+        ...k,
+        isActive: k.id === keyId,
+      }));
+
+      setGeminiKeysList(updatedList);
+
+      const groqKeysRef = doc(db, 'system_settings', 'groq_api_keys');
+      await setDoc(groqKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        groqApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      toast.success('تم تفعيل المفتاح');
+    } catch (error: any) {
+      console.error('Error setting active Groq key:', error);
+      toast.error('فشل تفعيل المفتاح');
+    }
+  };
+
+  const handleDeleteGeminiKey = async (keyId: string) => {
+    try {
+      const updatedList = geminiKeysList.filter(k => k.id !== keyId);
+
+      if (geminiKeysList.find(k => k.id === keyId)?.isActive && updatedList.length > 0) {
+        updatedList[0].isActive = true;
+      }
+
+      setGeminiKeysList(updatedList);
+
+      const groqKeysRef = doc(db, 'system_settings', 'groq_api_keys');
+      await setDoc(groqKeysRef, {
+        keysList: updatedList.map(k => ({
+          id: k.id,
+          key: k.key,
+          name: k.name,
+          isActive: k.isActive,
+          addedAt: k.addedAt,
+          lastTested: k.lastTested || null,
+          isValid: k.isValid !== undefined ? k.isValid : null,
+        })),
+        groqApiKey: updatedList.find(k => k.isActive)?.key || '',
+        updatedAt: new Date(),
+        updatedBy: user?.uid,
+      }, { merge: true });
+
+      toast.success('تم حذف المفتاح');
+      setGeminiKeyToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting Groq key:', error);
+      toast.error('فشل حذف المفتاح');
+    }
+  };
+
+  const toggleGeminiKeyVisibility = (keyId: string) => {
+    setVisibleGeminiKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(keyId)) {
+        newSet.delete(keyId);
+      } else {
+        newSet.add(keyId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCopyGeminiKey = async (keyId: string, key: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(key);
+        setCopiedGeminiKeyId(keyId);
+        toast.success('تم نسخ المفتاح');
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = key;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopiedGeminiKeyId(keyId);
+        toast.success('تم نسخ المفتاح');
+      }
+      setTimeout(() => setCopiedGeminiKeyId(null), 2000);
+    } catch (error) {
+      toast.error('فشل نسخ المفتاح');
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -866,6 +1153,298 @@ export default function AdminSettings() {
               <AlertDialogCancel className="font-cairo">إلغاء</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => keyToDelete && handleDeleteKey(keyToDelete)}
+                className="bg-destructive hover:bg-destructive/90 font-cairo"
+              >
+                <Trash2 className="w-4 h-4 ml-2" />
+                حذف المفتاح
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Gemini API Keys Management */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-3 font-cairo">
+                    <Key className="w-5 h-5 text-purple-600" />
+                    إدارة مفاتيح Groq AI
+                  </CardTitle>
+                  <CardDescription className="font-cairo mt-1">
+                    قم بإضافة وإدارة مفاتيح Groq API للذكاء الاصطناعي (مجاني وسريع جداً)
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="font-cairo bg-purple-50 text-purple-700 border-purple-200">
+                  {geminiKeysList.length} مفتاح
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Add New Hugging Face Key Section */}
+              <div className="p-4 border-2 border-dashed border-purple-200 rounded-lg bg-purple-50/50 space-y-4">
+                <div className="flex items-center gap-2 text-purple-600">
+                  <Plus className="w-5 h-5" />
+                  <h3 className="font-cairo font-semibold">إضافة مفتاح Hugging Face جديد</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="font-cairo">
+                      اسم المفتاح <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      value={newGeminiKeyName}
+                      onChange={(e) => setNewGeminiKeyName(e.target.value)}
+                      placeholder="مثال: حساب شخصي، حساب العمل..."
+                      className="font-cairo"
+                      dir="rtl"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-cairo">
+                      مفتاح Hugging Face API <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showNewGeminiKey ? "text" : "password"}
+                        value={newGeminiKey}
+                        onChange={(e) => setNewGeminiKey(e.target.value)}
+                        placeholder="أدخل مفتاح Hugging Face API"
+                        className="font-mono pl-12"
+                        dir="ltr"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute left-2 top-0 bottom-0 my-auto h-8 w-8 p-0"
+                        onClick={() => setShowNewGeminiKey(!showNewGeminiKey)}
+                      >
+                        {showNewGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-muted-foreground">
+                    احصل على مفتاح مجاني من{' '}
+                    <a
+                      href="https://huggingface.co/settings/tokens"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-600 hover:underline font-medium"
+                    >
+                      Google AI Studio
+                    </a>
+                  </p>
+                  <Button
+                    onClick={handleAddGeminiKey}
+                    disabled={isAddingGeminiKey || !newGeminiKey.trim() || !newGeminiKeyName.trim()}
+                    className="font-cairo bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  >
+                    <Plus className="w-4 h-4 ml-2" />
+                    {isAddingGeminiKey ? 'جاري الإضافة...' : 'إضافة المفتاح'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Gemini Keys List */}
+              {geminiKeysList.length > 0 && (
+                <>
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <h3 className="font-cairo font-semibold text-sm text-muted-foreground">
+                      المفاتيح المحفوظة ({geminiKeysList.length})
+                    </h3>
+
+                    <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3">
+                      <AnimatePresence mode="popLayout">
+                        {geminiKeysList.map((keyItem) => (
+                          <motion.div
+                            key={keyItem.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className={`p-4 rounded-lg border-2 transition-all ${keyItem.isActive
+                              ? 'border-purple-500 bg-purple-50 shadow-sm'
+                              : 'border-border bg-card hover:border-purple-300'
+                              }`}
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-cairo font-semibold truncate">
+                                      {keyItem.name}
+                                    </h4>
+                                    {keyItem.isActive && (
+                                      <Badge className="bg-purple-600 text-white font-cairo text-xs">
+                                        نشط
+                                      </Badge>
+                                    )}
+                                    {keyItem.isValid !== undefined && (
+                                      <Badge
+                                        variant={keyItem.isValid ? "default" : "destructive"}
+                                        className="font-cairo text-xs"
+                                      >
+                                        {keyItem.isValid ? '✓ صحيح' : '✗ غير صحيح'}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
+                                      {visibleGeminiKeys.has(keyItem.id)
+                                        ? keyItem.key
+                                        : '•'.repeat(Math.min(keyItem.key.length, 32))
+                                      }
+                                    </code>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => toggleGeminiKeyVisibility(keyItem.id)}
+                                    >
+                                      {visibleGeminiKeys.has(keyItem.id) ? (
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <Eye className="w-3.5 h-3.5" />
+                                      )}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => handleCopyGeminiKey(keyItem.id, keyItem.key)}
+                                    >
+                                      {copiedGeminiKeyId === keyItem.id ? (
+                                        <Check className="w-3.5 h-3.5 text-success" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                    </Button>
+                                  </div>
+
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                    <span>
+                                      أضيف: {keyItem.addedAt.toLocaleDateString('ar-EG')}
+                                    </span>
+                                    {keyItem.lastTested && (
+                                      <span>
+                                        آخر اختبار: {keyItem.lastTested.toLocaleTimeString('ar-EG', {
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => testGeminiKey(keyItem.id)}
+                                    disabled={testingGeminiKeys.has(keyItem.id)}
+                                    className="h-8 font-cairo"
+                                  >
+                                    <RefreshCw className={`w-3.5 h-3.5 ml-1 ${testingGeminiKeys.has(keyItem.id) ? 'animate-spin' : ''}`} />
+                                    {testingGeminiKeys.has(keyItem.id) ? 'جاري الاختبار...' : 'اختبار'}
+                                  </Button>
+
+                                  {!keyItem.isActive && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleSetActiveGeminiKey(keyItem.id)}
+                                      className="h-8 font-cairo"
+                                    >
+                                      تفعيل
+                                    </Button>
+                                  )}
+
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setGeminiKeyToDelete(keyItem.id)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {geminiKeysList.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Key className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p className="font-cairo">لا توجد مفاتيح محفوظة</p>
+                  <p className="text-sm mt-1">قم بإضافة مفتاح Groq API للبدء</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100">
+                <p className="font-cairo font-medium text-sm mb-2 flex items-center gap-2 text-purple-700">
+                  ✨ معلومات Groq AI:
+                </p>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-600 mt-0.5">•</span>
+                    <span>مجاني تماماً وسريع جداً</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-600 mt-0.5">•</span>
+                    <span>يستخدم لتوليد أسماء وأوصاف الأدوية تلقائياً</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-600 mt-0.5">•</span>
+                    <span>يمكنك إضافة عدة مفاتيح والتبديل بينها</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-600 mt-0.5">•</span>
+                    <span>المفتاح النشط هو المستخدم في توليد البيانات</span>
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Delete Groq Key Dialog */}
+        <AlertDialog open={!!geminiKeyToDelete} onOpenChange={() => setGeminiKeyToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-cairo text-xl">تأكيد حذف المفتاح</AlertDialogTitle>
+              <AlertDialogDescription className="font-cairo text-base">
+                هل أنت متأكد من حذف هذا المفتاح؟
+                <br />
+                لن تتمكن من استرجاعه بعد الحذف.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="font-cairo">إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => geminiKeyToDelete && handleDeleteGeminiKey(geminiKeyToDelete)}
                 className="bg-destructive hover:bg-destructive/90 font-cairo"
               >
                 <Trash2 className="w-4 h-4 ml-2" />

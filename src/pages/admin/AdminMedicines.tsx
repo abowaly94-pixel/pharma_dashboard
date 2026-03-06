@@ -11,7 +11,8 @@ import {
   Image as ImageIcon,
   Building2,
   MapPin,
-  Trash
+  Trash,
+  Sparkles
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import { toast } from 'sonner';
 import { MedicineImage } from '@/components/ui/medicine-image';
 import { removeDuplicateMedicines } from '@/utils/removeDuplicateMedicines';
+import { generateMedicineDetails, translateDescriptionToEnglish, translateNameToEnglish } from '@/services/geminiService';
 
 export default function AdminMedicines() {
   const { medicines, isLoading, addMedicine, updateMedicine, deleteMedicine, searchQuery, setSearchQuery } = useMedicines();
@@ -59,6 +61,8 @@ export default function AdminMedicines() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false); // AI loading state
+  const [isTranslating, setIsTranslating] = useState(false); // Translation loading state
   const savingRef = useRef(false); // حماية إضافية من race conditions
   const [imageLoadError, setImageLoadError] = useState(false); // جديد: لتتبع فشل تحميل الصورة
   const [uploadedImagesInSession, setUploadedImagesInSession] = useState<string[]>([]); // تتبع الصور المرفوعة في الجلسة الحالية
@@ -154,6 +158,39 @@ export default function AdminMedicines() {
 
     if (medicine) {
       setEditingMedicine(medicine);
+      
+      // إعادة تعبئة بيانات القسم والفئة من القوائم المتاحة إذا كانت مفقودة
+      const medicineSectionId = (medicine as any).sectionId || '';
+      const medicineCategoryId = (medicine as any).categoryId || '';
+      
+      // البحث عن القسم في القائمة
+      const foundSection = sections.find(s => s.id === medicineSectionId);
+      const sectionData = foundSection ? {
+        sectionId: foundSection.id,
+        sectionName: foundSection.name,
+        sectionNameEn: foundSection.nameEn,
+        sectionImageUrl: foundSection.sectionImageUrl,
+        sectionOriginalImageUrl: foundSection.originalImageUrl || ''
+      } : {
+        sectionId: medicineSectionId,
+        sectionName: (medicine as any).sectionName || '',
+        sectionNameEn: (medicine as any).sectionNameEn || '',
+        sectionImageUrl: (medicine as any).sectionImageUrl || '',
+        sectionOriginalImageUrl: (medicine as any).sectionOriginalImageUrl || ''
+      };
+      
+      // البحث عن الفئة في القائمة
+      const foundCategory = categories.find(c => c.id === medicineCategoryId);
+      const categoryData = foundCategory ? {
+        categoryId: foundCategory.id,
+        category: foundCategory.name,
+        categoryEn: foundCategory.nameEn
+      } : {
+        categoryId: medicineCategoryId,
+        category: medicine.category || '',
+        categoryEn: (medicine as any).categoryEn || ''
+      };
+      
       setFormData({
         name: medicine.name,
         nameEn: (medicine as any).nameEn || '',
@@ -165,14 +202,8 @@ export default function AdminMedicines() {
         pharmacyId: medicine.pharmacyId,
         pharmacyName: medicine.pharmacyName,
         pharmcyAddress: medicine.pharmcyAddress,
-        category: medicine.category || '',
-        categoryId: (medicine as any).categoryId || '',
-        categoryEn: (medicine as any).categoryEn || '',
-        sectionId: (medicine as any).sectionId || '',
-        sectionName: (medicine as any).sectionName || '',
-        sectionNameEn: (medicine as any).sectionNameEn || '',
-        sectionImageUrl: (medicine as any).sectionImageUrl || '',
-        sectionOriginalImageUrl: (medicine as any).sectionOriginalImageUrl || '',
+        ...categoryData,
+        ...sectionData,
         manufacturer: medicine.manufacturer || '',
         pharmacyPrice: (medicine as any).pharmacyPrice || 0,
         pharmacyDiscount: (medicine as any).pharmacyDiscount || 0,
@@ -225,6 +256,89 @@ export default function AdminMedicines() {
     }
     setIsAddEditDialogOpen(true);
   };
+
+  // AI: Generate medicine details using Gemini
+  const handleGenerateWithAI = async () => {
+    // يعتمد على الاسم العربي أولاً، ثم الإنجليزي كبديل
+    const inputName = formData.name || formData.nameEn;
+    
+    if (!inputName || inputName.trim() === '') {
+      toast.error('الرجاء إدخال اسم الدواء أولاً');
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      // تمرير الاسم الإنجليزي الموجود (إن وجد) للحفاظ عليه
+      const aiResult = await generateMedicineDetails(inputName, formData.nameEn);
+      
+      setFormData({
+        ...formData,
+        name: aiResult.nameAr,
+        nameEn: aiResult.nameEn,
+        description: aiResult.descriptionAr,
+        descriptionEn: aiResult.descriptionEn,
+      });
+      
+      toast.success('✨ تم ملء البيانات بواسطة AI بنجاح');
+    } catch (error: any) {
+      console.error('AI Generation Error:', error);
+      toast.error(error.message || 'فشل في توليد البيانات. تأكد من إضافة VITE_GEMINI_API_KEY');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // AI: Translate Arabic description to English
+  const handleTranslateDescription = async () => {
+    if (!formData.description || formData.description.trim() === '') {
+      toast.error('الرجاء إدخال الوصف بالعربي أولاً');
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const translationResult = await translateDescriptionToEnglish(formData.description);
+      
+      setFormData({
+        ...formData,
+        descriptionEn: translationResult.descriptionEn,
+      });
+      
+      toast.success('✨ تم ترجمة الوصف بنجاح');
+    } catch (error: any) {
+      console.error('Translation Error:', error);
+      toast.error(error.message || 'فشل في ترجمة الوصف');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // AI: Translate Arabic name to English
+  const handleTranslateName = async () => {
+    if (!formData.name || formData.name.trim() === '') {
+      toast.error('الرجاء إدخال اسم الدواء بالعربي أولاً');
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const translationResult = await translateNameToEnglish(formData.name);
+      
+      setFormData({
+        ...formData,
+        nameEn: translationResult.nameEn,
+      });
+      
+      toast.success('✨ تم ترجمة الاسم بنجاح');
+    } catch (error: any) {
+      console.error('Name Translation Error:', error);
+      toast.error(error.message || 'فشل في ترجمة الاسم');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -905,8 +1019,21 @@ export default function AdminMedicines() {
                   المعلومات الأساسية
                 </h3>
 
-                {/* Names Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* AI Generate Button */}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleGenerateWithAI}
+                    disabled={isGeneratingAI}
+                    className="h-8 text-xs font-cairo bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 ml-1" />
+                    {isGeneratingAI ? 'جاري التوليد...' : 'ملء تلقائي بالذكاء الاصطناعي'}
+                  </Button>
+                </div>
+
+                {/* Names - Vertical Layout */}
+                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="name" className="font-cairo text-xs font-medium text-gray-700">اسم الدواء بالعربي *</Label>
                     <Input
@@ -920,7 +1047,20 @@ export default function AdminMedicines() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="nameEn" className="font-cairo text-xs font-medium text-gray-700">اسم الدواء بالإنجليزي</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="nameEn" className="font-cairo text-xs font-medium text-gray-700">اسم الدواء بالإنجليزي</Label>
+                      <Button
+                        type="button"
+                        onClick={handleTranslateName}
+                        disabled={isTranslating || !formData.name}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs font-cairo border-blue-300 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Sparkles className="w-3 h-3 ml-1" />
+                        {isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية'}
+                      </Button>
+                    </div>
                     <Input
                       id="nameEn"
                       value={formData.nameEn}
@@ -932,8 +1072,8 @@ export default function AdminMedicines() {
                   </div>
                 </div>
 
-                {/* Descriptions Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Descriptions - Vertical Layout */}
+                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="description" className="font-cairo text-xs font-medium text-gray-700">الوصف بالعربي</Label>
                     <Textarea
@@ -947,7 +1087,20 @@ export default function AdminMedicines() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="descriptionEn" className="font-cairo text-xs font-medium text-gray-700">الوصف بالإنجليزي</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="descriptionEn" className="font-cairo text-xs font-medium text-gray-700">الوصف بالإنجليزي</Label>
+                      <Button
+                        type="button"
+                        onClick={handleTranslateDescription}
+                        disabled={isTranslating || !formData.description}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs font-cairo border-blue-300 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Sparkles className="w-3 h-3 ml-1" />
+                        {isTranslating ? 'جاري الترجمة...' : 'ترجمة تلقائية'}
+                      </Button>
+                    </div>
                     <Textarea
                       id="descriptionEn"
                       value={formData.descriptionEn}
@@ -1083,7 +1236,13 @@ export default function AdminMedicines() {
                       required
                     >
                       <SelectTrigger className={`h-9 text-sm ${!formData.sectionId ? 'border-red-300 bg-red-50' : 'bg-gray-50 border-gray-200'}`}>
-                        <SelectValue placeholder={sectionsLoading ? "جاري التحميل..." : "اختر القسم"} />
+                        <SelectValue placeholder={sectionsLoading ? "جاري التحميل..." : "اختر القسم"}>
+                          {formData.sectionId && sections.find(s => s.id === formData.sectionId) ? (
+                            <>
+                              {sections.find(s => s.id === formData.sectionId)?.icon} {sections.find(s => s.id === formData.sectionId)?.name}
+                            </>
+                          ) : null}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {sectionsLoading ? (
@@ -1103,7 +1262,7 @@ export default function AdminMedicines() {
                   <div className="space-y-1.5">
                     <Label htmlFor="category" className="font-cairo text-xs font-medium text-gray-700">الفئة *</Label>
                     <Select
-                      value={formData.categoryId || formData.category}
+                      value={formData.categoryId || undefined}
                       onValueChange={(value) => {
                         const selectedCat = categories.find(c => c.id === value);
                         
@@ -1141,7 +1300,11 @@ export default function AdminMedicines() {
                             : categoriesLoading 
                               ? "جاري التحميل..." 
                               : "اختر الفئة"
-                        } />
+                        }>
+                          {formData.categoryId && categories.find(c => c.id === formData.categoryId) ? (
+                            categories.find(c => c.id === formData.categoryId)?.name
+                          ) : null}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {categoriesLoading ? (
@@ -1414,9 +1577,11 @@ export default function AdminMedicines() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 || !formData.sectionId || !formData.categoryId}
+                  disabled={isSaving || !formData.subabaseImageUrl || !formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10 || !formData.sectionId || !formData.categoryId}
                   title={
-                    !formData.subabaseImageUrl
+                    isSaving
+                      ? 'جاري الحفظ...'
+                      : !formData.subabaseImageUrl
                       ? 'يجب رفع صورة للدواء أولاً'
                       : (!formData.pharmcyAddress || formData.pharmcyAddress.trim().length < 10)
                         ? 'يجب إدخال عنوان الصيدلية بالتفصيل الكامل (10 أحرف على الأقل)'
@@ -1428,7 +1593,12 @@ export default function AdminMedicines() {
                   }
                   className="h-9 px-6 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-cairo font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingMedicine ? '💾 حفظ' : '➕ إضافة'}
+                  {isSaving ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </div>
+                  ) : editingMedicine ? '💾 حفظ' : '➕ إضافة'}
                 </Button>
               </div>
             </form>
