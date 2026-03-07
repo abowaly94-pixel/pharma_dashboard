@@ -1,12 +1,12 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Pill, 
-  ShoppingCart, 
-  Users, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Pill,
+  ShoppingCart,
+  Users,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -14,7 +14,8 @@ import {
   Building2,
   ClipboardCheck,
   Tag,
-  Package
+  Package,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ const adminNavItems = [
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
   { icon: Building2, label: 'الصيدليات', path: '/admin/pharmacies' },
   { icon: ClipboardCheck, label: 'مراجعة الأدوية', path: '/admin/medicine-review' },
+  { icon: Truck, label: 'أسعار التوصيل', path: '/admin/delivery-settings' },
   { icon: Settings, label: 'الإعدادات', path: '/admin/settings' },
 ];
 

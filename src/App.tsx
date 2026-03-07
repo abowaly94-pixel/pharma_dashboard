@@ -16,6 +16,7 @@ import AdminMedicineReview from "./pages/admin/AdminMedicineReview";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSections from "./pages/admin/AdminSections";
+import AdminDeliverySettings from "./pages/admin/AdminDeliverySettings";
 import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
 import PharmacistOrders from "./pages/pharmacist/PharmacistOrders";
@@ -86,118 +87,126 @@ const App = () => {
           <Toaster />
           <Sonner />
           <AppErrorBoundary>
-              <BrowserRouter>
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/" element={<Navigate to="/login" replace />} />
-                  <Route path="/login" element={<LoginPage />} />
+            <BrowserRouter>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/login" element={<LoginPage />} />
 
-                  {/* Admin Routes */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/medicines"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminMedicines />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/orders"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/pharmacies"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminPharmacies />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/medicine-review"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminMedicineReview />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/categories"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminCategories />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/sections"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminSections />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/settings"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminSettings />
-                      </ProtectedRoute>
-                    }
-                  />
+                {/* Admin Routes */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/medicines"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminMedicines />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/orders"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminOrders />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pharmacies"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminPharmacies />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/medicine-review"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminMedicineReview />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/categories"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminCategories />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/sections"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminSections />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminSettings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/delivery-settings"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminDeliverySettings />
+                    </ProtectedRoute>
+                  }
+                />
 
-                  {/* Pharmacist Routes */}
-                  <Route
-                    path="/pharmacist"
-                    element={
-                      <ProtectedRoute requiredRole="pharmacist">
-                        <PharmacistDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pharmacist/medicines"
-                    element={
-                      <ProtectedRoute requiredRole="pharmacist">
-                        <PharmacistMedicines />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pharmacist/orders"
-                    element={
-                      <ProtectedRoute requiredRole="pharmacist">
-                        <PharmacistOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/pharmacist/settings"
-                    element={
-                      <ProtectedRoute requiredRole="pharmacist">
-                        <PharmacistSettings />
-                      </ProtectedRoute>
-                    }
-                  />
+                {/* Pharmacist Routes */}
+                <Route
+                  path="/pharmacist"
+                  element={
+                    <ProtectedRoute requiredRole="pharmacist">
+                      <PharmacistDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/pharmacist/medicines"
+                  element={
+                    <ProtectedRoute requiredRole="pharmacist">
+                      <PharmacistMedicines />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/pharmacist/orders"
+                  element={
+                    <ProtectedRoute requiredRole="pharmacist">
+                      <PharmacistOrders />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/pharmacist/settings"
+                  element={
+                    <ProtectedRoute requiredRole="pharmacist">
+                      <PharmacistSettings />
+                    </ProtectedRoute>
+                  }
+                />
 
-                  {/* Catch All */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
-            </AppErrorBoundary>
-          </TooltipProvider>
+                {/* Catch All */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </AppErrorBoundary>
+        </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -381,3 +381,23 @@ export interface GroupedMedicines {
   approved: MedicineWithApproval[];
   rejected: MedicineWithApproval[];
 }
+
+// ==================== Delivery Settings ====================
+
+/** إعدادات التوصيل - يتم التحكم فيها من لوحة الأدمن */
+export interface DeliverySettings {
+  expressPrice: number;      // سعر التوصيل السريع
+  standardPrice: number;     // سعر التوصيل العادي
+  // النصوص (عربي)
+  expressTitleAr: string;    // مثال: "توصيل سريع"
+  expressSubtitleAr: string; // مثال: "استلم طلبك خلال 15-30 دقيقة"
+  standardTitleAr: string;   // مثال: "توصيل عادي"
+  standardSubtitleAr: string;// مثال: "استلم طلبك خلال 1-2 ساعة"
+  // النصوص (إنجليزي)
+  expressTitleEn: string;
+  expressSubtitleEn: string;
+  standardTitleEn: string;
+  standardSubtitleEn: string;
+  updatedAt?: Date;
+  updatedBy?: string;
+}
