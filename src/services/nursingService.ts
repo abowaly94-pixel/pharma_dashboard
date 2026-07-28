@@ -97,7 +97,7 @@ const DEFAULT_NURSES: Omit<Nurse, 'createdAt' | 'updatedAt'>[] = [
     name: 'م. سارة فاروق الحسيني',
     titleAr: 'أخصائية تمريض منزلي وكبار السن',
     titleEn: 'Home Care & Elderly Specialist',
-    avatarUrl: 'https://images.unsplash.com/photo-1594824813566-88855ce78965?w=400&auto=format&fit=crop&q=60',
+    avatarUrl: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&auto=format&fit=crop&q=60',
     rating: 4.95,
     reviewsCount: 88,
     experienceYears: 9,

@@ -28,9 +28,10 @@ export function SafeImage({
 }: SafeImageProps) {
   const [hasError, setHasError] = useState(false);
   
-  // التحقق من أن الـ URL ليس data URL
+  // التحقق من أن الـ URL ليس data URL أو نص غير صالي
   const isDataUrl = src?.startsWith('data:');
-  const shouldShowPlaceholder = !src || isDataUrl || hasError;
+  const isValidUrl = Boolean(src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:')));
+  const shouldShowPlaceholder = !src || isDataUrl || !isValidUrl || hasError;
 
   if (shouldShowPlaceholder) {
     return (
@@ -48,7 +49,7 @@ export function SafeImage({
   return (
     <img
       src={src}
-      alt={alt}
+      alt={isAvatar ? '' : alt}
       className={cn('w-full h-full object-cover', className)}
       onError={() => setHasError(true)}
       {...props}
