@@ -504,7 +504,8 @@ export default function AdminNursingServices() {
                           <SafeImage
                             src={nurse.avatarUrl}
                             alt={nurse.name}
-                            className="w-16 h-16 rounded-2xl object-cover border border-gray-100"
+                            isAvatar
+                            className="w-16 h-16 rounded-2xl object-cover border border-gray-100 shrink-0"
                           />
                           {nurse.isVerified && (
                             <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5">
@@ -807,7 +808,8 @@ export default function AdminNursingServices() {
                   <SafeImage
                     src={nurseForm.avatarUrl}
                     alt="معاينة"
-                    className="w-12 h-12 rounded-xl object-cover border"
+                    isAvatar
+                    className="w-12 h-12 rounded-xl object-cover border shrink-0"
                   />
                   <label className="cursor-pointer bg-white px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-100 flex items-center gap-1">
                     {isUploadingAvatar ? 'جاري الرفع...' : 'تغيير الصورة'}

@@ -157,7 +157,8 @@ export default function NurseDashboard() {
             <SafeImage
               src={nurseProfile?.avatarUrl || user?.profileImageUrl || ''}
               alt={nurseProfile?.name || 'Nurse'}
-              className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow"
+              isAvatar
+              className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow shrink-0"
             />
             <div>
               <div className="flex items-center gap-2">
@@ -470,7 +471,8 @@ export default function NurseDashboard() {
                   <SafeImage
                     src={profileForm.avatarUrl}
                     alt="معاينة"
-                    className="w-14 h-14 rounded-xl object-cover border"
+                    isAvatar
+                    className="w-14 h-14 rounded-xl object-cover border shrink-0"
                   />
                   <label className="cursor-pointer bg-white px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-100 flex items-center gap-1">
                     {isUploading ? 'جاري الرفع...' : 'رفع صورة جديدة'}
