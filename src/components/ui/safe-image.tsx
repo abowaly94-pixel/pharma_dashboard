@@ -18,12 +18,12 @@ interface SafeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 export function SafeImage({ 
   src, 
   alt, 
-  fallbackMessage = 'لا يمكن عرض هذه الصورة. يرجى رفع الصورة على السيرفر أولاً.',
+  fallbackMessage = '',
   className,
   containerClassName,
   isAvatar = false,
   compact = false,
-  showFallbackText = true,
+  showFallbackText = false,
   ...props 
 }: SafeImageProps) {
   const [hasError, setHasError] = useState(false);
@@ -36,7 +36,7 @@ export function SafeImage({
   if (shouldShowPlaceholder) {
     return (
       <ImagePlaceholder 
-        message={isDataUrl ? 'الصور المحلية غير مسموحة. يرجى رفع الصورة أولاً.' : fallbackMessage}
+        message={showFallbackText ? (isDataUrl ? 'الصور المحلية غير مسموحة' : fallbackMessage) : ''}
         className={cn('w-full h-full overflow-hidden shrink-0', containerClassName, className)}
         showUploadIcon={!src && !isAvatar}
         isAvatar={isAvatar}

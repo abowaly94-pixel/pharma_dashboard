@@ -14,7 +14,7 @@ interface ImagePlaceholderProps {
  * عنصر لعرض رسالة بدلاً من الصور غير المسموحة (data URLs) أو غير المتاحة
  */
 export function ImagePlaceholder({ 
-  message = 'الصورة غير متاحة للعرض', 
+  message = '', 
   className,
   showUploadIcon = false,
   isAvatar = false,
@@ -35,7 +35,7 @@ export function ImagePlaceholder({
     );
   }
 
-  const shouldDisplayMessage = showText && !compact;
+  const shouldDisplayMessage = showText && !compact && Boolean(message);
 
   return (
     <div 
