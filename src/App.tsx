@@ -17,10 +17,12 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSections from "./pages/admin/AdminSections";
 import AdminDeliverySettings from "./pages/admin/AdminDeliverySettings";
+import AdminNursingServices from "./pages/admin/AdminNursingServices";
 import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
 import PharmacistOrders from "./pages/pharmacist/PharmacistOrders";
 import PharmacistSettings from "./pages/pharmacist/PharmacistSettings";
+import NurseDashboard from "./pages/nurse/NurseDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -166,6 +168,14 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/admin/nursing"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminNursingServices />
+                    </ProtectedRoute>
+                  }
+                />
 
                 {/* Pharmacist Routes */}
                 <Route
@@ -197,6 +207,32 @@ const App = () => {
                   element={
                     <ProtectedRoute requiredRole="pharmacist">
                       <PharmacistSettings />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Nurse Routes */}
+                <Route
+                  path="/nurse"
+                  element={
+                    <ProtectedRoute requiredRole="nurse">
+                      <NurseDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/nurse/bookings"
+                  element={
+                    <ProtectedRoute requiredRole="nurse">
+                      <NurseDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/nurse/profile"
+                  element={
+                    <ProtectedRoute requiredRole="nurse">
+                      <NurseDashboard />
                     </ProtectedRoute>
                   }
                 />

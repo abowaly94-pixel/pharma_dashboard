@@ -30,6 +30,8 @@ export default function LoginPage() {
           navigate('/admin');
         } else if (loggedInUser.role === 'pharmacist') {
           navigate('/pharmacist');
+        } else if (loggedInUser.role === 'nurse') {
+          navigate('/nurse');
         } else {
           toast.error('هذا الحساب لا يملك صلاحيات الوصول للوحة التحكم');
         }

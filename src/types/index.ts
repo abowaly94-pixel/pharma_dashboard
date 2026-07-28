@@ -175,7 +175,7 @@ export interface User {
   phoneNumber?: string;
   cart: CartItem[];
   favorites: string[];
-  role?: 'admin' | 'pharmacist' | 'user';
+  role?: 'admin' | 'pharmacist' | 'nurse' | 'user';
   pharmacyId?: number;
   pharmacyName?: string;
   createdAt?: Date;
@@ -401,3 +401,67 @@ export interface DeliverySettings {
   updatedAt?: Date;
   updatedBy?: string;
 }
+
+// ==================== Home Nursing Care Interfaces ====================
+
+/** خدمة التمريض المنزلي */
+export interface NursingService {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  icon: string;
+  startingPrice: number;
+  accentColorHex?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** بيانات الممرض / الممرضة */
+export interface Nurse {
+  id: string;
+  name: string;
+  titleAr: string;
+  titleEn: string;
+  avatarUrl: string;
+  rating: number;
+  reviewsCount: number;
+  experienceYears: number;
+  locationAr: string;
+  locationEn: string;
+  distanceKm: number;
+  price: number;
+  phone: string;
+  email?: string;
+  userId?: string;
+  hasAccount?: boolean;
+  isVerified: boolean;
+  serviceIds: string[];
+  aboutAr: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** طلب زيارة تمريض منزلية */
+export interface NursingBooking {
+  id: string;
+  nurseId: string;
+  nurseName: string;
+  nurseAvatar?: string;
+  serviceId: string;
+  serviceTitleAr?: string;
+  userId?: string;
+  userName: string;
+  userPhone: string;
+  address: string;
+  notes?: string;
+  isImmediate: boolean;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  price: number;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  createdAt: Date;
+  updatedAt?: Date;
+}
+

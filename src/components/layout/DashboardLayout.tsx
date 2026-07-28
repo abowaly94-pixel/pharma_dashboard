@@ -15,7 +15,8 @@ import {
   ClipboardCheck,
   Tag,
   Package,
-  Truck
+  Truck,
+  HeartPulse
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ interface DashboardLayoutProps {
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'الرئيسية', path: '/admin' },
   { icon: Pill, label: 'الأدوية', path: '/admin/medicines' },
+  { icon: HeartPulse, label: 'خدمات التمريض', path: '/admin/nursing' },
   { icon: Package, label: 'إدارة الأقسام', path: '/admin/sections' },
   { icon: Tag, label: 'إدارة التصنيفات', path: '/admin/categories' },
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },
@@ -51,14 +53,20 @@ const pharmacistNavItems = [
   { icon: Settings, label: 'الإعدادات', path: '/pharmacist/settings' },
 ];
 
+const nurseNavItems = [
+  { icon: LayoutDashboard, label: 'الرئيسية', path: '/nurse' },
+  { icon: HeartPulse, label: 'طلبات الزيارات', path: '/nurse/bookings' },
+  { icon: Settings, label: 'الملف الشخصي', path: '/nurse/profile' },
+];
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isNurse } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navItems = isAdmin ? adminNavItems : pharmacistNavItems;
+  const navItems = isAdmin ? adminNavItems : isNurse ? nurseNavItems : pharmacistNavItems;
 
   const handleLogout = () => {
     logout();
@@ -151,7 +159,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {user?.name}
                 </p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
-                  {isAdmin ? 'مدير النظام' : 'صيدلي'}
+                  {isAdmin ? 'مدير النظام' : isNurse ? 'ممرض أخصائي' : 'صيدلي'}
                 </p>
               </motion.div>
             )}
