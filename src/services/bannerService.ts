@@ -120,7 +120,7 @@ export const bannerService = {
     }
   },
 
-  // Seed default banners using exact app SVG images transferred to dashboard
+  // Seed default banners preserving exact nursing services banner and illustrations
   async seedInitialBanners(): Promise<void> {
     try {
       const sampleBanners: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -173,13 +173,13 @@ export const bannerService = {
           sortOrder: 3,
         },
         {
-          title: 'توصيل سريع وآمن',
-          titleEn: 'Trusted Delivery 24/7',
-          subtitle: 'رعاية وتوصيل الأدوية حتى باب المنزل على مدار 24 ساعة',
-          subtitleEn: 'Comprehensive 24/7 home delivery visits',
+          title: 'خدمات التمريض المنزلي',
+          titleEn: 'Home Nursing Services',
+          subtitle: 'رعاية تمريضية شاملة بالساعة أو اليوم على مدار 24 ساعة',
+          subtitleEn: 'Comprehensive hourly or daily nursing care 24/7',
           badgeText: 'متاح 24/7',
           badgeTextEn: 'Available 24/7',
-          imageUrl: getBannerIllustration('on_boarding'),
+          imageUrl: 'https://cdn-icons-png.flaticon.com/512/3209/3209028.png',
           bannerType: 'custom_card',
           primaryColor: '#8B5CF6',
           backgroundColor: '#F5F3FF',
