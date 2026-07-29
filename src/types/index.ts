@@ -489,6 +489,8 @@ export interface Banner {
   actionTarget?: string;
   isActive: boolean;
   sortOrder: number;
+  imageZoom?: number;
+  imageRotation?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -51,6 +51,8 @@ export const bannerService = {
           actionTarget: data.actionTarget || '',
           isActive: data.isActive !== undefined ? data.isActive : true,
           sortOrder: data.sortOrder || 0,
+          imageZoom: data.imageZoom !== undefined ? data.imageZoom : 1,
+          imageRotation: data.imageRotation !== undefined ? data.imageRotation : 0,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Banner;
@@ -178,6 +180,8 @@ export const bannerService = {
           actionTarget: '',
           isActive: true,
           sortOrder: 1,
+          imageZoom: 1,
+          imageRotation: 0,
         },
         {
           title: 'ابحث عن دواك بسهولة',
@@ -194,6 +198,8 @@ export const bannerService = {
           actionTarget: '',
           isActive: true,
           sortOrder: 2,
+          imageZoom: 1,
+          imageRotation: 0,
         },
         {
           title: 'عروض حصرية يومية',
@@ -210,6 +216,8 @@ export const bannerService = {
           actionTarget: '',
           isActive: true,
           sortOrder: 3,
+          imageZoom: 1,
+          imageRotation: 0,
         },
         {
           title: 'خدمات التمريض المنزلي',
@@ -226,6 +234,8 @@ export const bannerService = {
           actionTarget: '',
           isActive: true,
           sortOrder: 4,
+          imageZoom: 1,
+          imageRotation: 0,
         },
       ];
 

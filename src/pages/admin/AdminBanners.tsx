@@ -86,11 +86,10 @@ export default function AdminBanners() {
   });
 
   const handleOpenDialog = (banner?: Banner) => {
-    setImageZoom(1);
-    setImageRotation(0);
-
     if (banner) {
       setEditingBanner(banner);
+      setImageZoom(banner.imageZoom !== undefined ? banner.imageZoom : 1);
+      setImageRotation(banner.imageRotation !== undefined ? banner.imageRotation : 0);
       setFormData({
         title: banner.title || '',
         titleEn: banner.titleEn || '',
@@ -109,6 +108,8 @@ export default function AdminBanners() {
       });
     } else {
       setEditingBanner(null);
+      setImageZoom(1);
+      setImageRotation(0);
       setFormData({
         title: '',
         titleEn: '',
@@ -185,6 +186,8 @@ export default function AdminBanners() {
     const finalFormData = {
       ...formData,
       title: formData.title.trim() || (formData.bannerType === 'image_only' ? 'إعلان إعلاني كامل' : 'بانر'),
+      imageZoom: imageZoom,
+      imageRotation: imageRotation,
     };
 
     try {
@@ -241,49 +244,43 @@ export default function AdminBanners() {
               إضافة البانرات الافتراضية
             </Button>
 
-            {banners.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (window.confirm('هل أنت متاكد من إخفاء جميع البانرات؟ سيتم إخفاء قسم البانرات بالكامل من تطبيق الهاتف.')) {
-                      toggleAllStatus(false);
-                    }
-                  }}
-                  disabled={isLoading || activeCount === 0}
-                  className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-bold"
-                >
-                  <EyeOff className="w-4 h-4" />
-                  إخفاء جميع البانرات
-                </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (window.confirm('هل أنت متاكد من إخفاء جميع البانرات؟ سيتم إخفاء قسم البانرات بالكامل من تطبيق الهاتف.')) {
+                  toggleAllStatus(false);
+                }
+              }}
+              disabled={isLoading || banners.length === 0 || activeCount === 0}
+              className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-bold"
+            >
+              <EyeOff className="w-4 h-4" />
+              إخفاء جميع البانرات
+            </Button>
 
-                {hiddenCount > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => toggleAllStatus(true)}
-                    disabled={isLoading}
-                    className="gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-bold"
-                  >
-                    <Eye className="w-4 h-4" />
-                    تفعيل الكل
-                  </Button>
-                )}
+            <Button
+              variant="outline"
+              onClick={() => toggleAllStatus(true)}
+              disabled={isLoading || banners.length === 0 || hiddenCount === 0}
+              className="gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-bold"
+            >
+              <Eye className="w-4 h-4" />
+              تفعيل الكل
+            </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (window.confirm('هل أنت متاكد من حذف جميع البانرات نهائياً من قاعدة البيانات؟')) {
-                      deleteAllBanners();
-                    }
-                  }}
-                  disabled={isLoading}
-                  className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 font-bold"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  حذف الكل
-                </Button>
-              </>
-            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (window.confirm('هل أنت متاكد من حذف جميع البانرات نهائياً من قاعدة البيانات؟')) {
+                  deleteAllBanners();
+                }
+              }}
+              disabled={isLoading || banners.length === 0}
+              className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 font-bold"
+            >
+              <Trash2 className="w-4 h-4" />
+              حذف الكل
+            </Button>
 
             <Button
               onClick={() => handleOpenDialog()}
@@ -389,7 +386,10 @@ export default function AdminBanners() {
                     <img
                       src={getBannerIllustration(banner.imageUrl)}
                       alt={banner.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform"
+                      style={{
+                        transform: `scale(${banner.imageZoom ?? 1}) rotate(${banner.imageRotation ?? 0}deg)`
+                      }}
                     />
                     <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <Badge className="bg-black/60 backdrop-blur-md text-white font-bold gap-1">
@@ -477,7 +477,10 @@ export default function AdminBanners() {
                           <img
                             src={getBannerIllustration(banner.imageUrl)}
                             alt={banner.title}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain transition-transform"
+                            style={{
+                              transform: `scale(${banner.imageZoom ?? 1}) rotate(${banner.imageRotation ?? 0}deg)`
+                            }}
                           />
                         </div>
                       )}
