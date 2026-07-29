@@ -491,6 +491,8 @@ export interface Banner {
   sortOrder: number;
   imageZoom?: number;
   imageRotation?: number;
+  imageOffsetX?: number;
+  imageOffsetY?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }

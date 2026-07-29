@@ -53,6 +53,8 @@ export const bannerService = {
           sortOrder: data.sortOrder || 0,
           imageZoom: data.imageZoom !== undefined ? data.imageZoom : 1,
           imageRotation: data.imageRotation !== undefined ? data.imageRotation : 0,
+          imageOffsetX: data.imageOffsetX !== undefined ? data.imageOffsetX : 0,
+          imageOffsetY: data.imageOffsetY !== undefined ? data.imageOffsetY : 0,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Banner;

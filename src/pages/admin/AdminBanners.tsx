@@ -67,6 +67,8 @@ export default function AdminBanners() {
   // Image manipulation & zoom state for dialog preview
   const [imageZoom, setImageZoom] = useState<number>(1);
   const [imageRotation, setImageRotation] = useState<number>(0);
+  const [imageOffsetX, setImageOffsetX] = useState<number>(0);
+  const [imageOffsetY, setImageOffsetY] = useState<number>(0);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -90,6 +92,8 @@ export default function AdminBanners() {
       setEditingBanner(banner);
       setImageZoom(banner.imageZoom !== undefined ? banner.imageZoom : 1);
       setImageRotation(banner.imageRotation !== undefined ? banner.imageRotation : 0);
+      setImageOffsetX(banner.imageOffsetX !== undefined ? banner.imageOffsetX : 0);
+      setImageOffsetY(banner.imageOffsetY !== undefined ? banner.imageOffsetY : 0);
       setFormData({
         title: banner.title || '',
         titleEn: banner.titleEn || '',
@@ -110,6 +114,8 @@ export default function AdminBanners() {
       setEditingBanner(null);
       setImageZoom(1);
       setImageRotation(0);
+      setImageOffsetX(0);
+      setImageOffsetY(0);
       setFormData({
         title: '',
         titleEn: '',
@@ -188,6 +194,8 @@ export default function AdminBanners() {
       title: formData.title.trim() || (formData.bannerType === 'image_only' ? 'إعلان إعلاني كامل' : 'بانر'),
       imageZoom: imageZoom,
       imageRotation: imageRotation,
+      imageOffsetX: imageOffsetX,
+      imageOffsetY: imageOffsetY,
     };
 
     try {
@@ -605,7 +613,7 @@ export default function AdminBanners() {
                         alt="Full Banner Preview"
                         className="w-full h-full object-cover transition-transform duration-150"
                         style={{
-                          transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                          transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
                         }}
                       />
                     ) : (
@@ -667,7 +675,7 @@ export default function AdminBanners() {
                             alt="Banner Preview"
                             className="w-full h-full object-contain transition-transform duration-150"
                             style={{
-                              transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                              transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
                             }}
                           />
                         </div>
@@ -708,46 +716,13 @@ export default function AdminBanners() {
                   </div>
                 </div>
 
-                {/* ZOOM IN / ZOOM OUT / ROTATE CONTROLS */}
+                {/* ZOOM / ROTATION / POSITION CONTROLS */}
                 {formData.imageUrl && (
-                  <div className="pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-xs font-bold text-muted-foreground">
-                      🔍 التحكم في مقياس وزاوية الصورة المعروضة:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setImageZoom((z) => Math.min(z + 0.25, 3))}
-                        title="تكبير Zoom In"
-                        className="gap-1 font-bold text-xs"
-                      >
-                        <ZoomIn className="w-4 h-4 text-primary" />
-                        تكبير ({Math.round(imageZoom * 100)}%)
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setImageZoom((z) => Math.max(z - 0.25, 0.5))}
-                        title="تصغير Zoom Out"
-                        className="gap-1 font-bold text-xs"
-                      >
-                        <ZoomOut className="w-4 h-4 text-primary" />
-                        تصغير
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setImageRotation((r) => (r + 90) % 360)}
-                        title="تدوير Rotate"
-                        className="gap-1 font-bold text-xs"
-                      >
-                        <RotateCw className="w-4 h-4" />
-                        تدوير
-                      </Button>
+                  <div className="pt-3 border-t border-border/60 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">
+                        🎯 التحكم التام في موضع ومقياس وزاوية الصورة:
+                      </span>
                       <Button
                         type="button"
                         size="sm"
@@ -755,12 +730,77 @@ export default function AdminBanners() {
                         onClick={() => {
                           setImageZoom(1);
                           setImageRotation(0);
+                          setImageOffsetX(0);
+                          setImageOffsetY(0);
                         }}
-                        title="إعادة ضبط Reset"
-                        className="text-xs"
+                        className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
                       >
+                        <RefreshCw className="w-3.5 h-3.5 ml-1" />
                         إعادة الضبط
                       </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Zoom & Rotation Controls */}
+                      <div className="flex items-center gap-2 bg-background p-2 rounded-lg border border-border">
+                        <span className="text-xs font-bold text-muted-foreground w-16">التكبير:</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setImageZoom((z) => Math.min(z + 0.15, 3.5))}
+                          className="h-8 w-8 p-0"
+                          title="تكبير"
+                        >
+                          <ZoomIn className="w-4 h-4 text-primary" />
+                        </Button>
+                        <span className="text-xs font-mono font-bold min-w-[42px] text-center">
+                          {Math.round(imageZoom * 100)}%
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setImageZoom((z) => Math.max(z - 0.15, 0.4))}
+                          className="h-8 w-8 p-0"
+                          title="تصغير"
+                        >
+                          <ZoomOut className="w-4 h-4 text-primary" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setImageRotation((r) => (r + 90) % 360)}
+                          className="h-8 px-2 text-xs font-bold gap-1 ml-auto"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          {imageRotation}°
+                        </Button>
+                      </div>
+
+                      {/* X & Y Position Offset Controls */}
+                      <div className="flex items-center gap-3 bg-background p-2 rounded-lg border border-border">
+                        <span className="text-xs font-bold text-muted-foreground w-16">الموقع X/Y:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground font-mono">X:</span>
+                          <Input
+                            type="number"
+                            value={imageOffsetX}
+                            onChange={(e) => setImageOffsetX(Number(e.target.value) || 0)}
+                            className="h-8 w-16 text-xs text-center font-mono p-1"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground font-mono">Y:</span>
+                          <Input
+                            type="number"
+                            value={imageOffsetY}
+                            onChange={(e) => setImageOffsetY(Number(e.target.value) || 0)}
+                            className="h-8 w-16 text-xs text-center font-mono p-1"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
