@@ -482,6 +482,7 @@ export interface Banner {
   badgeText?: string;
   badgeTextEn?: string;
   imageUrl: string;
+  bannerType?: 'custom_card' | 'image_only';
   primaryColor: string;
   backgroundColor: string;
   actionType?: 'none' | 'category' | 'medicine' | 'url';
