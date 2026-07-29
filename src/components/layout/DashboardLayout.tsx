@@ -16,7 +16,8 @@ import {
   Tag,
   Package,
   Truck,
-  HeartPulse
+  HeartPulse,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: 'الرئيسية', path: '/admin' },
   { icon: Pill, label: 'الأدوية', path: '/admin/medicines' },
   { icon: HeartPulse, label: 'خدمات التمريض', path: '/admin/nursing' },
+  { icon: ImageIcon, label: 'إدارة البانرات', path: '/admin/banners' },
   { icon: Package, label: 'إدارة الأقسام', path: '/admin/sections' },
   { icon: Tag, label: 'إدارة التصنيفات', path: '/admin/categories' },
   { icon: ShoppingCart, label: 'الطلبات', path: '/admin/orders' },

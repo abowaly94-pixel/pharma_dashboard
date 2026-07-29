@@ -18,6 +18,7 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSections from "./pages/admin/AdminSections";
 import AdminDeliverySettings from "./pages/admin/AdminDeliverySettings";
 import AdminNursingServices from "./pages/admin/AdminNursingServices";
+import AdminBanners from "./pages/admin/AdminBanners";
 import PharmacistDashboard from "./pages/pharmacist/PharmacistDashboard";
 import PharmacistMedicines from "./pages/pharmacist/PharmacistMedicines";
 import PharmacistOrders from "./pages/pharmacist/PharmacistOrders";
@@ -149,6 +150,14 @@ const App = () => {
                   element={
                     <ProtectedRoute requiredRole="admin">
                       <AdminSections />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/banners"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminBanners />
                     </ProtectedRoute>
                   }
                 />

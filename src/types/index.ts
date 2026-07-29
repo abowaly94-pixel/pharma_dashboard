@@ -463,11 +463,33 @@ export interface NursingBooking {
   isImmediate: boolean;
   scheduledDate?: string;
   scheduledTime?: string;
-  price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   latitude?: number;
   longitude?: number;
   createdAt: Date;
   updatedAt?: Date;
 }
+
+// ==================== Banner Management Interfaces ====================
+
+/** بانر إعلاني للصفحة الرئيسية */
+export interface Banner {
+  id: string;
+  title: string;
+  titleEn?: string;
+  subtitle?: string;
+  subtitleEn?: string;
+  badgeText?: string;
+  badgeTextEn?: string;
+  imageUrl: string;
+  primaryColor: string;
+  backgroundColor: string;
+  actionType?: 'none' | 'category' | 'medicine' | 'url';
+  actionTarget?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 
