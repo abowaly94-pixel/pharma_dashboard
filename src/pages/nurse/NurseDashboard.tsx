@@ -94,7 +94,18 @@ export default function NurseDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+
+    if (nurseProfile) {
+      const unsubscribe = nursingService.subscribeToNurseBookings(
+        nurseProfile.id,
+        nurseProfile.email,
+        (liveBookings) => {
+          setBookings(liveBookings);
+        }
+      );
+      return () => unsubscribe();
+    }
+  }, [user, nurseProfile?.id]);
 
   const handleUpdateStatus = async (id: string, status: NursingBooking['status']) => {
     try {

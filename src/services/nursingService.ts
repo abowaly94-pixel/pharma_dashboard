@@ -9,7 +9,8 @@ import {
   orderBy,
   Timestamp,
   setDoc,
-  getDoc
+  getDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { db, getSecondaryApp } from '@/lib/firebase';
@@ -335,21 +336,93 @@ export const nursingService = {
     }
   },
 
-  // Bookings CRUD
+  // Bookings CRUD - Resilient Fetch & Real-time Subscriptions
   async getAllBookings(): Promise<NursingBooking[]> {
     try {
-      const q = query(collection(db, BOOKINGS_COLLECTION), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as NursingBooking[];
+      let snapshot;
+      try {
+        const q = query(collection(db, BOOKINGS_COLLECTION), orderBy('createdAt', 'desc'));
+        snapshot = await getDocs(q);
+      } catch (qErr) {
+        console.warn('Ordered query failed, falling back to simple getDocs:', qErr);
+        snapshot = await getDocs(collection(db, BOOKINGS_COLLECTION));
+      }
+
+      const list = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        let cDate = new Date();
+        if (data.createdAt?.toDate) {
+          cDate = data.createdAt.toDate();
+        } else if (data.createdAt) {
+          cDate = new Date(data.createdAt);
+        }
+
+        let uDate = undefined;
+        if (data.updatedAt?.toDate) {
+          uDate = data.updatedAt.toDate();
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: cDate,
+          updatedAt: uDate,
+        };
+      }) as NursingBooking[];
+
+      list.sort((a, b) => {
+        const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tB - tA;
+      });
+
+      return list;
     } catch (error) {
       console.error('Error fetching nursing bookings:', error);
       return [];
     }
+  },
+
+  // Real-time listener for all bookings (Admin Dashboard)
+  subscribeToBookings(callback: (bookings: NursingBooking[]) => void): () => void {
+    const colRef = collection(db, BOOKINGS_COLLECTION);
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const list = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          let cDate = new Date();
+          if (data.createdAt?.toDate) {
+            cDate = data.createdAt.toDate();
+          } else if (data.createdAt) {
+            cDate = new Date(data.createdAt);
+          }
+
+          let uDate = undefined;
+          if (data.updatedAt?.toDate) {
+            uDate = data.updatedAt.toDate();
+          }
+
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: cDate,
+            updatedAt: uDate,
+          };
+        }) as NursingBooking[];
+
+        list.sort((a, b) => {
+          const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tB - tA;
+        });
+
+        callback(list);
+      },
+      (error) => {
+        console.error('Error in nursing bookings snapshot listener:', error);
+      }
+    );
   },
 
   async updateBookingStatus(id: string, status: NursingBooking['status']): Promise<void> {
@@ -405,20 +478,17 @@ export const nursingService = {
 
   // Fetch bookings for a specific logged-in nurse
   async getNurseBookings(nurseId: string, nurseEmail?: string): Promise<NursingBooking[]> {
-    try {
-      const q = query(collection(db, BOOKINGS_COLLECTION), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const all = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as NursingBooking[];
+    const all = await this.getAllBookings();
+    return all.filter((b) => b.nurseId === nurseId || (nurseEmail && (b as any).nurseEmail === nurseEmail));
+  },
 
-      return all.filter((b) => b.nurseId === nurseId || (nurseEmail && (b as any).nurseEmail === nurseEmail));
-    } catch (error) {
-      console.error('Error fetching nurse bookings:', error);
-      return [];
-    }
+  // Real-time listener for nurse bookings
+  subscribeToNurseBookings(nurseId: string, nurseEmail: string | undefined, callback: (bookings: NursingBooking[]) => void): () => void {
+    return this.subscribeToBookings((allBookings) => {
+      const filtered = allBookings.filter(
+        (b) => b.nurseId === nurseId || (nurseEmail && (b as any).nurseEmail === nurseEmail)
+      );
+      callback(filtered);
+    });
   },
 };

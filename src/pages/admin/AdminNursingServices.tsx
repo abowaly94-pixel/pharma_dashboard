@@ -119,6 +119,19 @@ export default function AdminNursingServices() {
 
   useEffect(() => {
     fetchData();
+
+    // Real-time listener for incoming nursing visit requests
+    const unsubscribe = nursingService.subscribeToBookings((liveBookings) => {
+      setBookings((prev) => {
+        if (prev.length > 0 && liveBookings.length > prev.length) {
+          const newest = liveBookings[0];
+          toast.success(`🔔 وصل طلب زيارة منزلية جديد من ${newest.userName || 'عميل جديد'}!`);
+        }
+        return liveBookings;
+      });
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Nurse Dialog Handlers
