@@ -53,6 +53,8 @@ export default function AdminBanners() {
     updateBanner,
     deleteBanner,
     toggleBannerStatus,
+    toggleAllStatus,
+    deleteAllBanners,
     seedInitialBanners,
   } = useBanners();
 
@@ -229,17 +231,60 @@ export default function AdminBanners() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {banners.length === 0 && (
-              <Button
-                variant="outline"
-                onClick={seedInitialBanners}
-                disabled={isLoading}
-                className="gap-2 border-primary text-primary hover:bg-primary/10 font-bold"
-              >
-                <Sparkles className="w-4 h-4" />
-                إضافة البانرات الافتراضية
-              </Button>
+            <Button
+              variant="outline"
+              onClick={seedInitialBanners}
+              disabled={isLoading}
+              className="gap-2 border-primary/40 text-primary hover:bg-primary/10 font-bold"
+            >
+              <Sparkles className="w-4 h-4 text-primary" />
+              إضافة البانرات الافتراضية
+            </Button>
+
+            {banners.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (window.confirm('هل أنت متاكد من إخفاء جميع البانرات؟ سيتم إخفاء قسم البانرات بالكامل من تطبيق الهاتف.')) {
+                      toggleAllStatus(false);
+                    }
+                  }}
+                  disabled={isLoading || activeCount === 0}
+                  className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-bold"
+                >
+                  <EyeOff className="w-4 h-4" />
+                  إخفاء جميع البانرات
+                </Button>
+
+                {hiddenCount > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => toggleAllStatus(true)}
+                    disabled={isLoading}
+                    className="gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-bold"
+                  >
+                    <Eye className="w-4 h-4" />
+                    تفعيل الكل
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (window.confirm('هل أنت متاكد من حذف جميع البانرات نهائياً من قاعدة البيانات؟')) {
+                      deleteAllBanners();
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 font-bold"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  حذف الكل
+                </Button>
+              </>
             )}
+
             <Button
               onClick={() => handleOpenDialog()}
               className="gap-2 gradient-primary text-primary-foreground font-bold shadow-md"

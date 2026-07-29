@@ -106,7 +106,7 @@ export const bannerService = {
     }
   },
 
-  // Toggle active status
+  // Toggle single banner active status
   async toggleBannerStatus(id: string, currentStatus: boolean): Promise<void> {
     try {
       const docRef = doc(db, BANNERS_COLLECTION, id);
@@ -120,7 +120,46 @@ export const bannerService = {
     }
   },
 
-  // Seed default banners preserving exact nursing services banner and illustrations
+  // Hide or Deactivate all banners with 1 click
+  async toggleAllBannersStatus(active: boolean): Promise<void> {
+    try {
+      const q = query(collection(db, BANNERS_COLLECTION));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return;
+
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((docSnap) => {
+        batch.update(docSnap.ref, {
+          isActive: active,
+          updatedAt: Timestamp.now(),
+        });
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error('Error toggling all banners status:', error);
+      throw error;
+    }
+  },
+
+  // Delete all banners with 1 click
+  async deleteAllBanners(): Promise<void> {
+    try {
+      const q = query(collection(db, BANNERS_COLLECTION));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return;
+
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error('Error deleting all banners:', error);
+      throw error;
+    }
+  },
+
+  // Seed default banners including exact Home Nursing Services banner & SVG illustrations
   async seedInitialBanners(): Promise<void> {
     try {
       const sampleBanners: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>[] = [

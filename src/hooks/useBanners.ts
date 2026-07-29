@@ -72,6 +72,32 @@ export function useBanners() {
     }
   };
 
+  const toggleAllStatus = async (active: boolean) => {
+    try {
+      setIsLoading(true);
+      await bannerService.toggleAllBannersStatus(active);
+      toast.success(active ? 'تم تفعيل جميع البانرات' : 'تم إخفاء جميع البانرات بنجاح');
+      await fetchBanners();
+    } catch (err: any) {
+      toast.error('فشل في تغيير حالة جميع البانرات');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteAllBanners = async () => {
+    try {
+      setIsLoading(true);
+      await bannerService.deleteAllBanners();
+      toast.success('تم حذف جميع البانرات بنجاح');
+      await fetchBanners();
+    } catch (err: any) {
+      toast.error('فشل في حذف جميع البانرات');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const seedInitialBanners = async () => {
     try {
       setIsLoading(true);
@@ -94,6 +120,8 @@ export function useBanners() {
     updateBanner,
     deleteBanner,
     toggleBannerStatus,
+    toggleAllStatus,
+    deleteAllBanners,
     seedInitialBanners,
   };
 }
