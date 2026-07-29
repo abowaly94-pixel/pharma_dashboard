@@ -1094,6 +1094,17 @@ export default function AdminNursingServices() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>الوصف (إنجليزي)</Label>
+                <Textarea
+                  value={serviceForm.descriptionEn}
+                  onChange={(e) => setServiceForm({ ...serviceForm, descriptionEn: e.target.value })}
+                  placeholder="IM/IV injections by certified professionals..."
+                  rows={2}
+                  dir="ltr"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>السعر المبدئي (ج.م)</Label>
