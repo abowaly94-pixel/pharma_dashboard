@@ -60,7 +60,7 @@ export const bannerService = {
   // Add new banner
   async addBanner(bannerData: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      if (!bannerData.title || bannerData.title.trim() === '') {
+      if (!bannerData.title && bannerData.bannerType === 'custom_card') {
         throw new Error('عنوان البانر مطلوب');
       }
 
@@ -116,7 +116,7 @@ export const bannerService = {
     }
   },
 
-  // Seed sample initial banners
+  // Seed default banners (including exact app default banners & rare medicines banner)
   async seedInitialBanners(): Promise<void> {
     try {
       const sampleBanners: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -137,34 +137,52 @@ export const bannerService = {
           sortOrder: 1,
         },
         {
-          title: 'خدمات التمريض المنزلي',
-          titleEn: 'Home Nursing Services',
-          subtitle: 'رعاية تمريضية شاملة بالساعة أو اليوم',
-          subtitleEn: 'Comprehensive hourly or daily nursing care',
-          badgeText: 'متاح 24/7',
-          badgeTextEn: 'Available 24/7',
+          title: 'ابحث عن دواك بسهولة',
+          titleEn: 'Find your medicine easily',
+          subtitle: 'جد الأدوية والمستلزمات الطبية في أقرب الصيدليات بلمسة واحدة',
+          subtitleEn: 'Locate medicines in nearby pharmacies with a single touch',
+          badgeText: 'تحديد الموقع',
+          badgeTextEn: 'Medicine Locator',
           imageUrl: 'https://cdn-icons-png.flaticon.com/512/2874/2874780.png',
-          primaryColor: '#10B981',
-          backgroundColor: '#ECFDF5',
+          bannerType: 'custom_card',
+          primaryColor: '#3478F6',
+          backgroundColor: '#EBF3FF',
           actionType: 'none',
           actionTarget: '',
           isActive: true,
           sortOrder: 2,
         },
         {
-          title: 'عروض وتخفيضات أسبوعية',
-          titleEn: 'Weekly Deals & Offers',
-          subtitle: 'خصومات تصل حتى 30% على المستلزمات الطبية',
-          subtitleEn: 'Discounts up to 30% on medical supplies',
-          badgeText: 'خصم حقيقي',
-          badgeTextEn: 'Exclusive Discount',
+          title: 'عروض حصرية يومية',
+          titleEn: 'Exclusive Daily Deals',
+          subtitle: 'خصومات رائعة على المستلزمات الطبية والمنتجات الأكثر طلباً',
+          subtitleEn: 'Great discounts on medical supplies and products',
+          badgeText: 'عروض خاصة',
+          badgeTextEn: 'Special Deals',
           imageUrl: 'https://cdn-icons-png.flaticon.com/512/1043/1043444.png',
+          bannerType: 'custom_card',
+          primaryColor: '#10B981',
+          backgroundColor: '#ECFDF5',
+          actionType: 'none',
+          actionTarget: '',
+          isActive: true,
+          sortOrder: 3,
+        },
+        {
+          title: 'خدمات التمريض المنزلي',
+          titleEn: 'Home Nursing Care',
+          subtitle: 'رعاية تمريضية شاملة بالساعة أو اليوم على مدار 24 ساعة',
+          subtitleEn: 'Comprehensive 24/7 home nursing visits',
+          badgeText: 'متاح 24/7',
+          badgeTextEn: 'Available 24/7',
+          imageUrl: 'https://cdn-icons-png.flaticon.com/512/3209/3209028.png',
+          bannerType: 'custom_card',
           primaryColor: '#8B5CF6',
           backgroundColor: '#F5F3FF',
           actionType: 'none',
           actionTarget: '',
           isActive: true,
-          sortOrder: 3,
+          sortOrder: 4,
         },
       ];
 
