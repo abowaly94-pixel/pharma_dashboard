@@ -16,7 +16,12 @@ import {
   XCircle,
   Layers,
   Layout,
-  Maximize2
+  Maximize2,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Move
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -69,6 +74,26 @@ export default function AdminBanners() {
   const [imageRotation, setImageRotation] = useState<number>(0);
   const [imageOffsetX, setImageOffsetX] = useState<number>(0);
   const [imageOffsetY, setImageOffsetY] = useState<number>(0);
+
+  // Mouse Drag / Pan handlers for live interactive framing
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!formData.imageUrl) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - imageOffsetX, y: e.clientY - imageOffsetY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setImageOffsetX(Math.round(e.clientX - dragStart.x));
+    setImageOffsetY(Math.round(e.clientY - dragStart.y));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   const [formData, setFormData] = useState({
     title: '',
@@ -546,403 +571,447 @@ export default function AdminBanners() {
 
         {/* Add / Edit Dialog with 2 Banner Options (Full Image vs Custom Card) */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto font-cairo" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                {editingBanner ? (
-                  <>
-                    <Edit className="w-5 h-5 text-primary" />
-                    تعديل البانر الإعلاني
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5 text-primary" />
-                    إضافة بانر إعلاني جديد
-                  </>
-                )}
+          <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto font-cairo" dir="rtl">
+            <DialogHeader className="border-b border-border pb-3">
+              <DialogTitle className="text-xl font-bold text-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {editingBanner ? (
+                    <>
+                      <Edit className="w-5 h-5 text-primary" />
+                      تعديل البانر الإعلاني
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5 text-primary" />
+                      إضافة بانر إعلاني جديد
+                    </>
+                  )}
+                </span>
+                <Badge variant="outline" className="text-xs font-mono font-normal">
+                  {formData.bannerType === 'image_only' ? '🖼️ صورة كاملة' : '🎨 تصميم مخصص'}
+                </Badge>
               </DialogTitle>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-              {/* BANNER MODE SELECTOR SWITCH */}
-              <div className="space-y-2">
-                <Label className="font-bold text-sm text-foreground flex items-center gap-2">
-                  <Layout className="w-4 h-4 text-primary" />
-                  اختر طريقة عرض البانر في التطبيق
-                </Label>
-                <div className="grid grid-cols-2 gap-3 p-1.5 bg-muted/60 rounded-xl border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, bannerType: 'image_only' })}
-                    className={`py-3 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                      formData.bannerType === 'image_only'
-                        ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/30'
-                        : 'text-muted-foreground hover:bg-background/80'
-                    }`}
-                  >
-                    <ImageIcon className="w-4.5 h-4.5" />
-                    🖼️ صورة كاملة (تغطي البانر بالكامل)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, bannerType: 'custom_card' })}
-                    className={`py-3 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                      formData.bannerType === 'custom_card'
-                        ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/30'
-                        : 'text-muted-foreground hover:bg-background/80'
-                    }`}
-                  >
-                    <Layers className="w-4.5 h-4.5" />
-                    🎨 تصميم مخصص (عنوان وشارات وألوان)
-                  </button>
-                </div>
-              </div>
-
-              {/* LIVE MOBILE PREVIEW FRAME */}
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  📱 المعاينة الحية في تطبيق الهاتف
-                </Label>
-
-                {formData.bannerType === 'image_only' ? (
-                  /* FULL IMAGE BANNER PREVIEW */
-                  <div className="h-[180px] w-full rounded-2xl overflow-hidden border border-border shadow-md relative bg-slate-900 flex items-center justify-center">
-                    {formData.imageUrl ? (
-                      <img
-                        src={getBannerIllustration(formData.imageUrl)}
-                        alt="Full Banner Preview"
-                        className="w-full h-full object-cover transition-transform duration-150"
-                        style={{
-                          transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
-                        }}
-                      />
-                    ) : (
-                      <div className="text-center p-6 text-slate-400 space-y-2">
-                        <ImageIcon className="w-10 h-10 mx-auto opacity-50" />
-                        <p className="text-xs font-bold">يرجى رفع أو إضافة رابط الصورة الإعلانية الكاملة بالأسفل</p>
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-md backdrop-blur-xs">
-                      صورة كاملة Full Image
+            <form onSubmit={handleSubmit} className="mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* RIGHT COLUMN (7/12): FORM FIELDS & INPUTS */}
+                <div className="lg:col-span-7 space-y-5">
+                  
+                  {/* 1. Mode Selector Switch */}
+                  <div className="space-y-2">
+                    <Label className="font-bold text-sm text-foreground flex items-center gap-2">
+                      <Layout className="w-4 h-4 text-primary" />
+                      1. اختر طريقة عرض البانر في التطبيق
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3 p-1.5 bg-muted/60 rounded-xl border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, bannerType: 'image_only' })}
+                        className={`py-3 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                          formData.bannerType === 'image_only'
+                            ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/30'
+                            : 'text-muted-foreground hover:bg-background/80'
+                        }`}
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        🖼️ صورة كاملة (تغطية)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, bannerType: 'custom_card' })}
+                        className={`py-3 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                          formData.bannerType === 'custom_card'
+                            ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/30'
+                            : 'text-muted-foreground hover:bg-background/80'
+                        }`}
+                      >
+                        <Layers className="w-4 h-4" />
+                        🎨 كارت مخصص (نصوص وشارة)
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  /* CUSTOM CARD PREVIEW */
-                  <div
-                    className="p-5 rounded-2xl relative overflow-hidden border border-border shadow-md transition-all min-h-[170px] flex flex-col justify-between"
-                    style={{ backgroundColor: formData.backgroundColor }}
-                  >
-                    {/* Decorative Circles */}
-                    <div
-                      className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-10"
-                      style={{ backgroundColor: formData.primaryColor }}
-                    />
-                    <div
-                      className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full opacity-15"
-                      style={{ backgroundColor: formData.primaryColor }}
-                    />
 
-                    {/* Badge */}
-                    <div className="z-10 flex justify-start">
-                      <span
-                        className="px-3 py-1 rounded-full text-xs font-bold shadow-xs"
-                        style={{
-                          backgroundColor: `${formData.primaryColor}20`,
-                          color: formData.primaryColor,
-                          border: `1px solid ${formData.primaryColor}30`,
-                        }}
+                  {/* 2. Image Source Uploader */}
+                  <div className="space-y-3 bg-muted/30 p-3.5 rounded-xl border border-border">
+                    <Label className="font-bold text-xs text-foreground flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                      2. صورة البانر *
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground mb-1 block">رفع من الجهاز</Label>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={isUploading}
+                          className="text-xs h-9"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground mb-1 block">أو رابط مباشر URL</Label>
+                        <Input
+                          type="text"
+                          value={formData.imageUrl}
+                          onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                          placeholder="https://..."
+                          className="text-xs h-9"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Text Fields */}
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="title" className="font-bold text-xs">
+                        {formData.bannerType === 'image_only'
+                          ? 'عنوان مرجعي للبانر (للإدارة)'
+                          : 'العنوان الرئيسي (بالعربي) *'}
+                      </Label>
+                      <Input
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        placeholder={
+                          formData.bannerType === 'image_only'
+                            ? 'مثال: إعلان عروض الصيف'
+                            : 'مثال: الدوا مش موجود؟ إحنا نجيبهولك'
+                        }
+                        required={formData.bannerType === 'custom_card'}
+                        className="text-sm"
+                      />
+                    </div>
+
+                    {formData.bannerType === 'custom_card' && (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="titleEn" className="text-xs">العنوان (بالإنجليزي)</Label>
+                            <Input
+                              id="titleEn"
+                              value={formData.titleEn}
+                              onChange={(e) => setFormData({ ...formData, titleEn: e.target.value })}
+                              placeholder="e.g. Medicine unavailable?"
+                              className="text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="subtitle" className="text-xs">الوصف الفرعي (بالعربي)</Label>
+                            <Input
+                              id="subtitle"
+                              value={formData.subtitle}
+                              onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                              placeholder="مثال: مش هتلف على صيدليات تاني"
+                              className="text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="badgeText" className="text-xs">نص الشارة (بالعربي)</Label>
+                            <Input
+                              id="badgeText"
+                              value={formData.badgeText}
+                              onChange={(e) => setFormData({ ...formData, badgeText: e.target.value })}
+                              placeholder="مثال: أدوية نادرة"
+                              className="text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="badgeTextEn" className="text-xs">نص الشارة (بالإنجليزي)</Label>
+                            <Input
+                              id="badgeTextEn"
+                              value={formData.badgeTextEn}
+                              onChange={(e) => setFormData({ ...formData, badgeTextEn: e.target.value })}
+                              placeholder="e.g. Rare Medicines"
+                              className="text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Color Presets */}
+                        <div className="space-y-2 pt-1">
+                          <Label className="text-xs font-bold">ألوان البانر السريعة</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {COLOR_PRESETS.map((preset) => (
+                              <button
+                                key={preset.name}
+                                type="button"
+                                onClick={() =>
+                                  setFormData({
+                                    ...formData,
+                                    primaryColor: preset.primary,
+                                    backgroundColor: preset.bg,
+                                  })
+                                }
+                                className="px-2.5 py-1 rounded-md border text-[11px] font-bold flex items-center gap-1.5 transition-transform hover:scale-105"
+                                style={{
+                                  backgroundColor: preset.bg,
+                                  borderColor: preset.primary,
+                                  color: preset.primary,
+                                }}
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-white"
+                                  style={{ backgroundColor: preset.primary }}
+                                />
+                                {preset.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 4. Order & Active Switch */}
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                    <div className="space-y-1">
+                      <Label htmlFor="sortOrder" className="text-xs font-bold">ترتيب الظهور</Label>
+                      <Input
+                        id="sortOrder"
+                        type="number"
+                        min="1"
+                        value={formData.sortOrder}
+                        onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 1 })}
+                        className="text-xs h-9 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold">حالة البانر</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={formData.isActive ? 'default' : 'outline'}
+                        onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
+                        className="w-full justify-center gap-1.5 font-bold h-9 text-xs"
                       >
-                        {formData.badgeText || 'شارة الترويج'}
+                        {formData.isActive ? (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            مفعل ومتاح
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                            مخفي
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* LEFT COLUMN (5/12): STICKY LIVE INTERACTIVE PREVIEW & IMAGE POSITIONING STUDIO */}
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="sticky top-0 space-y-3 bg-muted/20 p-4 rounded-2xl border border-border">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                        📱 المعاينة الحية والتأطير التفاعلي
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        {imageZoom !== 1 || imageRotation !== 0 || imageOffsetX !== 0 || imageOffsetY !== 0 ? 'مُعدل' : 'افتراضي'}
                       </span>
                     </div>
 
-                    {/* Content & Image */}
-                    <div className="flex justify-between items-center gap-4 z-10 mt-3">
-                      <div className="space-y-1 flex-1">
-                        <h3 className="font-bold text-slate-800 text-lg leading-snug">
-                          {formData.title || 'عنوان البانر الرئيسي'}
-                        </h3>
-                        <p className="text-slate-600 text-xs leading-relaxed">
-                          {formData.subtitle || 'الوصف الفرعي المعروض أسفل العنوان'}
-                        </p>
-                      </div>
-
-                      {/* Image with Interactive Zoom Transformation */}
-                      {formData.imageUrl && (
-                        <div className="w-24 h-24 flex-shrink-0 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-xs p-1.5 border border-white/50 shadow-sm overflow-hidden relative">
+                    {/* INTERACTIVE DRAG-TO-POSITION CANVAS */}
+                    <div
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
+                      className={`relative w-full rounded-2xl overflow-hidden border-2 shadow-lg transition-colors select-none ${
+                        isDragging ? 'border-primary cursor-grabbing' : 'border-border cursor-grab hover:border-primary/50'
+                      }`}
+                      style={{
+                        height: '180px',
+                        backgroundColor: formData.bannerType === 'custom_card' ? formData.backgroundColor : '#0f172a',
+                      }}
+                    >
+                      {formData.bannerType === 'image_only' ? (
+                        /* FULL IMAGE PREVIEW */
+                        formData.imageUrl ? (
                           <img
                             src={getBannerIllustration(formData.imageUrl)}
-                            alt="Banner Preview"
-                            className="w-full h-full object-contain transition-transform duration-150"
+                            alt="Full Banner Preview"
+                            draggable={false}
+                            className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
                             style={{
                               transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
                             }}
                           />
+                        ) : (
+                          <div className="text-center p-6 text-slate-400 space-y-2 pointer-events-none">
+                            <ImageIcon className="w-10 h-10 mx-auto opacity-50" />
+                            <p className="text-xs font-bold">يرجى رفع أو إضافة رابط الصورة الإعلانية الكاملة</p>
+                          </div>
+                        )
+                      ) : (
+                        /* CUSTOM CARD PREVIEW */
+                        <div className="p-4 w-full h-full relative flex flex-col justify-between pointer-events-none">
+                          <div
+                            className="absolute -top-10 -right-10 w-36 h-36 rounded-full opacity-10"
+                            style={{ backgroundColor: formData.primaryColor }}
+                          />
+                          <div className="z-10 flex justify-start">
+                            <span
+                              className="px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs"
+                              style={{
+                                backgroundColor: `${formData.primaryColor}20`,
+                                color: formData.primaryColor,
+                                border: `1px solid ${formData.primaryColor}30`,
+                              }}
+                            >
+                              {formData.badgeText || 'شارة الترويج'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center gap-3 z-10">
+                            <div className="space-y-0.5 flex-1">
+                              <h3 className="font-bold text-slate-800 text-sm leading-snug">
+                                {formData.title || 'عنوان البانر الرئيسي'}
+                              </h3>
+                              <p className="text-slate-600 text-[10px] leading-relaxed">
+                                {formData.subtitle || 'الوصف الفرعي المعروض أسفل العنوان'}
+                              </p>
+                            </div>
+                            {formData.imageUrl && (
+                              <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center rounded-xl bg-white/70 p-1 border border-white/50 shadow-xs overflow-hidden relative">
+                                <img
+                                  src={getBannerIllustration(formData.imageUrl)}
+                                  alt="Banner Preview"
+                                  draggable={false}
+                                  className="w-full h-full object-contain pointer-events-none transition-transform duration-75"
+                                  style={{
+                                    transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Drag Indicator Overlay */}
+                      {formData.imageUrl && (
+                        <div className="absolute bottom-2 left-2 z-20 bg-black/70 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 pointer-events-none">
+                          <Move className="w-3 h-3 text-primary animate-pulse" />
+                          اسحب بالماوس لتحريك الصورة
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* IMAGE UPLOAD & CONTROLS */}
-              <div className="space-y-3 bg-muted/40 p-4 rounded-xl border border-border">
-                <Label className="font-bold flex items-center gap-2">
-                  <ImageIcon className="w-4.5 h-4.5 text-primary" />
-                  {formData.bannerType === 'image_only'
-                    ? 'رفع صورة البانر الإعلاني الكاملة *'
-                    : 'صورة التوضيح الخاصة بالبانر المخصص'}
-                </Label>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">رفع صورة من الجهاز</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={isUploading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">أو رابط صورة مباشر (URL)</Label>
-                    <Input
-                      type="text"
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                      placeholder="https://example.com/banner.png"
-                    />
-                  </div>
-                </div>
-
-                {/* ZOOM / ROTATION / POSITION CONTROLS */}
-                {formData.imageUrl && (
-                  <div className="pt-3 border-t border-border/60 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">
-                        🎯 التحكم التام في موضع ومقياس وزاوية الصورة:
-                      </span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setImageZoom(1);
-                          setImageRotation(0);
-                          setImageOffsetX(0);
-                          setImageOffsetY(0);
-                        }}
-                        className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 ml-1" />
-                        إعادة الضبط
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {/* Zoom & Rotation Controls */}
-                      <div className="flex items-center gap-2 bg-background p-2 rounded-lg border border-border">
-                        <span className="text-xs font-bold text-muted-foreground w-16">التكبير:</span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setImageZoom((z) => Math.min(z + 0.15, 3.5))}
-                          className="h-8 w-8 p-0"
-                          title="تكبير"
-                        >
-                          <ZoomIn className="w-4 h-4 text-primary" />
-                        </Button>
-                        <span className="text-xs font-mono font-bold min-w-[42px] text-center">
-                          {Math.round(imageZoom * 100)}%
-                        </span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setImageZoom((z) => Math.max(z - 0.15, 0.4))}
-                          className="h-8 w-8 p-0"
-                          title="تصغير"
-                        >
-                          <ZoomOut className="w-4 h-4 text-primary" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setImageRotation((r) => (r + 90) % 360)}
-                          className="h-8 px-2 text-xs font-bold gap-1 ml-auto"
-                        >
-                          <RotateCw className="w-3.5 h-3.5" />
-                          {imageRotation}°
-                        </Button>
-                      </div>
-
-                      {/* X & Y Position Offset Controls */}
-                      <div className="flex items-center gap-3 bg-background p-2 rounded-lg border border-border">
-                        <span className="text-xs font-bold text-muted-foreground w-16">الموقع X/Y:</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground font-mono">X:</span>
-                          <Input
-                            type="number"
-                            value={imageOffsetX}
-                            onChange={(e) => setImageOffsetX(Number(e.target.value) || 0)}
-                            className="h-8 w-16 text-xs text-center font-mono p-1"
+                    {/* CONTROLS STUDIO */}
+                    {formData.imageUrl && (
+                      <div className="space-y-3 bg-background p-3 rounded-xl border border-border">
+                        {/* Zoom Slider */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span className="flex items-center gap-1">
+                              <ZoomIn className="w-3.5 h-3.5 text-primary" />
+                              التكبير (Zoom):
+                            </span>
+                            <span className="font-mono text-primary text-xs">{Math.round(imageZoom * 100)}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.4"
+                            max="3.0"
+                            step="0.05"
+                            value={imageZoom}
+                            onChange={(e) => setImageZoom(parseFloat(e.target.value))}
+                            className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                           />
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground font-mono">Y:</span>
-                          <Input
-                            type="number"
-                            value={imageOffsetY}
-                            onChange={(e) => setImageOffsetY(Number(e.target.value) || 0)}
-                            className="h-8 w-16 text-xs text-center font-mono p-1"
-                          />
+
+                        {/* Directional Nudge Pad + Rotation + Reset */}
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setImageOffsetY((y) => y - 5)}
+                              className="h-7 w-7 p-0"
+                              title="تحريك لأعلى"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setImageOffsetY((y) => y + 5)}
+                              className="h-7 w-7 p-0"
+                              title="تحريك لأسفل"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setImageOffsetX((x) => x - 5)}
+                              className="h-7 w-7 p-0"
+                              title="تحريك لليسار"
+                            >
+                              <ArrowLeft className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setImageOffsetX((x) => x + 5)}
+                              className="h-7 w-7 p-0"
+                              title="تحريك لليمين"
+                            >
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setImageRotation((r) => (r + 90) % 360)}
+                              className="h-7 px-2 text-[11px] font-bold gap-1"
+                              title="تدوير 90 درجة"
+                            >
+                              <RotateCw className="w-3 h-3" />
+                              {imageRotation}°
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setImageZoom(1);
+                                setImageRotation(0);
+                                setImageOffsetX(0);
+                                setImageOffsetY(0);
+                              }}
+                              className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                              title="إعادة الضبط"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Title Input (Required for custom_card, optional description for image_only) */}
-              <div className="space-y-2">
-                <Label htmlFor="title" className="font-bold">
-                  {formData.bannerType === 'image_only'
-                    ? 'اسم / توضيح البانر (مرجعي للإدارة)'
-                    : 'العنوان الرئيسي (بالعربي) *'}
-                </Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder={
-                    formData.bannerType === 'image_only'
-                      ? 'مثال: إعلان عروض الصيف'
-                      : 'مثال: الدوا مش موجود؟ إحنا نجيبهولك'
-                  }
-                  required={formData.bannerType === 'custom_card'}
-                />
-              </div>
-
-              {/* CONDITIONAL TEXT FIELDS FOR CUSTOM CARD MODE */}
-              {formData.bannerType === 'custom_card' && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="titleEn">العنوان الرئيسي (بالإنجليزي)</Label>
-                      <Input
-                        id="titleEn"
-                        value={formData.titleEn}
-                        onChange={(e) => setFormData({ ...formData, titleEn: e.target.value })}
-                        placeholder="e.g. Medicine unavailable? We will find it"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="subtitle">الوصف الفرعي (بالعربي)</Label>
-                      <Input
-                        id="subtitle"
-                        value={formData.subtitle}
-                        onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-                        placeholder="مثال: مش هتلف على صيدليات تاني"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="badgeText">نص الشارة (بالعربي)</Label>
-                      <Input
-                        id="badgeText"
-                        value={formData.badgeText}
-                        onChange={(e) => setFormData({ ...formData, badgeText: e.target.value })}
-                        placeholder="مثال: أدوية نادرة"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="badgeTextEn">نص الشارة (بالإنجليزي)</Label>
-                      <Input
-                        id="badgeTextEn"
-                        value={formData.badgeTextEn}
-                        onChange={(e) => setFormData({ ...formData, badgeTextEn: e.target.value })}
-                        placeholder="e.g. Rare Medicines"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Colors Presets & Picker */}
-                  <div className="space-y-3">
-                    <Label className="font-bold">ألوان كارت البانر</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {COLOR_PRESETS.map((preset) => (
-                        <button
-                          key={preset.name}
-                          type="button"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              primaryColor: preset.primary,
-                              backgroundColor: preset.bg,
-                            })
-                          }
-                          className="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-2 transition-transform hover:scale-105"
-                          style={{
-                            backgroundColor: preset.bg,
-                            borderColor: preset.primary,
-                            color: preset.primary,
-                          }}
-                        >
-                          <span
-                            className="w-3 h-3 rounded-full border border-white"
-                            style={{ backgroundColor: preset.primary }}
-                          />
-                          {preset.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Order & Status */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sortOrder">ترتيب الظهور</Label>
-                  <Input
-                    id="sortOrder"
-                    type="number"
-                    min="1"
-                    value={formData.sortOrder}
-                    onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>تفعيل البانر</Label>
-                  <Button
-                    type="button"
-                    variant={formData.isActive ? 'default' : 'outline'}
-                    onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                    className="w-full justify-center gap-2 font-bold h-10"
-                  >
-                    {formData.isActive ? (
-                      <>
-                        <CheckCircle className="w-4 h-4" />
-                        مفعل ومتاح للمستخدمين
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-4 h-4 text-muted-foreground" />
-                        غير مفعل (مخفي)
-                      </>
                     )}
-                  </Button>
+
+                  </div>
                 </div>
+
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <div className="flex justify-end gap-3 pt-4 mt-6 border-t border-border">
                 <Button
                   type="button"
                   variant="outline"
@@ -953,7 +1022,7 @@ export default function AdminBanners() {
                 <Button
                   type="submit"
                   disabled={isUploading}
-                  className="gradient-primary text-primary-foreground font-bold px-6 shadow-md"
+                  className="gradient-primary text-primary-foreground font-bold px-8 shadow-md"
                 >
                   {editingBanner ? 'حفظ التعديلات' : 'إضافة البانر الآن'}
                 </Button>
