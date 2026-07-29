@@ -20,6 +20,8 @@ import {
   Clock,
   User,
   ShieldCheck,
+  ExternalLink,
+  Compass,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -37,6 +39,7 @@ import { toast } from 'sonner';
 import { SafeImage } from '@/components/ui/safe-image';
 import { nursingService } from '@/services/nursingService';
 import { Nurse, NursingService, NursingBooking } from '@/types';
+import { MapLocationPicker } from '@/components/maps/MapLocationPicker';
 
 export default function AdminNursingServices() {
   const [activeTab, setActiveTab] = useState<'nurses' | 'services' | 'bookings'>('nurses');
@@ -75,6 +78,10 @@ export default function AdminNursingServices() {
     isVerified: true,
     serviceIds: [] as string[],
     aboutAr: '',
+    latitude: 30.0444,
+    longitude: 31.2357,
+    coverageAreas: ['الشيخ زايد', '6 أكتوبر'] as string[],
+    coverageRadiusKm: 10,
   });
 
   // Dialog States - Services
@@ -139,6 +146,10 @@ export default function AdminNursingServices() {
         isVerified: nurse.isVerified ?? true,
         serviceIds: nurse.serviceIds || [],
         aboutAr: nurse.aboutAr || '',
+        latitude: nurse.latitude || 30.0444,
+        longitude: nurse.longitude || 31.2357,
+        coverageAreas: nurse.coverageAreas || ['الشيخ زايد', '6 أكتوبر'],
+        coverageRadiusKm: nurse.coverageRadiusKm || 10,
       });
     } else {
       setEditingNurse(null);
@@ -163,6 +174,10 @@ export default function AdminNursingServices() {
         isVerified: true,
         serviceIds: services.map((s) => s.id),
         aboutAr: '',
+        latitude: 30.0444,
+        longitude: 31.2357,
+        coverageAreas: ['الشيخ زايد', '6 أكتوبر'],
+        coverageRadiusKm: 10,
       });
     }
     setIsNurseDialogOpen(true);
@@ -563,6 +578,25 @@ export default function AdminNursingServices() {
                         </div>
                       </div>
 
+                      {/* Coverage Areas */}
+                      {nurse.coverageAreas && nurse.coverageAreas.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1 font-cairo">
+                            <Compass className="w-3 h-3 text-emerald-600" /> مناطق التغطية ({nurse.coverageRadiusKm || 10} كم):
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {nurse.coverageAreas.map((area) => (
+                              <span
+                                key={area}
+                                className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-cairo border border-emerald-200"
+                              >
+                                {area}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Services badges */}
                       <div className="flex flex-wrap gap-1 mb-4">
                         {nurse.serviceIds.map((sid) => {
@@ -712,7 +746,28 @@ export default function AdminNursingServices() {
                           <p className="font-medium text-indigo-600">{b.nurseName}</p>
                           {b.serviceTitleAr && <p className="text-xs text-gray-400">{b.serviceTitleAr}</p>}
                         </td>
-                        <td className="p-4 text-xs text-gray-600 max-w-xs truncate">{b.address}</td>
+                        <td className="p-4 text-xs text-gray-600 max-w-xs">
+                          <p className="font-medium text-slate-800 line-clamp-2">{b.address || 'لم يحدد عنوان نصي'}</p>
+                          {b.latitude && b.longitude ? (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 transition-all"
+                            >
+                              <ExternalLink className="w-3 h-3" /> فتح موقع المريض بالخريطة 📍
+                            </a>
+                          ) : (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address || '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-1 text-[11px] text-slate-500 hover:text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200"
+                            >
+                              <ExternalLink className="w-3 h-3" /> بحث في الخريطة 🗺️
+                            </a>
+                          )}
+                        </td>
                         <td className="p-4 text-xs">
                           {b.isImmediate ? (
                             <Badge className="bg-red-50 text-red-600 border-red-200">زيارة فورية ⚡</Badge>
@@ -892,6 +947,29 @@ export default function AdminNursingServices() {
                   onChange={(e) => setNurseForm({ ...nurseForm, aboutAr: e.target.value })}
                   placeholder="خبرة طويلة في تركيب المحاليل والرعاية المنزلية..."
                   rows={2}
+                />
+              </div>
+
+              {/* Map Location & Coverage Areas Picker */}
+              <div className="space-y-2 pt-2 border-t border-gray-200">
+                <Label className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-emerald-600" /> موقع الممرض على خريطة القمر الصناعي ومناطق التغطية 🛰️
+                </Label>
+                <MapLocationPicker
+                  latitude={nurseForm.latitude}
+                  longitude={nurseForm.longitude}
+                  coverageAreas={nurseForm.coverageAreas}
+                  coverageRadiusKm={nurseForm.coverageRadiusKm}
+                  onChange={(locData) => {
+                    setNurseForm((prev) => ({
+                      ...prev,
+                      latitude: locData.latitude,
+                      longitude: locData.longitude,
+                      coverageAreas: locData.coverageAreas,
+                      coverageRadiusKm: locData.coverageRadiusKm,
+                      locationAr: locData.locationAr || prev.locationAr,
+                    }));
+                  }}
                 />
               </div>
 

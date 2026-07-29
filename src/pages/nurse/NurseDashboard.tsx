@@ -15,6 +15,7 @@ import {
   Upload,
   ShieldCheck,
   ClipboardList,
+  ExternalLink,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +28,7 @@ import { toast } from 'sonner';
 import { SafeImage } from '@/components/ui/safe-image';
 import { nursingService } from '@/services/nursingService';
 import { Nurse, NursingBooking } from '@/types';
+import { MapLocationPicker } from '@/components/maps/MapLocationPicker';
 
 export default function NurseDashboard() {
   const { user } = useAuth();
@@ -46,6 +48,10 @@ export default function NurseDashboard() {
     aboutAr: '',
     experienceYears: 5,
     avatarUrl: '',
+    latitude: 30.0444,
+    longitude: 31.2357,
+    coverageAreas: ['الشيخ زايد', '6 أكتوبر'] as string[],
+    coverageRadiusKm: 10,
   });
 
   const fetchData = async () => {
@@ -68,6 +74,10 @@ export default function NurseDashboard() {
           aboutAr: currentNurse.aboutAr,
           experienceYears: currentNurse.experienceYears,
           avatarUrl: currentNurse.avatarUrl,
+          latitude: currentNurse.latitude || 30.0444,
+          longitude: currentNurse.longitude || 31.2357,
+          coverageAreas: currentNurse.coverageAreas || ['الشيخ زايد', '6 أكتوبر'],
+          coverageRadiusKm: currentNurse.coverageRadiusKm || 10,
         });
 
         // Fetch bookings for this nurse
@@ -323,6 +333,25 @@ export default function NurseDashboard() {
                         <div>
                           <span className="font-bold">العنوان:</span>
                           <p className="text-gray-600 mt-0.5">{b.address}</p>
+                          {b.latitude && b.longitude ? (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 transition-all shadow-xs"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" /> فتح موقع المريض بالخريطة مباشرة 📍
+                            </a>
+                          ) : (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address || '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-1 text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200"
+                            >
+                              <ExternalLink className="w-3 h-3" /> فتح في خرائط جوجل 🗺️
+                            </a>
+                          )}
                         </div>
                       </div>
 
@@ -523,6 +552,29 @@ export default function NurseDashboard() {
                   value={profileForm.aboutAr}
                   onChange={(e) => setProfileForm({ ...profileForm, aboutAr: e.target.value })}
                   rows={3}
+                />
+              </div>
+
+              {/* Map Location & Coverage Areas Picker */}
+              <div className="space-y-2 pt-3 border-t border-gray-200">
+                <Label className="text-sm font-bold text-slate-900 flex items-center gap-1.5 font-cairo">
+                  <MapPin className="w-4 h-4 text-emerald-600" /> موقعك على خريطة القمر الصناعي ومناطق تغطيتك 🛰️
+                </Label>
+                <MapLocationPicker
+                  latitude={profileForm.latitude}
+                  longitude={profileForm.longitude}
+                  coverageAreas={profileForm.coverageAreas}
+                  coverageRadiusKm={profileForm.coverageRadiusKm}
+                  onChange={(locData) => {
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      latitude: locData.latitude,
+                      longitude: locData.longitude,
+                      coverageAreas: locData.coverageAreas,
+                      coverageRadiusKm: locData.coverageRadiusKm,
+                      locationAr: locData.locationAr || prev.locationAr,
+                    }));
+                  }}
                 />
               </div>
 

@@ -439,6 +439,10 @@ export interface Nurse {
   isVerified: boolean;
   serviceIds: string[];
   aboutAr: string;
+  latitude?: number;
+  longitude?: number;
+  coverageAreas?: string[];
+  coverageRadiusKm?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -461,6 +465,8 @@ export interface NursingBooking {
   scheduledTime?: string;
   price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  latitude?: number;
+  longitude?: number;
   createdAt: Date;
   updatedAt?: Date;
 }
