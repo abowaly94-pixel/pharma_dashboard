@@ -28,15 +28,15 @@ export function SafeImage({
 }: SafeImageProps) {
   const [hasError, setHasError] = useState(false);
   
-  // التحقق من أن الـ URL ليس data URL أو نص غير صالي
-  const isDataUrl = src?.startsWith('data:');
-  const isValidUrl = Boolean(src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:')));
-  const shouldShowPlaceholder = !src || isDataUrl || !isValidUrl || hasError;
+  // التحقق من أن الـ URL صالح (يدعم HTTP, HTTPS, Paths, Blobs, و Data URIs للصور)
+  const isDataUrl = Boolean(src?.startsWith('data:image/'));
+  const isValidUrl = Boolean(src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:') || isDataUrl));
+  const shouldShowPlaceholder = !src || !isValidUrl || hasError;
 
   if (shouldShowPlaceholder) {
     return (
       <ImagePlaceholder 
-        message={showFallbackText ? (isDataUrl ? 'الصور المحلية غير مسموحة' : fallbackMessage) : ''}
+        message={showFallbackText ? fallbackMessage : ''}
         className={cn('w-full h-full overflow-hidden shrink-0', containerClassName, className)}
         showUploadIcon={!src && !isAvatar}
         isAvatar={isAvatar}

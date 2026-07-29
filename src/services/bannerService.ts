@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Banner } from '@/types';
+import { getBannerIllustration } from '@/assets/bannerIllustrations';
 
 const BANNERS_COLLECTION = 'banners';
 
@@ -31,6 +32,9 @@ export const bannerService = {
 
       return snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
+        const rawUrl = data.imageUrl || '';
+        const resolvedUrl = getBannerIllustration(rawUrl);
+
         return {
           id: docSnap.id,
           title: data.title || '',
@@ -39,7 +43,7 @@ export const bannerService = {
           subtitleEn: data.subtitleEn || '',
           badgeText: data.badgeText || '',
           badgeTextEn: data.badgeTextEn || '',
-          imageUrl: data.imageUrl || '',
+          imageUrl: resolvedUrl,
           bannerType: data.bannerType || 'custom_card',
           primaryColor: data.primaryColor || '#3478F6',
           backgroundColor: data.backgroundColor || '#EBF3FF',
@@ -116,7 +120,7 @@ export const bannerService = {
     }
   },
 
-  // Seed default banners using exact app SVG images transferred to dashboard (/banners/*.svg)
+  // Seed default banners using exact app SVG images transferred to dashboard
   async seedInitialBanners(): Promise<void> {
     try {
       const sampleBanners: Omit<Banner, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -127,7 +131,7 @@ export const bannerService = {
           subtitleEn: 'No need to search multiple pharmacies',
           badgeText: 'أدوية نادرة',
           badgeTextEn: 'Rare Medicines',
-          imageUrl: '/banners/medicine_amico.svg',
+          imageUrl: getBannerIllustration('medicine_amico'),
           bannerType: 'custom_card',
           primaryColor: '#3478F6',
           backgroundColor: '#EBF3FF',
@@ -143,7 +147,7 @@ export const bannerService = {
           subtitleEn: 'Locate medicines in nearby pharmacies with a single touch',
           badgeText: 'تحديد الموقع',
           badgeTextEn: 'Medicine Locator',
-          imageUrl: '/banners/medicine_bro.svg',
+          imageUrl: getBannerIllustration('medicine_bro'),
           bannerType: 'custom_card',
           primaryColor: '#3478F6',
           backgroundColor: '#EBF3FF',
@@ -159,7 +163,7 @@ export const bannerService = {
           subtitleEn: 'Great discounts on medical supplies and products',
           badgeText: 'عروض خاصة',
           badgeTextEn: 'Special Deals',
-          imageUrl: '/banners/public_health.svg',
+          imageUrl: getBannerIllustration('public_health'),
           bannerType: 'custom_card',
           primaryColor: '#10B981',
           backgroundColor: '#ECFDF5',
@@ -175,7 +179,7 @@ export const bannerService = {
           subtitleEn: 'Comprehensive 24/7 home delivery visits',
           badgeText: 'متاح 24/7',
           badgeTextEn: 'Available 24/7',
-          imageUrl: '/banners/on_boarding.svg',
+          imageUrl: getBannerIllustration('on_boarding'),
           bannerType: 'custom_card',
           primaryColor: '#8B5CF6',
           backgroundColor: '#F5F3FF',

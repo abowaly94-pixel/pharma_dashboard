@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { uploadImageToSupabase } from '@/lib/supabase';
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
-import { SafeImage } from '@/components/ui/safe-image';
+import { getBannerIllustration } from '@/assets/bannerIllustrations';
 
 const COLOR_PRESETS = [
   { name: 'أزرق (سحابة الصيدلية)', primary: '#3478F6', bg: '#EBF3FF' },
@@ -341,8 +341,8 @@ export default function AdminBanners() {
                 {/* Check Banner Mode: Full Image vs Custom Card */}
                 {banner.bannerType === 'image_only' || (!banner.subtitle && banner.imageUrl) ? (
                   <div className="relative h-[180px] w-full bg-slate-900 overflow-hidden flex items-center justify-center">
-                    <SafeImage
-                      src={banner.imageUrl}
+                    <img
+                      src={getBannerIllustration(banner.imageUrl)}
                       alt={banner.title}
                       className="w-full h-full object-cover"
                     />
@@ -429,8 +429,8 @@ export default function AdminBanners() {
                       </div>
                       {banner.imageUrl && (
                         <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-xs p-1 border border-white/40 shadow-xs overflow-hidden">
-                          <SafeImage
-                            src={banner.imageUrl}
+                          <img
+                            src={getBannerIllustration(banner.imageUrl)}
                             alt={banner.title}
                             className="w-full h-full object-contain"
                           />
@@ -553,7 +553,7 @@ export default function AdminBanners() {
                   <div className="h-[180px] w-full rounded-2xl overflow-hidden border border-border shadow-md relative bg-slate-900 flex items-center justify-center">
                     {formData.imageUrl ? (
                       <img
-                        src={formData.imageUrl}
+                        src={getBannerIllustration(formData.imageUrl)}
                         alt="Full Banner Preview"
                         className="w-full h-full object-cover transition-transform duration-150"
                         style={{
@@ -615,7 +615,7 @@ export default function AdminBanners() {
                       {formData.imageUrl && (
                         <div className="w-24 h-24 flex-shrink-0 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-xs p-1.5 border border-white/50 shadow-sm overflow-hidden relative">
                           <img
-                            src={formData.imageUrl}
+                            src={getBannerIllustration(formData.imageUrl)}
                             alt="Banner Preview"
                             className="w-full h-full object-contain transition-transform duration-150"
                             style={{
