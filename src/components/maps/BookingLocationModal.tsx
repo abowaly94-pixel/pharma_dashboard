@@ -52,24 +52,14 @@ export const BookingLocationModal: React.FC<BookingLocationModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl font-cairo p-0 overflow-hidden rounded-3xl" dir="rtl">
-        <DialogHeader className="p-6 bg-slate-900 text-white flex flex-row items-center justify-between border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <DialogTitle className="text-xl font-bold font-cairo flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-400" />
-                موقع زيارة المريض: {booking.userName}
-              </DialogTitle>
-              <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
-                {mapType === 'satellite' ? 'خريطة قمر صناعي تفاعلية 🛰️' : 'خريطة شوارع تفاعلية 🗺️'}
-              </Badge>
-            </div>
-            <DialogDescription className="text-slate-400 text-xs mt-1 font-cairo">
-              {booking.address || 'موقع جغرافي محدد بالدقة'}
-            </DialogDescription>
-          </div>
+        <DialogHeader className="px-6 py-4 bg-slate-900 text-white flex flex-row items-center justify-between border-b border-slate-800">
+          <DialogTitle className="text-lg font-bold font-cairo flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-emerald-400" />
+            موقع زيارة المريض: {booking.userName}
+          </DialogTitle>
         </DialogHeader>
 
-        {/* Interactive Satellite / Street Map */}
+        {/* Clean Interactive Map */}
         <div className="relative w-full h-[420px]">
           <MapContainer
             center={[lat, lng]}
@@ -80,14 +70,12 @@ export const BookingLocationModal: React.FC<BookingLocationModalProps> = ({
             <MapInvalidateSize />
             {mapType === 'satellite' ? (
               <>
-                {/* Esri World Imagery (Satellite Tiles) with maxNativeZoom to prevent tile missing errors */}
                 <TileLayer
                   url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                  attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+                  attribution="&copy; Esri"
                   maxZoom={20}
                   maxNativeZoom={18}
                 />
-                {/* Esri Transportation Labels Overlay for Streets & Labels */}
                 <TileLayer
                   url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
                   maxZoom={20}
@@ -96,7 +84,7 @@ export const BookingLocationModal: React.FC<BookingLocationModalProps> = ({
               </>
             ) : (
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution='&copy; OpenStreetMap'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 maxZoom={20}
                 maxNativeZoom={19}
@@ -107,39 +95,30 @@ export const BookingLocationModal: React.FC<BookingLocationModalProps> = ({
               <Popup className="font-cairo">
                 <div className="text-center p-1 font-cairo">
                   <p className="font-bold text-slate-900 text-sm">{booking.userName}</p>
-                  <p className="text-xs text-slate-600 mt-1">{booking.userPhone}</p>
-                  <div className="text-[11px] text-slate-500 mt-0.5 font-mono" dir="ltr">
-                    {lat.toFixed(5)}, {lng.toFixed(5)}
-                  </div>
+                  {booking.userPhone && <p className="text-xs text-slate-600 mt-1">{booking.userPhone}</p>}
                 </div>
               </Popup>
             </Marker>
           </MapContainer>
 
-          {/* Map Type Toggle */}
-          <div className="absolute top-4 left-4 z-[1000]">
+          {/* Clean Map Type Toggle */}
+          <div className="absolute top-3 left-3 z-[1000]">
             <Button
               type="button"
               size="sm"
               onClick={() => setMapType(mapType === 'satellite' ? 'street' : 'satellite')}
-              className="bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/50 shadow-md text-xs font-cairo gap-1.5"
+              className="bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md border border-slate-700/50 shadow-md text-xs font-cairo"
             >
-              {mapType === 'satellite' ? '🗺️ خريطة الشوارع' : '🛰️ قمر صناعي'}
+              {mapType === 'satellite' ? '🗺️ شوارع' : '🛰️ قمر صناعي'}
             </Button>
-          </div>
-
-          {/* Floating badge for coordinates */}
-          <div className="absolute top-4 right-4 z-[1000] bg-slate-900/90 backdrop-blur-md text-white px-3.5 py-2 rounded-xl border border-slate-700/50 shadow-lg text-xs flex items-center gap-2">
-            <Satellite className="w-4 h-4 text-emerald-400" />
-            <span className="font-mono text-[11px]" dir="ltr">{lat.toFixed(5)}, {lng.toFixed(5)}</span>
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {/* Simplified Footer Actions */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4">
           <div className="text-xs text-slate-600 flex items-center gap-1.5 overflow-hidden">
             <Navigation className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="font-medium truncate">العنوان: {booking.address}</span>
+            <span className="font-medium truncate">{booking.address || 'موقع جغرافي محدد بالدقة'}</span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -149,7 +128,7 @@ export const BookingLocationModal: React.FC<BookingLocationModalProps> = ({
             <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
               <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-cairo text-xs gap-1.5">
                 <ExternalLink className="w-4 h-4" />
-                فتح في تطبيق خرائط جوجل 📍
+                فتح في خرائط جوجل 📍
               </Button>
             </a>
           </div>
