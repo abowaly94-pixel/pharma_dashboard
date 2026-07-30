@@ -16,8 +16,10 @@ import {
   ShieldCheck,
   ClipboardList,
   ExternalLink,
+  Eye,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { BookingLocationModal } from '@/components/maps/BookingLocationModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +36,7 @@ export default function NurseDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'bookings' | 'schedule' | 'profile'>('bookings');
   const [bookings, setBookings] = useState<NursingBooking[]>([]);
+  const [selectedLocationBooking, setSelectedLocationBooking] = useState<NursingBooking | null>(null);
   const [nurseProfile, setNurseProfile] = useState<Nurse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -345,14 +348,23 @@ export default function NurseDashboard() {
                           <span className="font-bold">العنوان:</span>
                           <p className="text-gray-600 mt-0.5">{b.address}</p>
                           {b.latitude && b.longitude ? (
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 transition-all shadow-xs"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" /> فتح موقع المريض بالخريطة مباشرة 📍
-                            </a>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 transition-all shadow-xs"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" /> فتح موقع المريض بالخريطة مباشرة 📍
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLocationBooking(b)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200 transition-all shadow-xs"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-indigo-600" /> معاينة الخريطة التفاعلية 🛰️
+                              </button>
+                            </div>
                           ) : (
                             <a
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address || '')}`}
@@ -596,6 +608,12 @@ export default function NurseDashboard() {
           </div>
         )}
       </div>
+
+      <BookingLocationModal
+        booking={selectedLocationBooking}
+        isOpen={!!selectedLocationBooking}
+        onClose={() => setSelectedLocationBooking(null)}
+      />
     </DashboardLayout>
   );
 }

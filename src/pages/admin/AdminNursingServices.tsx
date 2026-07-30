@@ -22,8 +22,10 @@ import {
   ShieldCheck,
   ExternalLink,
   Compass,
+  Eye,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { BookingLocationModal } from '@/components/maps/BookingLocationModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +49,7 @@ export default function AdminNursingServices() {
   const [nurses, setNurses] = useState<Nurse[]>([]);
   const [services, setServices] = useState<NursingService[]>([]);
   const [bookings, setBookings] = useState<NursingBooking[]>([]);
+  const [selectedLocationBooking, setSelectedLocationBooking] = useState<NursingBooking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Search & Filters
@@ -762,14 +765,23 @@ export default function AdminNursingServices() {
                         <td className="p-4 text-xs text-gray-600 max-w-xs">
                           <p className="font-medium text-slate-800 line-clamp-2">{b.address || 'لم يحدد عنوان نصي'}</p>
                           {b.latitude && b.longitude ? (
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 transition-all"
-                            >
-                              <ExternalLink className="w-3 h-3" /> فتح موقع المريض بالخريطة 📍
-                            </a>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 transition-all"
+                              >
+                                <ExternalLink className="w-3 h-3" /> جوجل 📍
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLocationBooking(b)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 transition-all"
+                              >
+                                <Eye className="w-3 h-3 text-indigo-600" /> معاينة 🛰️
+                              </button>
+                            </div>
                           ) : (
                             <a
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address || '')}`}
@@ -1137,6 +1149,12 @@ export default function AdminNursingServices() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <BookingLocationModal
+          booking={selectedLocationBooking}
+          isOpen={!!selectedLocationBooking}
+          onClose={() => setSelectedLocationBooking(null)}
+        />
       </div>
     </DashboardLayout>
   );
