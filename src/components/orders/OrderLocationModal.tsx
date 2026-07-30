@@ -30,6 +30,8 @@ export const OrderLocationModal: React.FC<OrderLocationModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [mapType, setMapType] = React.useState<'satellite' | 'street'>('satellite');
+
   const patientPinIcon = useMemo(
     () =>
       new L.Icon({
@@ -64,7 +66,7 @@ export const OrderLocationModal: React.FC<OrderLocationModalProps> = ({
                 موقع توصيل الطلب #{order.orderId?.slice(-8)} ({userName})
               </DialogTitle>
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
-                خريطة قمر صناعي تفاعلية 🛰️
+                {mapType === 'satellite' ? 'خريطة قمر صناعي تفاعلية 🛰️' : 'خريطة شوارع تفاعلية 🗺️'}
               </Badge>
             </div>
             <DialogDescription className="text-slate-400 text-xs mt-1 font-cairo">
@@ -73,7 +75,7 @@ export const OrderLocationModal: React.FC<OrderLocationModalProps> = ({
           </div>
         </DialogHeader>
 
-        {/* Interactive Satellite Map */}
+        {/* Interactive Satellite / Street Map */}
         <div className="relative w-full h-[420px]">
           <MapContainer
             center={[lat, lng]}
@@ -82,35 +84,60 @@ export const OrderLocationModal: React.FC<OrderLocationModalProps> = ({
             scrollWheelZoom={true}
           >
             <MapInvalidateSize />
-            {/* Esri World Imagery (Satellite Tiles) */}
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-              maxZoom={19}
-            />
-            {/* Esri Transportation Labels Overlay for Streets & Labels */}
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={19}
-            />
+            {mapType === 'satellite' ? (
+              <>
+                {/* Esri World Imagery (Satellite Tiles) with maxNativeZoom to prevent tile missing errors */}
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+                  maxZoom={20}
+                  maxNativeZoom={18}
+                />
+                {/* Esri Transportation Labels Overlay for Streets & Labels */}
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+                  maxZoom={20}
+                  maxNativeZoom={18}
+                />
+              </>
+            ) : (
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={20}
+                maxNativeZoom={19}
+              />
+            )}
 
             <Marker position={[lat, lng]} icon={patientPinIcon}>
               <Popup className="font-cairo">
                 <div className="text-center p-1 font-cairo">
                   <p className="font-bold text-slate-900 text-sm">{userName}</p>
                   <p className="text-xs text-slate-600 mt-1">{userPhone}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 dir-ltr font-mono">
+                  <div className="text-[11px] text-slate-500 mt-0.5 font-mono" dir="ltr">
                     {lat.toFixed(5)}, {lng.toFixed(5)}
-                  </p>
+                  </div>
                 </div>
               </Popup>
             </Marker>
           </MapContainer>
 
+          {/* Map Type Toggle */}
+          <div className="absolute top-4 left-4 z-[1000]">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setMapType(mapType === 'satellite' ? 'street' : 'satellite')}
+              className="bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/50 shadow-md text-xs font-cairo gap-1.5"
+            >
+              {mapType === 'satellite' ? '🗺️ خريطة الشوارع' : '🛰️ قمر صناعي'}
+            </Button>
+          </div>
+
           {/* Floating badge for coordinates */}
           <div className="absolute top-4 right-4 z-[1000] bg-slate-900/90 backdrop-blur-md text-white px-3.5 py-2 rounded-xl border border-slate-700/50 shadow-lg text-xs flex items-center gap-2">
             <Satellite className="w-4 h-4 text-emerald-400" />
-            <span className="font-mono text-[11px] dir-ltr">{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+            <span className="font-mono text-[11px]" dir="ltr">{lat.toFixed(5)}, {lng.toFixed(5)}</span>
           </div>
         </div>
 
