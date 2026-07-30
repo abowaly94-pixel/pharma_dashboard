@@ -124,38 +124,41 @@ export function useOrders(pharmacyId?: number, options?: { enabled?: boolean; is
 
         console.log('useOrders - Pharmacy view, filtering for pharmacyId:', pharmacyId);
 
-        // Filter orders for specific pharmacy - only show orders with items from this pharmacy
+        // Filter orders for specific pharmacy - only show orders with items from this pharmacy or matching order pharmacyId
         ordersList = ordersList.filter(order => {
+          const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
+          const orderPharmId = typeof order.pharmacyId === 'string' ? parseInt(order.pharmacyId, 10) : order.pharmacyId;
+
+          if (orderPharmId === targetIdNum) return true;
+
           return order.cartItem.some(
             (item: CartItem) => {
               const itemPharmacyId = item.medicineEntity?.pharmacyId;
               const itemIdNum = typeof itemPharmacyId === 'string' ? parseInt(itemPharmacyId, 10) : itemPharmacyId;
-              const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
               return itemIdNum === targetIdNum;
             }
           );
         }).map(order => {
-          // Filter cart items to show only this pharmacy's items
+          const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
+          const orderPharmId = typeof order.pharmacyId === 'string' ? parseInt(order.pharmacyId, 10) : order.pharmacyId;
+
           const filteredCartItems = order.cartItem.filter(
             (item: CartItem) => {
-              const itemPharmacyId = item.medicineEntity?.pharmacyId;
+              const itemPharmacyId = item.medicineEntity?.pharmacyId ?? orderPharmId;
               const itemIdNum = typeof itemPharmacyId === 'string' ? parseInt(itemPharmacyId, 10) : itemPharmacyId;
-              const targetIdNum = typeof pharmacyId === 'string' ? parseInt(pharmacyId, 10) : pharmacyId;
-              return itemIdNum === targetIdNum;
+              return itemIdNum === targetIdNum || orderPharmId === targetIdNum;
             }
           );
 
-          // Recalculate totals for this pharmacy's items only
           const pharmacySubtotal = filteredCartItems.reduce(
-            (sum, item) => sum + (item.medicineEntity.price * item.count), 0
+            (sum, item) => sum + ((item.medicineEntity?.price || 0) * item.count), 0
           );
 
           return {
             ...order,
-            cartItem: filteredCartItems,
-            subtotal: pharmacySubtotal,
-            // Calculate total for this pharmacy's items only
-            totalAmount: pharmacySubtotal + order.deliveryFee
+            cartItem: filteredCartItems.length > 0 ? filteredCartItems : order.cartItem,
+            subtotal: pharmacySubtotal > 0 ? pharmacySubtotal : order.subtotal,
+            totalAmount: (pharmacySubtotal > 0 ? pharmacySubtotal : order.subtotal) + (order.deliveryFee || 0)
           };
         });
 
