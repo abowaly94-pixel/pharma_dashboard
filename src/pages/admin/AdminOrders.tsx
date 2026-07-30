@@ -281,22 +281,25 @@ export default function AdminOrders() {
 
         {/* Order Details Dialog */}
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogContent 
+            className="w-[94vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl font-cairo" 
+            dir="rtl"
+          >
             <DialogHeader>
-              <DialogTitle className="font-cairo text-xl">
+              <DialogTitle className="font-cairo text-lg sm:text-xl">
                 تفاصيل الطلب #{selectedOrder?.orderId?.slice(-8) ?? ''}
               </DialogTitle>
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
                 {/* Status Update */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 bg-muted rounded-lg">
                   <span className="font-cairo font-medium">حالة الطلب:</span>
                   <Select
                     value={selectedOrder.orderStatus}
                     onValueChange={(value) => handleStatusChange(selectedOrder.id, value as Order['orderStatus'])}
                   >
-                    <SelectTrigger className="w-48 font-cairo">
+                    <SelectTrigger className="w-full sm:w-48 font-cairo">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
