@@ -12,6 +12,7 @@ import {
   FileText,
   ReceiptText,
   ExternalLink,
+  MapPin,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { OrderLocationModal } from '@/components/orders/OrderLocationModal';
@@ -239,7 +240,25 @@ export default function AdminOrders() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-2 justify-end">
+                          <div className="flex flex-wrap gap-2 justify-end items-center">
+                            {(() => {
+                              const lat = order.latitude ?? order.shippingAddressEntity?.latitude;
+                              const lng = order.longitude ?? order.shippingAddressEntity?.longitude;
+                              if (lat && lng) {
+                                return (
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="فتح موقع المريض بالخريطة مباشرة"
+                                    className="inline-flex items-center justify-center p-2 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors border border-emerald-200"
+                                  >
+                                    <MapPin className="w-4 h-4" />
+                                  </a>
+                                );
+                              }
+                              return null;
+                            })()}
                             <Button
                               variant="outline"
                               size="sm"
