@@ -143,6 +143,8 @@ export interface ShippingAddress {
   address: string;
   city: string;
   apartmentNumber: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Order {
@@ -164,6 +166,8 @@ export interface Order {
   createdAt: Date;
   updatedAt: Date;
   pharmacyId?: number;
+  latitude?: number;
+  longitude?: number;
   reviews?: Review[];
 }
 

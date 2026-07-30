@@ -12,9 +12,11 @@ import {
   FileText,
   ReceiptText,
   ShoppingBag,
-  TrendingUp
+  TrendingUp,
+  ExternalLink,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { OrderLocationModal } from '@/components/orders/OrderLocationModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -59,6 +61,7 @@ export default function PharmacistOrders() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedLocationOrder, setSelectedLocationOrder] = useState<Order | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<{
     type: 'prescription' | 'payment';
     url: string;
@@ -377,6 +380,32 @@ export default function PharmacistOrders() {
                       <p><span className="text-muted-foreground">المدينة:</span> {selectedOrder.shippingAddressEntity.city}</p>
                       <p><span className="text-muted-foreground">العنوان:</span> {selectedOrder.shippingAddressEntity.address}</p>
                       <p><span className="text-muted-foreground">الشقة:</span> {selectedOrder.shippingAddressEntity.apartmentNumber}</p>
+                      {(() => {
+                        const lat = selectedOrder.latitude ?? selectedOrder.shippingAddressEntity?.latitude;
+                        const lng = selectedOrder.longitude ?? selectedOrder.shippingAddressEntity?.longitude;
+                        if (lat && lng) {
+                          return (
+                            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 transition-all shadow-xs"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" /> فتح موقع المريض بالخريطة مباشرة 📍
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLocationOrder(selectedOrder)}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200 transition-all shadow-xs"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-indigo-600" /> معاينة الخريطة التفاعلية 🛰️
+                              </button>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -577,6 +606,12 @@ export default function PharmacistOrders() {
       <AttachmentPreview
         preview={attachmentPreview}
         onClose={() => setAttachmentPreview(null)}
+      />
+
+      <OrderLocationModal
+        order={selectedLocationOrder}
+        isOpen={!!selectedLocationOrder}
+        onClose={() => setSelectedLocationOrder(null)}
       />
     </DashboardLayout>
   );
