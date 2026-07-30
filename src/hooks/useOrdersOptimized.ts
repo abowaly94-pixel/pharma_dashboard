@@ -85,6 +85,16 @@ export function useOrdersOptimized(pharmacyId?: number, options?: { enabled?: bo
               deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
               subtotal: typeof data.subtotal === 'number' ? data.subtotal : 0,
               totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : 0,
+              latitude: typeof data.latitude === 'number'
+                ? data.latitude
+                : (typeof data.shippingAddressEntity?.latitude === 'number'
+                  ? data.shippingAddressEntity.latitude
+                  : undefined),
+              longitude: typeof data.longitude === 'number'
+                ? data.longitude
+                : (typeof data.shippingAddressEntity?.longitude === 'number'
+                  ? data.shippingAddressEntity.longitude
+                  : undefined),
               shippingAddressEntity: {
                 namee: data.shippingAddressEntity?.namee || 'عميل غير معروف',
                 email: data.shippingAddressEntity?.email || '',
@@ -92,6 +102,12 @@ export function useOrdersOptimized(pharmacyId?: number, options?: { enabled?: bo
                 address: data.shippingAddressEntity?.address || '',
                 city: data.shippingAddressEntity?.city || '',
                 apartmentNumber: data.shippingAddressEntity?.apartmentNumber || '',
+                latitude: typeof data.shippingAddressEntity?.latitude === 'number'
+                  ? data.shippingAddressEntity.latitude
+                  : (typeof data.latitude === 'number' ? data.latitude : undefined),
+                longitude: typeof data.shippingAddressEntity?.longitude === 'number'
+                  ? data.shippingAddressEntity.longitude
+                  : (typeof data.longitude === 'number' ? data.longitude : undefined),
               },
               senderWalletPhone: data.senderWalletPhone || '',
               pharmacyWalletNumber: data.pharmacyWalletNumber || null,

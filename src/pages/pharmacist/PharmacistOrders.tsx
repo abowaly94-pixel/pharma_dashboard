@@ -423,7 +423,21 @@ export default function PharmacistOrders() {
                             </div>
                           );
                         }
-                        return null;
+                        const searchAddr = encodeURIComponent(
+                          `${selectedOrder.shippingAddressEntity?.address || ''} ${selectedOrder.shippingAddressEntity?.city || ''}`
+                        );
+                        return (
+                          <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${searchAddr}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 transition-all shadow-xs"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" /> البحث عن العنوان في الخريطة 🗺️
+                            </a>
+                          </div>
+                        );
                       })()}
                     </div>
                   </div>
