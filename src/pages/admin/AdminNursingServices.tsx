@@ -23,7 +23,32 @@ import {
   ExternalLink,
   Compass,
   Eye,
+  Droplets,
+  Activity,
 } from 'lucide-react';
+
+const renderServiceIcon = (iconName: string, className = "w-5 h-5") => {
+  switch (iconName) {
+    case 'water_drop':
+    case 'iv_drips':
+      return <Droplets className={className} />;
+    case 'healing':
+    case 'wound_care':
+      return <ShieldCheck className={className} />;
+    case 'monitor_heart':
+    case 'vital_signs':
+      return <Activity className={className} />;
+    case 'elderly':
+    case 'elderly_care':
+      return <UserCheck className={className} />;
+    case 'clock':
+      return <Clock className={className} />;
+    case 'vaccines':
+    case 'injections':
+    default:
+      return <HeartPulse className={className} />;
+  }
+};
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { BookingLocationModal } from '@/components/maps/BookingLocationModal';
 import { Button } from '@/components/ui/button';
@@ -233,6 +258,17 @@ export default function AdminNursingServices() {
       return;
     }
 
+    if (accountForm.createAccount) {
+      if (!accountForm.email.trim() || !accountForm.email.includes('@')) {
+        toast.error('يرجى إدخال بريد إلكتروني صحيح لحساب الدخول');
+        return;
+      }
+      if (!editingNurse && accountForm.password.trim().length < 6) {
+        toast.error('كلمة المرور يجب أن تكون 6 أحرف أو أكثر');
+        return;
+      }
+    }
+
     try {
       let nurseId = editingNurse?.id;
       if (editingNurse) {
@@ -243,18 +279,18 @@ export default function AdminNursingServices() {
         toast.success('تم إضافة الممرض بنجاح');
       }
 
-      if (accountForm.createAccount && accountForm.email.trim() && accountForm.password.trim() && nurseId) {
+      if (accountForm.createAccount && accountForm.email.trim() && nurseId) {
         try {
           await nursingService.createNurseAccount(
             nurseId,
             accountForm.email.trim(),
-            accountForm.password.trim(),
+            accountForm.password.trim() || '12345678',
             nurseForm.name.trim(),
             nurseForm.avatarUrl
           );
-          toast.success('تم إنشاء حساب الدخول للممرض بنجاح! 🔑');
+          toast.success('تم إنشاء / تحديث حساب الدخول للممرض بنجاح! 🔑');
         } catch (accErr: any) {
-          toast.error(`فشل إنشاء حساب الدخول: ${accErr.message || 'خطأ'}`);
+          toast.error(`ملاحظة الحساب: ${accErr.message || 'فشل تفعيل حساب الدخول'}`);
         }
       }
 
@@ -269,6 +305,7 @@ export default function AdminNursingServices() {
     if (window.confirm('هل أنت متأكد من حذف هذا الممرض؟')) {
       try {
         await nursingService.deleteNurse(id);
+        setNurses((prev) => prev.filter((n) => n.id !== id));
         toast.success('تم حذف الممرض بنجاح');
         fetchData();
       } catch (error) {
@@ -343,6 +380,7 @@ export default function AdminNursingServices() {
     if (window.confirm('هل أنت متأكد من حذف هذه الخدمة؟')) {
       try {
         await nursingService.deleteService(id);
+        setServices((prev) => prev.filter((s) => s.id !== id));
         toast.success('تم حذف الخدمة بنجاح');
         fetchData();
       } catch (error) {
@@ -354,19 +392,21 @@ export default function AdminNursingServices() {
   // Booking Status Handler
   const handleUpdateBookingStatus = async (id: string, status: NursingBooking['status']) => {
     try {
+      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
       await nursingService.updateBookingStatus(id, status);
       toast.success('تم تحديث حالة طلب الزيارة');
       fetchData();
     } catch (error) {
       toast.error('فشل تحديث حالة الطلب');
+      fetchData();
     }
   };
 
   const filteredNurses = nurses.filter(
     (n) =>
-      n.name.toLowerCase().includes(nurseSearch.toLowerCase()) ||
-      n.titleAr.toLowerCase().includes(nurseSearch.toLowerCase()) ||
-      n.locationAr.toLowerCase().includes(nurseSearch.toLowerCase())
+      (n.name || '').toLowerCase().includes(nurseSearch.toLowerCase()) ||
+      (n.titleAr || '').toLowerCase().includes(nurseSearch.toLowerCase()) ||
+      (n.locationAr || '').toLowerCase().includes(nurseSearch.toLowerCase())
   );
 
   const filteredBookings = bookings.filter((b) => {
@@ -615,7 +655,7 @@ export default function AdminNursingServices() {
 
                       {/* Services badges */}
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {nurse.serviceIds.map((sid) => {
+                        {(nurse.serviceIds || []).map((sid) => {
                           const sObj = services.find((s) => s.id === sid);
                           return (
                             <Badge key={sid} variant="secondary" className="text-[10px] font-cairo">
@@ -663,52 +703,62 @@ export default function AdminNursingServices() {
 
         {/* Tab 2: Services List */}
         {activeTab === 'services' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {services.map((service) => (
-              <div
-                key={service.id}
-                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
-                      style={{ backgroundColor: service.accentColorHex || '#3638DA' }}
-                    >
-                      <HeartPulse className="w-5 h-5" />
+          services.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-2xl border border-gray-100 font-cairo shadow-sm">
+              <HeartPulse className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-600 mb-4 font-semibold">لا توجد خدمات تمريض مضافة حالياً</p>
+              <Button onClick={() => handleOpenServiceDialog()} className="gradient-primary text-white text-xs">
+                <Plus className="w-4 h-4 ml-1" /> إضافة خدمة تمريض جديدة
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {services.map((service) => (
+                <div
+                  key={service.id}
+                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3 flex flex-col justify-between hover:shadow-md transition-shadow"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-sm"
+                        style={{ backgroundColor: service.accentColorHex || '#3638DA' }}
+                      >
+                        {renderServiceIcon(service.icon)}
+                      </div>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        تبدأ من {service.startingPrice} ج.م
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      تبدأ من {service.startingPrice} ج.م
-                    </Badge>
+
+                    <h3 className="font-bold text-gray-900 font-cairo text-lg">{service.titleAr}</h3>
+                    <p className="text-xs text-gray-400 font-mono mb-2">{service.titleEn}</p>
+                    <p className="text-xs text-gray-600 font-cairo leading-relaxed">{service.descriptionAr}</p>
                   </div>
 
-                  <h3 className="font-bold text-gray-900 font-cairo text-lg">{service.titleAr}</h3>
-                  <p className="text-xs text-gray-400 font-mono mb-2">{service.titleEn}</p>
-                  <p className="text-xs text-gray-600 font-cairo leading-relaxed">{service.descriptionAr}</p>
+                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 font-cairo text-xs"
+                      onClick={() => handleOpenServiceDialog(service)}
+                    >
+                      <Edit className="w-3.5 h-3.5 ml-1" />
+                      تعديل الخدمة
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600"
+                      onClick={() => handleDeleteService(service.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 font-cairo text-xs"
-                    onClick={() => handleOpenServiceDialog(service)}
-                  >
-                    <Edit className="w-3.5 h-3.5 ml-1" />
-                    تعديل الخدمة
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-500 hover:text-red-600"
-                    onClick={() => handleDeleteService(service.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* Tab 3: Bookings List */}
@@ -1115,6 +1165,22 @@ export default function AdminNursingServices() {
                   rows={2}
                   dir="ltr"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>أيقونة الخدمة</Label>
+                <select
+                  value={serviceForm.icon}
+                  onChange={(e) => setServiceForm({ ...serviceForm, icon: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-gray-200 bg-white text-sm font-cairo focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="vaccines">💉 إعطاء الحقن (حقن ومطعومات)</option>
+                  <option value="water_drop">💧 تركيب المحاليل (مغذيات وتغذية وريدية)</option>
+                  <option value="healing">🩹 الغيار على الجروح (حروق وقدم سكري)</option>
+                  <option value="monitor_heart">🫀 قياس الضغط والسكر (علامات حيوية)</option>
+                  <option value="elderly">👴 تمريض كبار السن (رعاية خاصة)</option>
+                  <option value="clock">⏰ تمريض بالشيفت / الساعة</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

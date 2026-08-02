@@ -153,11 +153,18 @@ export const nursingService = {
   // Seed initial data if Firestore is empty
   async seedInitialDataIfNeeded(): Promise<void> {
     try {
+      const metaRef = doc(db, 'system_metadata', 'nursing_seeded');
+      const metaSnap = await getDoc(metaRef);
+      if (metaSnap.exists()) {
+        return; // Seeded previously; do not re-seed even if collections are emptied by deletion
+      }
+
       const servicesSnap = await getDocs(collection(db, SERVICES_COLLECTION));
       if (servicesSnap.empty) {
         for (const s of DEFAULT_SERVICES) {
-          await setDoc(doc(db, SERVICES_COLLECTION, s.id), {
-            ...s,
+          const { id, ...dataToSave } = s as any;
+          await setDoc(doc(db, SERVICES_COLLECTION, id), {
+            ...dataToSave,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           });
@@ -167,13 +174,16 @@ export const nursingService = {
       const nursesSnap = await getDocs(collection(db, NURSES_COLLECTION));
       if (nursesSnap.empty) {
         for (const n of DEFAULT_NURSES) {
-          await setDoc(doc(db, NURSES_COLLECTION, n.id), {
-            ...n,
+          const { id, ...dataToSave } = n as any;
+          await setDoc(doc(db, NURSES_COLLECTION, id), {
+            ...dataToSave,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           });
         }
       }
+
+      await setDoc(metaRef, { seededAt: Timestamp.now() });
     } catch (err) {
       console.error('Error seeding nursing initial data:', err);
     }
@@ -183,14 +193,25 @@ export const nursingService = {
   async getAllServices(): Promise<NursingService[]> {
     try {
       await this.seedInitialDataIfNeeded();
-      const q = query(collection(db, SERVICES_COLLECTION), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as NursingService[];
+      let snapshot;
+      try {
+        const q = query(collection(db, SERVICES_COLLECTION), orderBy('createdAt', 'desc'));
+        snapshot = await getDocs(q);
+      } catch (qErr) {
+        snapshot = await getDocs(collection(db, SERVICES_COLLECTION));
+      }
+
+      return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        let cDate = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : undefined);
+        let uDate = data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : undefined);
+        return {
+          ...data,
+          id: docSnap.id, // Always override with actual Firestore doc.id
+          createdAt: cDate,
+          updatedAt: uDate,
+        };
+      }) as NursingService[];
     } catch (error) {
       console.error('Error fetching nursing services:', error);
       return DEFAULT_SERVICES as NursingService[];
@@ -199,8 +220,9 @@ export const nursingService = {
 
   async addService(serviceData: Omit<NursingService, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      const { id, ...dataToSave } = serviceData as any;
       const docRef = await addDoc(collection(db, SERVICES_COLLECTION), {
-        ...serviceData,
+        ...dataToSave,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
@@ -213,9 +235,10 @@ export const nursingService = {
 
   async updateService(id: string, serviceData: Partial<NursingService>): Promise<void> {
     try {
+      const { id: _, ...dataToSave } = serviceData as any;
       const ref = doc(db, SERVICES_COLLECTION, id);
       await updateDoc(ref, {
-        ...serviceData,
+        ...dataToSave,
         updatedAt: Timestamp.now(),
       });
     } catch (error) {
@@ -238,14 +261,25 @@ export const nursingService = {
   async getAllNurses(): Promise<Nurse[]> {
     try {
       await this.seedInitialDataIfNeeded();
-      const q = query(collection(db, NURSES_COLLECTION), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as Nurse[];
+      let snapshot;
+      try {
+        const q = query(collection(db, NURSES_COLLECTION), orderBy('createdAt', 'desc'));
+        snapshot = await getDocs(q);
+      } catch (qErr) {
+        snapshot = await getDocs(collection(db, NURSES_COLLECTION));
+      }
+
+      return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        let cDate = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : undefined);
+        let uDate = data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : undefined);
+        return {
+          ...data,
+          id: docSnap.id, // Always override with actual Firestore doc.id
+          createdAt: cDate,
+          updatedAt: uDate,
+        };
+      }) as Nurse[];
     } catch (error) {
       console.error('Error fetching nurses:', error);
       return DEFAULT_NURSES as Nurse[];
@@ -254,8 +288,9 @@ export const nursingService = {
 
   async addNurse(nurseData: Omit<Nurse, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      const { id, ...dataToSave } = nurseData as any;
       const docRef = await addDoc(collection(db, NURSES_COLLECTION), {
-        ...nurseData,
+        ...dataToSave,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
@@ -268,9 +303,10 @@ export const nursingService = {
 
   async updateNurse(id: string, nurseData: Partial<Nurse>): Promise<void> {
     try {
+      const { id: _, ...dataToSave } = nurseData as any;
       const ref = doc(db, NURSES_COLLECTION, id);
       await updateDoc(ref, {
-        ...nurseData,
+        ...dataToSave,
         updatedAt: Timestamp.now(),
       });
     } catch (error) {
